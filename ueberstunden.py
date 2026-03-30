@@ -1,3 +1,6 @@
+"""
+Überstundenrechner Pro - Ein Tool zur Erfassung und Berechnung von Arbeitsstunden.
+"""
 import calendar
 import csv
 import getpass
@@ -9,7 +12,6 @@ import shutil
 import sqlite3
 import subprocess
 import sys
-import webbrowser
 from dataclasses import dataclass
 from datetime import datetime
 
@@ -20,6 +22,7 @@ if getattr(sys, 'frozen', False):
         BASE_DIR = os.path.abspath(os.path.join(sys.executable, '..', '..', '..', '..'))
     else:
         BASE_DIR = os.path.dirname(sys.executable)
+    # pylint: disable=protected-access
     BUNDLE_DIR = sys._MEIPASS if hasattr(sys, '_MEIPASS') else BASE_DIR
     # Matplotlib Font-Cache in einen persistenten Ordner leiten,
     # sonst wird er bei jedem Start neu gebaut → starke Verzögerung.
@@ -28,6 +31,7 @@ else:
     BASE_DIR = os.path.dirname(os.path.abspath(__file__))
     BUNDLE_DIR = BASE_DIR
 
+# pylint: disable=wrong-import-position
 import matplotlib
 matplotlib.use('QtAgg')
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg
@@ -65,6 +69,9 @@ BUNDESLAENDER = {
 # --- DATENKLASSEN ---
 @dataclass
 class WorkEntry:
+    """
+    Repräsentiert einen einzelnen Arbeitseintrag.
+    """
     id: int
     date: str
     start: str
@@ -76,6 +83,9 @@ class WorkEntry:
 
 # --- FEIERTAGS-RECHNER (DEUTSCHLAND) ---
 def get_holidays(year, state):
+    """
+    Berechnet die gesetzlichen Feiertage für ein gegebenes Jahr und Bundesland.
+    """
     a = year % 19
     b = year // 100
     c = year % 100
@@ -104,14 +114,21 @@ def get_holidays(year, state):
         f"{year}-12-26": "2. Weihnachtstag",
     }
 
-    if state in ["BW", "BY", "ST"]: holidays[f"{year}-01-06"] = "Hl. Drei Könige"
-    if state in ["BE", "MV"]: holidays[f"{year}-03-08"] = "Int. Frauentag"
-    if state in ["BW", "BY", "HE", "NW", "RP", "SL"]: holidays[easter.addDays(60).toString("yyyy-MM-dd")] = "Fronleichnam"
-    if state in ["BY", "SL"]: holidays[f"{year}-08-15"] = "Mariä Himmelfahrt"
-    if state in ["TH"]: holidays[f"{year}-09-20"] = "Weltkindertag"
-    if state in ["BB", "HB", "HH", "MV", "NI", "SH", "SN", "ST", "TH"]: holidays[f"{year}-10-31"] = "Reformationstag"
-    if state in ["BW", "BY", "NW", "RP", "SL"]: holidays[f"{year}-11-01"] = "Allerheiligen"
-    if state in ["SN"]:
+    if state in ["BW", "BY", "ST"]:
+        holidays[f"{year}-01-06"] = "Hl. Drei Könige"
+    if state in ["BE", "MV"]:
+        holidays[f"{year}-03-08"] = "Int. Frauentag"
+    if state in ["BW", "HE", "NW", "RP", "SL"] or (state == "BY"):
+        holidays[easter.addDays(60).toString("yyyy-MM-dd")] = "Fronleichnam"
+    if state in ["BY", "SL"]:
+        holidays[f"{year}-08-15"] = "Mariä Himmelfahrt"
+    if state == "TH":
+        holidays[f"{year}-09-20"] = "Weltkindertag"
+    if state in ["BB", "HB", "HH", "MV", "NI", "SH", "SN", "ST", "TH"]:
+        holidays[f"{year}-10-31"] = "Reformationstag"
+    if state in ["BW", "BY", "NW", "RP", "SL"]:
+        holidays[f"{year}-11-01"] = "Allerheiligen"
+    if state == "SN":
         d = QDate(year, 11, 22)
         while d.dayOfWeek() != 3:
             d = d.addDays(-1)
@@ -120,13 +137,23 @@ def get_holidays(year, state):
     return holidays
 
 
+
 # --- DATENBANK MANAGER ---
 class DBManager:
+    """
+    Verwaltet die SQLite-Datenbankverbindung und Operationen für Arbeitseinträge.
+    """
     def __init__(self, db_path):
+        """
+        Initialisiert den DBManager und erstellt die Tabelle, falls sie nicht existiert.
+        """
         self.conn = sqlite3.connect(db_path)
         self.create_table()
 
     def create_table(self):
+        """
+        Erstellt die 'entries'-Tabelle und führt notwendige Migrationen durch.
+        """
         cursor = self.conn.cursor()
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS entries (
@@ -148,38 +175,62 @@ class DBManager:
         self.conn.commit()
 
     def load_all(self):
+        """
+        Lädt alle Arbeitseinträge aus der Datenbank, sortiert nach Datum und Startzeit.
+        """
         cursor = self.conn.cursor()
         cursor.execute("SELECT * FROM entries ORDER BY date DESC, start DESC")
         return [WorkEntry(*row) for row in cursor.fetchall()]
 
     def insert(self, entry: WorkEntry):
+        """
+        Fügt einen neuen Arbeitseintrag in die Datenbank ein.
+        """
         cursor = self.conn.cursor()
         cursor.execute("""
             INSERT INTO entries (date, start, end, pause, minutes, reason, target_minutes)
             VALUES (?, ?, ?, ?, ?, ?, ?)
-        """, (entry.date, entry.start, entry.end, entry.pause, entry.minutes, entry.reason, entry.target_minutes))
+        """, (entry.date, entry.start, entry.end, entry.pause,
+              entry.minutes, entry.reason, entry.target_minutes))
         self.conn.commit()
         entry.id = cursor.lastrowid
 
     def update(self, entry: WorkEntry):
+        """
+        Aktualisiert einen bestehenden Arbeitseintrag in der Datenbank.
+        """
         cursor = self.conn.cursor()
         cursor.execute("""
-            UPDATE entries SET date=?, start=?, end=?, pause=?, minutes=?, reason=?, target_minutes=? WHERE id=?
-        """, (entry.date, entry.start, entry.end, entry.pause, entry.minutes, entry.reason, entry.target_minutes, entry.id))
+            UPDATE entries SET date=?, start=?, end=?, pause=?, minutes=?, reason=?,
+                               target_minutes=? WHERE id=?
+        """, (entry.date, entry.start, entry.end, entry.pause, entry.minutes,
+              entry.reason, entry.target_minutes, entry.id))
         self.conn.commit()
 
     def delete(self, entry_id: int):
+        """
+        Löscht einen Arbeitseintrag anhand seiner ID.
+        """
         cursor = self.conn.cursor()
         cursor.execute("DELETE FROM entries WHERE id=?", (entry_id,))
         self.conn.commit()
 
     def get_last_entry_before(self, date_str: str):
+        """
+        Findet den zeitlich letzten Eintrag vor dem angegebenen Datum, der eine Endzeit hat.
+        """
         cursor = self.conn.cursor()
-        cursor.execute("SELECT * FROM entries WHERE date < ? AND end != '' ORDER BY date DESC, end DESC LIMIT 1", (date_str,))
+        cursor.execute("""
+            SELECT * FROM entries WHERE date < ? AND end != ''
+            ORDER BY date DESC, end DESC LIMIT 1
+        """, (date_str,))
         row = cursor.fetchone()
         return WorkEntry(*row) if row else None
 
     def close(self):
+        """
+        Schließt die Datenbankverbindung.
+        """
         self.conn.close()
 
 
@@ -208,21 +259,27 @@ def calculate_timed_entries(timed_entries, target_mins, max_mins, is_auto):
                 s = QTime.fromString(e.start, "HH:mm")
                 en = QTime.fromString(e.end, "HH:mm")
                 diff = s.secsTo(en) // 60
-                if diff < 0: diff += 24 * 60
+                if diff < 0:
+                    diff += 24 * 60
                 current_gross = diff
                 if last_end_qtime:
                     gap = last_end_qtime.secsTo(s) // 60
-                    if gap < 0: gap += 24 * 60
+                    if gap < 0:
+                        gap += 24 * 60
                     total_accumulated_gap += max(0, gap)
                 last_end_qtime = en
-            except: pass
+            except (ValueError, TypeError):
+                pass
 
         total_accumulated_gross += current_gross
 
         if is_auto:
-            if total_accumulated_gross > 9 * 60: req = 45
-            elif total_accumulated_gross > 6 * 60: req = 30
-            else: req = 0
+            if total_accumulated_gross > 9 * 60:
+                req = 45
+            elif total_accumulated_gross > 6 * 60:
+                req = 30
+            else:
+                req = 0
             current_total_pause_needed = max(0, req - total_accumulated_gap)
             current_break = max(0, current_total_pause_needed - recorded_pause_distributed)
         else:
@@ -259,26 +316,26 @@ def get_login_time():
                 ["journalctl", "-u", "systemd-logind",
                  "--grep", f"New session.*{user}",
                  "-n", "1", "--output=short-iso", "--no-pager"],
-                capture_output=True, text=True, timeout=5
+                capture_output=True, text=True, timeout=5, check=False
             )
             if r.returncode == 0 and r.stdout.strip():
                 m = re.search(r"T(\d{2}):(\d{2}):", r.stdout.strip().split("\n")[-1])
                 if m:
                     return QTime(int(m.group(1)), int(m.group(2)))
-        except Exception:
+        except (subprocess.SubprocessError, OSError):
             pass
 
         # Fallback: who
         try:
             user = getpass.getuser()
-            r = subprocess.run(["who"], capture_output=True, text=True, timeout=3)
+            r = subprocess.run(["who"], capture_output=True, text=True, timeout=3, check=False)
             if r.returncode == 0:
                 for line in r.stdout.strip().splitlines():
                     if line.startswith(user + " ") or line.startswith(user + "\t"):
                         m = re.search(r"(\d{2}:\d{2})", line)
                         if m:
                             return QTime.fromString(m.group(1), "HH:mm")
-        except Exception:
+        except (subprocess.SubprocessError, OSError):
             pass
 
     elif sys.platform == "darwin":
@@ -286,25 +343,25 @@ def get_login_time():
         try:
             user = getpass.getuser()
             r = subprocess.run(["last", "-1", user],
-                               capture_output=True, text=True, timeout=5)
+                               capture_output=True, text=True, timeout=5, check=False)
             if r.returncode == 0 and r.stdout:
                 m = re.search(r"\s(\d{1,2}:\d{2})\s", r.stdout.split("\n")[0])
                 if m:
                     return QTime.fromString(m.group(1).zfill(5), "HH:mm")
-        except Exception:
+        except (subprocess.SubprocessError, OSError):
             pass
 
         # Fallback: who
         try:
             user = getpass.getuser()
-            r = subprocess.run(["who"], capture_output=True, text=True, timeout=3)
+            r = subprocess.run(["who"], capture_output=True, text=True, timeout=3, check=False)
             if r.returncode == 0:
                 for line in r.stdout.strip().splitlines():
                     if line.startswith(user):
                         m = re.search(r"(\d{1,2}:\d{2})", line)
                         if m:
                             return QTime.fromString(m.group(1).zfill(5), "HH:mm")
-        except Exception:
+        except (subprocess.SubprocessError, OSError):
             pass
 
     elif sys.platform == "win32":
@@ -318,11 +375,11 @@ def get_login_time():
             )
             r = subprocess.run(
                 ["powershell", "-NoProfile", "-NonInteractive", "-Command", ps_cmd],
-                capture_output=True, text=True, timeout=8, **_no_win
+                capture_output=True, text=True, timeout=8, check=False, **_no_win
             )
             if r.returncode == 0 and r.stdout.strip():
                 return QTime.fromString(r.stdout.strip(), "HH:mm")
-        except Exception:
+        except (subprocess.SubprocessError, OSError):
             pass
 
     return None
@@ -330,10 +387,13 @@ def get_login_time():
 
 # --- ItemDelegate für den blauen Rahmen am heutigen Tag ---
 class HeatmapDelegate(QStyledItemDelegate):
-    def __init__(self, parent=None):
-        super().__init__(parent)
-
+    """
+    Delegate zum Zeichnen eines blauen Rahmens um den heutigen Tag in der Heatmap.
+    """
     def paint(self, painter: QPainter, option, index):
+        """
+        Zeichnet die Zelle und fügt einen Rahmen hinzu, wenn es der heutige Tag ist.
+        """
         super().paint(painter, option, index)
 
         is_today = index.data(Qt.ItemDataRole.UserRole + 1)
@@ -346,7 +406,14 @@ class HeatmapDelegate(QStyledItemDelegate):
 
 # --- DIALOGE ---
 class SettingsDialog(QDialog):
+    """
+    Dialog zum Verwalten der Benutzereinstellungen wie Standardarbeitszeiten,
+    Bundesland und Sonderarbeitstage.
+    """
     def __init__(self, current_settings, parent=None):
+        """
+        Initialisiert den Einstellungsdialog mit den aktuellen Werten.
+        """
         super().__init__(parent)
         self.setWindowTitle("Einstellungen")
         self.resize(380, 450)
@@ -380,10 +447,11 @@ class SettingsDialog(QDialog):
         time_layout = QHBoxLayout()
         self.time_start = QTimeEdit()
         self.time_start.setDisplayFormat("HH:mm")
-        self.time_start.setTime(QTime.fromString(current_settings.get("default_start", "07:00"), "HH:mm"))
+        default_start = current_settings.get("default_start", "07:00")
+        self.time_start.setTime(QTime.fromString(default_start, "HH:mm"))
         self.time_start.setEnabled(not current_settings.get("use_login_time", False))
         self.login_time_cb.stateChanged.connect(
-            lambda: self.time_start.setEnabled(not self.login_time_cb.isChecked())
+            self._on_login_time_state_changed
         )
         time_layout.addWidget(QLabel("Fallback Startzeit:"))
         time_layout.addWidget(self.time_start)
@@ -392,7 +460,8 @@ class SettingsDialog(QDialog):
         target_layout = QHBoxLayout()
         self.time_target = QTimeEdit()
         self.time_target.setDisplayFormat("HH:mm")
-        self.time_target.setTime(QTime.fromString(current_settings.get("target_work_time", "08:00"), "HH:mm"))
+        target_work_time = current_settings.get("target_work_time", "08:00")
+        self.time_target.setTime(QTime.fromString(target_work_time, "HH:mm"))
         target_layout.addWidget(QLabel("Regelarbeitszeit (Soll):"))
         target_layout.addWidget(self.time_target)
         layout.addLayout(target_layout)
@@ -423,7 +492,8 @@ class SettingsDialog(QDialog):
 
         curr_state = current_settings.get("state", "TH")
         idx = self.state_combo.findData(curr_state)
-        if idx >= 0: self.state_combo.setCurrentIndex(idx)
+        if idx >= 0:
+            self.state_combo.setCurrentIndex(idx)
 
         state_layout.addWidget(QLabel("Bundesland (für Feiertage):"))
         state_layout.addWidget(self.state_combo)
@@ -433,7 +503,9 @@ class SettingsDialog(QDialog):
         layout.addWidget(QLabel("<b>Sonder-Arbeitstage (z.B. 24.12.):</b>"))
         self.special_days_table = QTableWidget(0, 3)
         self.special_days_table.setHorizontalHeaderLabels(["Tag", "Monat", "Soll-Zeit"])
-        self.special_days_table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+        self.special_days_table.horizontalHeader().setSectionResizeMode(
+            QHeaderView.ResizeMode.Stretch
+        )
         self.special_days_table.setFixedHeight(120)
         layout.addWidget(self.special_days_table)
 
@@ -457,13 +529,23 @@ class SettingsDialog(QDialog):
         self.dark_mode_cb.setChecked(current_settings.get("dark_mode", False))
         layout.addWidget(self.dark_mode_cb)
 
-        btn_save = QPushButton("Speichern")
-        btn_save.clicked.connect(self.accept)
+        self.btn_save = QPushButton("Speichern")
+        self.btn_save.clicked.connect(self.accept)
         layout.addSpacing(15)
-        layout.addWidget(btn_save)
+        layout.addWidget(self.btn_save)
+
+    def _on_login_time_state_changed(self):
+        """
+        Aktiviert oder deaktiviert die Startzeit-Eingabe basierend auf der Login-Zeit-Option.
+        """
+        self.time_start.setEnabled(not self.login_time_cb.isChecked())
 
     def add_special_day_row(self, data=None):
-        if not isinstance(data, dict): data = None # Handle QPushButton click
+        """
+        Fügt eine Zeile für einen Sonderarbeitstag hinzu.
+        """
+        if not isinstance(data, dict):
+            data = None  # Handle QPushButton click
         row = self.special_days_table.rowCount()
         self.special_days_table.insertRow(row)
 
@@ -483,11 +565,17 @@ class SettingsDialog(QDialog):
         self.special_days_table.setCellWidget(row, 2, time_edit)
 
     def remove_special_day_row(self):
+        """
+        Entfernt die aktuell ausgewählte Zeile der Sonderarbeitstage.
+        """
         curr = self.special_days_table.currentRow()
         if curr >= 0:
             self.special_days_table.removeRow(curr)
 
     def get_settings(self):
+        """
+        Gibt die im Dialog eingestellten Werte als Dictionary zurück.
+        """
         workdays = [i for i, cb in enumerate(self.workday_checkboxes) if cb.isChecked()]
         special_days = []
         for r in range(self.special_days_table.rowCount()):
@@ -510,12 +598,19 @@ class SettingsDialog(QDialog):
 
 
 class EditDialog(QDialog):
-    def __init__(self, entry: WorkEntry, all_entries: list, target_minutes: int, max_minutes: int = 600, auto_break: bool = True, parent=None):
+    """
+    Dialog zum Bearbeiten oder Hinzufügen eines Arbeitseintrags.
+    """
+    def __init__(self, entry: WorkEntry, all_entries: list, target_minutes: int,
+                 max_minutes: int = 600, auto_break: bool = True, parent=None):
+        """
+        Initialisiert den Bearbeitungsdialog.
+        """
         super().__init__(parent)
         self.setWindowTitle("Eintrag bearbeiten")
         self.resize(450, 300)
         self.entry = entry
-        self.all_entries = all_entries # All entries to filter by date
+        self.all_entries = all_entries  # All entries to filter by date
         self.target_minutes = target_minutes
         self.max_minutes = max_minutes
         self.auto_break = auto_break
@@ -586,12 +681,16 @@ class EditDialog(QDialog):
         self.custom_target_time = QTimeEdit()
         self.custom_target_time.setDisplayFormat("HH:mm")
         if entry.target_minutes != -1:
-            self.custom_target_time.setTime(QTime(entry.target_minutes // 60, entry.target_minutes % 60))
+            self.custom_target_time.setTime(QTime(entry.target_minutes // 60,
+                                                  entry.target_minutes % 60))
         else:
-            self.custom_target_time.setTime(QTime.fromString(self.parent().settings.get("target_work_time", "08:00"), "HH:mm"))
-        
+            def_target = self.parent().settings.get("target_work_time", "08:00")
+            self.custom_target_time.setTime(QTime.fromString(def_target, "HH:mm"))
+
         self.custom_target_time.setEnabled(self.custom_target_cb.isChecked())
-        self.custom_target_cb.stateChanged.connect(lambda: self.custom_target_time.setEnabled(self.custom_target_cb.isChecked()))
+        self.custom_target_cb.stateChanged.connect(
+            self._on_custom_target_changed
+        )
         self.custom_target_cb.stateChanged.connect(self.recalc_minutes)
         self.custom_target_time.timeChanged.connect(self.recalc_minutes)
 
@@ -604,17 +703,32 @@ class EditDialog(QDialog):
         btn_save.clicked.connect(self.accept)
         layout.addWidget(btn_save)
 
-        if has_times: self.recalc_minutes()
+        if has_times:
+            self.recalc_minutes()
+
+    def _on_custom_target_changed(self):
+        """
+        Aktiviert oder deaktiviert das Zeit-Eingabefeld für das individuelle Tagessoll.
+        """
+        self.custom_target_time.setEnabled(self.custom_target_cb.isChecked())
 
     def toggle_times(self, state):
+        """
+        Aktiviert oder deaktiviert die Zeit-Eingabefelder basierend auf der Checkbox.
+        """
         is_checked = self.has_times_cb.isChecked()
         self.time_start.setEnabled(is_checked)
         self.time_end.setEnabled(is_checked)
         self.pause_spin.setEnabled(is_checked and not self.auto_break)
-        if is_checked: self.recalc_minutes()
+        if is_checked:
+            self.recalc_minutes()
 
     def recalc_minutes(self):
-        if not self.has_times_cb.isChecked(): return
+        """
+        Berechnet die Überstunden automatisch basierend auf Start-, Endzeit und Pause.
+        """
+        if not self.has_times_cb.isChecked():
+            return
 
         curr_date_str = self.date_edit.date().toString("yyyy-MM-dd")
         target_mins = self.parent().get_target_minutes_for_date(curr_date_str)
@@ -643,6 +757,9 @@ class EditDialog(QDialog):
         self.min_spinbox.setValue(entry_overtime)
 
     def apply_to_entry(self):
+        """
+        Übernimmt die Werte aus dem Dialog in das übergebene WorkEntry-Objekt.
+        """
         self.entry.date = self.date_edit.date().toString("yyyy-MM-dd")
         self.entry.minutes = self.min_spinbox.value()
         self.entry.reason = self.reason_edit.text().strip()
@@ -665,7 +782,14 @@ class EditDialog(QDialog):
 
 # --- HAUPTANWENDUNG ---
 class UeberstundenApp(QMainWindow):
+    """
+    Hauptklasse der Anwendung Überstunden-Rechner Pro.
+    Verwaltet das Hauptfenster, die Tabs und die Geschäftslogik.
+    """
     def __init__(self):
+        """
+        Initialisiert die Anwendung, lädt Einstellungen und baut die UI auf.
+        """
         super().__init__()
         self.setWindowTitle("Überstunden-Rechner Pro")
         self.resize(1000, 750)
@@ -676,7 +800,8 @@ class UeberstundenApp(QMainWindow):
         self.db = DBManager(DB_FILE)
 
         self.system_palette = QApplication.instance().palette()
-        bg_lightness = self.system_palette.color(QPalette.ColorRole.Window).lightness()
+        bg_color = self.system_palette.color(QPalette.ColorRole.Window)
+        bg_lightness = bg_color.lightness()
         self.system_is_dark = bg_lightness < 128
 
         self.settings = self.load_settings()
@@ -687,8 +812,8 @@ class UeberstundenApp(QMainWindow):
 
         self.apply_theme()
 
-        self.db = DBManager(DB_FILE)
-        self.entries = self.db.load_all() # Daten laden BEVOR die UI sie berechnet
+        # Daten laden BEVOR die UI sie berechnet
+        self.entries = self.db.load_all()
 
         self.tabs = QTabWidget()
         self.setCentralWidget(self.tabs)
@@ -711,6 +836,9 @@ class UeberstundenApp(QMainWindow):
         self.load_data()
 
     def load_settings(self):
+        """
+        Lädt die Einstellungen aus der JSON-Datei oder gibt Standardwerte zurück.
+        """
         defaults = {
             "default_start": "07:00",
             "target_work_time": "08:00",
@@ -732,10 +860,14 @@ class UeberstundenApp(QMainWindow):
             try:
                 with open(SETTINGS_FILE, "r", encoding="utf-8") as f:
                     defaults.update(json.load(f))
-            except: pass
+            except (json.JSONDecodeError, OSError):
+                pass
         return defaults
 
     def save_settings(self):
+        """
+        Speichert die aktuellen Einstellungen in die JSON-Datei.
+        """
         try:
             with open(SETTINGS_FILE, "w", encoding="utf-8") as f:
                 json.dump(self.settings, f)
@@ -743,7 +875,9 @@ class UeberstundenApp(QMainWindow):
             pass
 
     def get_light_palette(self):
-        # Breeze Light
+        """
+        Erstellt und gibt die Farbpalette für den hellen Modus zurück (Breeze Light).
+        """
         palette = QPalette()
         palette.setColor(QPalette.ColorRole.Window,          QColor("#eff0f1"))
         palette.setColor(QPalette.ColorRole.WindowText,      QColor("#31363b"))
@@ -761,7 +895,9 @@ class UeberstundenApp(QMainWindow):
         return palette
 
     def get_dark_palette(self):
-        # Breeze Dark
+        """
+        Erstellt und gibt die Farbpalette für den dunklen Modus zurück (Breeze Dark).
+        """
         palette = QPalette()
         palette.setColor(QPalette.ColorRole.Window,          QColor("#31363b"))
         palette.setColor(QPalette.ColorRole.WindowText,      QColor("#eff0f1"))
@@ -778,8 +914,10 @@ class UeberstundenApp(QMainWindow):
         palette.setColor(QPalette.ColorRole.Link,            QColor("#3daee9"))
         return palette
 
-    def get_dark_stylesheet(self, icon_dir=''):
-        # Breeze Dark
+    def get_dark_stylesheet(self):
+        """
+        Gibt das CSS-Stylesheet für den Breeze Dark Modus zurück.
+        """
         return """
             * { font-size: 13px; }
 
@@ -1217,11 +1355,17 @@ class UeberstundenApp(QMainWindow):
         app.setStyleSheet(sheet)
 
     def closeEvent(self, event):
+        """
+        Wird beim Schließen der Anwendung aufgerufen. Speichert Einstellungen und schließt die DB.
+        """
         self.save_settings()
         self.db.close()
         super().closeEvent(event)
 
     def load_data(self):
+        """
+        Lädt alle Daten aus der Datenbank und aktualisiert die Benutzeroberfläche.
+        """
         self.entries = self.db.load_all()
         self.update_ui()
         self.update_stats_chart()
@@ -1229,17 +1373,24 @@ class UeberstundenApp(QMainWindow):
         self.update_calendar_heatmap()
 
     def get_target_minutes(self):
+        """
+        Gibt die in den Einstellungen festgelegte Regelarbeitszeit in Minuten zurück.
+        """
         t = QTime.fromString(self.settings.get("target_work_time", "08:00"), "HH:mm")
         return t.hour() * 60 + t.minute()
 
     def get_target_minutes_for_date(self, date_str):
+        """
+        Ermittelt das Tagessoll für ein bestimmtes Datum unter Berücksichtigung von
+        individuellen Einträgen, Sonderarbeitstagen, Feiertagen und Wochenenden.
+        """
         # 1. Check if any entry for this day has a custom target_minutes
         for e in self.entries:
             if e.date == date_str and e.target_minutes != -1:
                 return e.target_minutes
 
         qdate = QDate.fromString(date_str, "yyyy-MM-dd")
-        
+
         # 2. Check special days from settings (e.g. 24.12.)
         special_days = self.settings.get("special_days", [])
         for sd in special_days:
@@ -1250,21 +1401,24 @@ class UeberstundenApp(QMainWindow):
         year = qdate.year()
         state = self.settings.get("state", "TH")
         holidays = get_holidays(year, state)
-        
+
         # Check if holiday
         if date_str in holidays:
             return 0
-            
+
         # Check if workday (0=Mon, 6=Sun)
         # QDate.dayOfWeek() returns 1 (Mon) to 7 (Sun)
         day_idx = qdate.dayOfWeek() - 1
         workdays = self.settings.get("workdays", [0, 1, 2, 3, 4])
         if day_idx not in workdays:
             return 0
-            
+
         return self.get_target_minutes()
 
     def get_max_minutes(self):
+        """
+        Gibt die maximal anrechenbare Arbeitszeit pro Tag in Minuten zurück.
+        """
         return self.settings.get("max_work_hours", 10) * 60
 
     def _get_default_start_time(self):
@@ -1283,13 +1437,19 @@ class UeberstundenApp(QMainWindow):
 
     # --- SETUP TABS ---
     def setup_main_tab(self):
+        """
+        Erstellt das Layout und die Steuerelemente für den Haupt-Tab (Eingabe & Liste).
+        """
         layout = QVBoxLayout(self.tab_main)
 
         self.lbl_saldo = QLabel("0h 0m")
         self.lbl_saldo.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        font = QFont(); font.setPointSize(28); font.setBold(True)
+        font = QFont()
+        font.setPointSize(28)
+        font.setBold(True)
         self.lbl_saldo.setFont(font)
-        layout.addWidget(QLabel("<b>Gesamt-Saldo:</b>", alignment=Qt.AlignmentFlag.AlignCenter))
+        layout.addWidget(QLabel("<b>Gesamt-Saldo:</b>",
+                                alignment=Qt.AlignmentFlag.AlignCenter))
         layout.addWidget(self.lbl_saldo)
 
         frame_input = QFrame()
@@ -1348,12 +1508,15 @@ class UeberstundenApp(QMainWindow):
         self.custom_target_cb = QCheckBox("Indiv. Tagessoll:")
         self.custom_target_time = QTimeEdit()
         self.custom_target_time.setDisplayFormat("HH:mm")
-        self.custom_target_time.setTime(QTime.fromString(self.settings.get("target_work_time", "08:00"), "HH:mm"))
+        def_target = self.settings.get("target_work_time", "08:00")
+        self.custom_target_time.setTime(QTime.fromString(def_target, "HH:mm"))
         self.custom_target_time.setEnabled(False)
-        self.custom_target_cb.stateChanged.connect(lambda: self.custom_target_time.setEnabled(self.custom_target_cb.isChecked()))
+        self.custom_target_cb.stateChanged.connect(
+            lambda: self.custom_target_time.setEnabled(self.custom_target_cb.isChecked())
+        )
         self.custom_target_cb.stateChanged.connect(self.update_live_calc)
         self.custom_target_time.timeChanged.connect(self.update_live_calc)
-        
+
         input_row2.addWidget(self.custom_target_cb)
         input_row2.addWidget(self.custom_target_time)
         input_row2.addStretch()
@@ -1791,12 +1954,12 @@ class UeberstundenApp(QMainWindow):
             self.save_settings()
             self.apply_theme()
             self.pause_spin.setEnabled(not self.settings.get("auto_break", True))
-            
+
             # Alle Tage neu berechnen, da sich das Soll geändert haben könnte
             all_dates = sorted(list(set(e.date for e in self.entries)))
             for d_str in all_dates:
                 self.recalculate_day(d_str)
-            
+
             self.load_data() # Lädt alles neu (inkl. UI-Update)
 
             new_start = self._get_default_start_time()
@@ -1820,7 +1983,7 @@ class UeberstundenApp(QMainWindow):
         # Wenn das Soll (inkl. manueller Einträge) bereits erreicht ist,
         # geben wir einfach die Startzeit zurück (0 Min. Dauer für den neuen Eintrag).
         # Die Live-Vorschau wird dann korrekt 0m oder den aktuellen Stand anzeigen.
-        
+
         # Wir suchen die kleinste Dauer G (in Minuten), die das Soll erfüllt.
         for G in range(0, max_mins * 2 + 1):
             temp = WorkEntry(
@@ -1834,7 +1997,7 @@ class UeberstundenApp(QMainWindow):
             )
             # calculate_timed_entries liefert uns das Netto der Zeiteinträge (timed_existing + temp)
             _, total_net_timed = calculate_timed_entries(timed_existing + [temp], target_mins, max_mins, is_auto)
-            
+
             # Das gesamte Tagessaldo ist Netto-Zeit + manuelle Korrekturen
             if (total_net_timed + manual_sum) >= target_mins:
                 break
@@ -1936,14 +2099,14 @@ class UeberstundenApp(QMainWindow):
 
         s_new = QTime.fromString(start_str, "HH:mm")
         e_new = QTime.fromString(end_str, "HH:mm")
-        
-        # Falls Mitternacht überschritten wird, ist die Logik komplexer, 
+
+        # Falls Mitternacht überschritten wird, ist die Logik komplexer,
         # hier vereinfacht für den gleichen Tag:
         for e in self.entries:
             if e.date == date_str and e.start and e.end and e.id != exclude_id:
                 s_old = QTime.fromString(e.start, "HH:mm")
                 e_old = QTime.fromString(e.end, "HH:mm")
-                
+
                 # Standard Überlappungs-Check: (StartA < EndeB) und (EndeA > StartB)
                 # Wir nutzen secsTo für den Vergleich
                 if s_new.secsTo(e_old) > 0 and s_old.secsTo(e_new) > 0:
@@ -1958,7 +2121,7 @@ class UeberstundenApp(QMainWindow):
         # Überlappungs-Check
         overlap = self.check_overlap(date_str, start_str, end_str)
         if overlap:
-            QMessageBox.warning(self, "Überschneidung", 
+            QMessageBox.warning(self, "Überschneidung",
                 f"Dieser Zeitraum überschneidet sich mit einem existierenden Eintrag:\n\n{overlap}\n\nBitte korrigiere die Zeiten.")
             return
 
@@ -1976,7 +2139,7 @@ class UeberstundenApp(QMainWindow):
         self.reason_edit.clear()
         self.custom_target_cb.setChecked(False)
         self.date_edit.setDate(QDate.currentDate())
-        
+
         # Alle Einträge neu laden und den betroffenen Tag glattziehen
         self.entries = self.db.load_all()
         self.recalculate_day(date_str)
@@ -2007,16 +2170,16 @@ class UeberstundenApp(QMainWindow):
             new_date = dialog.date_edit.date().toString("yyyy-MM-dd")
             new_start = dialog.time_start.time().toString("HH:mm") if dialog.has_times_cb.isChecked() else ""
             new_end = dialog.time_end.time().toString("HH:mm") if dialog.has_times_cb.isChecked() else ""
-            
+
             overlap = self.check_overlap(new_date, new_start, new_end, exclude_id=entry.id)
             if overlap:
-                QMessageBox.warning(self, "Überschneidung", 
+                QMessageBox.warning(self, "Überschneidung",
                     f"Die Änderungen überschneiden sich mit einem anderen Eintrag:\n\n{overlap}\n\nBitte korrigiere die Zeiten.")
                 return
 
             dialog.apply_to_entry()
             self.db.update(entry)
-            
+
             # Neu laden und beide betroffenen Tage (alt/neu) neu berechnen
             self.entries = self.db.load_all()
             self.recalculate_day(old_date)
@@ -2309,7 +2472,7 @@ class UeberstundenApp(QMainWindow):
                         date_str = row[0].strip()
                         if date_str.lower() in ["datum", "date"] or not date_str:
                             continue
-                        
+
                         # Minuten optional behandeln
                         try:
                             minutes = int(row[1].strip()) if len(row) > 1 and row[1].strip() else 0
@@ -2331,7 +2494,7 @@ class UeberstundenApp(QMainWindow):
                                 break
                             except ValueError:
                                 pass
-                        
+
                         if not parsed_date:
                             parsed_date = date_str # Fallback
 
@@ -2355,15 +2518,15 @@ class UeberstundenApp(QMainWindow):
 
             if os.path.exists(DB_FILE):
                 shutil.copy2(DB_FILE, DB_FILE + ".backup")
-            
+
             for entry in pending:
                 self.db.insert(entry)
-            
+
             # Alle Einträge neu laden und alle betroffenen Tage glattziehen
             self.entries = self.db.load_all()
             for d in sorted(list(affected_dates)):
                 self.recalculate_day(d)
-            
+
             self.load_data()
             QMessageBox.information(self, "Erfolg", f"{len(pending)} Einträge importiert!\nTagessalden wurden automatisch berechnet.\nBackup der Datenbank angelegt.")
 
