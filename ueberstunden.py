@@ -37,7 +37,7 @@ matplotlib.use('QtAgg')
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg
 from matplotlib.figure import Figure
 
-from PyQt6.QtCore import QDate, Qt, QTime, QRect, QPoint
+from PyQt6.QtCore import QDate, Qt, QTime, QPoint
 from PyQt6.QtGui import QColor, QFont, QIcon, QPalette, QPainter, QPen, QPixmap, QPolygon
 from PyQt6.QtWidgets import (
     QApplication, QCheckBox, QComboBox, QDateEdit, QDialog,
@@ -712,7 +712,7 @@ class EditDialog(QDialog):
         """
         self.custom_target_time.setEnabled(self.custom_target_cb.isChecked())
 
-    def toggle_times(self, state):
+    def toggle_times(self, _state):
         """
         Aktiviert oder deaktiviert die Zeit-Eingabefelder basierend auf der Checkbox.
         """
@@ -914,7 +914,7 @@ class UeberstundenApp(QMainWindow):
         palette.setColor(QPalette.ColorRole.Link,            QColor("#3daee9"))
         return palette
 
-    def get_dark_stylesheet(self):
+    def get_dark_stylesheet(self, icon_dir=''):
         """
         Gibt das CSS-Stylesheet für den Breeze Dark Modus zurück.
         """
@@ -1110,13 +1110,16 @@ class UeberstundenApp(QMainWindow):
                 border: 1px solid #4a5056;
             }
             QCalendarWidget QMenu::item:selected { background-color: #3daee9; color: #fff; }
-        """ + (f"""
-            QAbstractSpinBox::up-arrow   {{ image: url("{icon_dir}/arrow_up.png");   width: 10px; height: 10px; }}
-            QAbstractSpinBox::down-arrow {{ image: url("{icon_dir}/arrow_down.png"); width: 10px; height: 10px; }}
-        """ if icon_dir else "")
+        """ + (
+            f"            QAbstractSpinBox::up-arrow   "
+            f"{{ image: url(\"{icon_dir}/arrow_up.png\");   width: 10px; height: 10px; }}\n"
+            f"            QAbstractSpinBox::down-arrow "
+            f"{{ image: url(\"{icon_dir}/arrow_down.png\"); width: 10px; height: 10px; }}\n"
+            if icon_dir else ""
+        )
 
     def get_light_stylesheet(self, icon_dir=''):
-        # Breeze Light
+        """Gibt das CSS-Stylesheet für den Breeze Light Modus zurück."""
         return """
             * { font-size: 13px; }
 
@@ -1309,10 +1312,13 @@ class UeberstundenApp(QMainWindow):
                 border: 1px solid #bdc3c7;
             }
             QCalendarWidget QMenu::item:selected { background-color: #3daee9; color: #fff; }
-        """ + (f"""
-            QAbstractSpinBox::up-arrow   {{ image: url("{icon_dir}/arrow_up.png");   width: 10px; height: 10px; }}
-            QAbstractSpinBox::down-arrow {{ image: url("{icon_dir}/arrow_down.png"); width: 10px; height: 10px; }}
-        """ if icon_dir else "")
+        """ + (
+            f"            QAbstractSpinBox::up-arrow   "
+            f"{{ image: url(\"{icon_dir}/arrow_up.png\");   width: 10px; height: 10px; }}\n"
+            f"            QAbstractSpinBox::down-arrow "
+            f"{{ image: url(\"{icon_dir}/arrow_down.png\"); width: 10px; height: 10px; }}\n"
+            if icon_dir else ""
+        )
 
     def _create_arrow_icons(self):
         """Zeichnet kleine Dreieck-Pfeile als PNG und speichert sie für die QSS-Nutzung."""
@@ -1338,6 +1344,7 @@ class UeberstundenApp(QMainWindow):
         return icon_dir.replace('\\', '/')
 
     def apply_theme(self):
+        """Wendet das aktuelle Theme (Hell/Dunkel) auf die gesamte Anwendung an."""
         app = QApplication.instance()
         is_dark = self.settings.get("dark_mode", False)
 
@@ -1351,7 +1358,9 @@ class UeberstundenApp(QMainWindow):
         app.setStyle("Fusion")
         app.setPalette(self.get_dark_palette() if is_dark else self.get_light_palette())
         icon_dir = self._create_arrow_icons()
-        sheet = self.get_dark_stylesheet(icon_dir) if is_dark else self.get_light_stylesheet(icon_dir)
+        sheet = (
+            self.get_dark_stylesheet(icon_dir) if is_dark else self.get_light_stylesheet(icon_dir)
+        )
         app.setStyleSheet(sheet)
 
     def closeEvent(self, event):
@@ -1557,7 +1566,9 @@ class UeberstundenApp(QMainWindow):
         layout.addLayout(toolbar_layout)
 
         self.table = QTableWidget(0, 5)
-        self.table.setHorizontalHeaderLabels(["Datum", "Zeitraum", "Überstunden", "Anlass", "Aktion"])
+        self.table.setHorizontalHeaderLabels(
+            ["Datum", "Zeitraum", "Überstunden", "Anlass", "Aktion"]
+        )
         header = self.table.horizontalHeader()
         header.setSectionResizeMode(3, QHeaderView.ResizeMode.Stretch)
         self.table.setColumnWidth(1, 160)
@@ -1568,6 +1579,7 @@ class UeberstundenApp(QMainWindow):
         self.on_start_time_changed(start_to_use)
 
     def setup_goals_tab(self):
+        """Erstellt den Tab für Ziele und das Fortschritts-Dashboard."""
         layout = QVBoxLayout(self.tab_goals)
         layout.setContentsMargins(30, 30, 30, 30)
         layout.setSpacing(20)
@@ -1589,14 +1601,18 @@ class UeberstundenApp(QMainWindow):
         goal_inputs_layout.addWidget(QLabel("Urlaub / Frei von:"))
         self.goal_start_edit = QDateEdit()
         self.goal_start_edit.setCalendarPopup(True)
-        self.goal_start_edit.setDate(QDate.fromString(self.settings.get("goal_start_date", ""), "yyyy-MM-dd"))
+        self.goal_start_edit.setDate(
+            QDate.fromString(self.settings.get("goal_start_date", ""), "yyyy-MM-dd")
+        )
         self.goal_start_edit.dateChanged.connect(self.auto_calculate_goal_hours)
         goal_inputs_layout.addWidget(self.goal_start_edit)
 
         goal_inputs_layout.addWidget(QLabel("bis:"))
         self.goal_end_edit = QDateEdit()
         self.goal_end_edit.setCalendarPopup(True)
-        self.goal_end_edit.setDate(QDate.fromString(self.settings.get("goal_end_date", ""), "yyyy-MM-dd"))
+        self.goal_end_edit.setDate(
+            QDate.fromString(self.settings.get("goal_end_date", ""), "yyyy-MM-dd")
+        )
         self.goal_end_edit.dateChanged.connect(self.auto_calculate_goal_hours)
         goal_inputs_layout.addWidget(self.goal_end_edit)
 
@@ -1646,7 +1662,9 @@ class UeberstundenApp(QMainWindow):
         self.lbl_goal_days = QLabel("0")
         self.lbl_goal_days.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.lbl_goal_days.setFont(QFont("Arial", 20, QFont.Weight.Bold))
-        grid.addWidget(QLabel("Arbeitstage zum Ansparen", alignment=Qt.AlignmentFlag.AlignCenter), 0, 2)
+        grid.addWidget(
+            QLabel("Arbeitstage zum Ansparen", alignment=Qt.AlignmentFlag.AlignCenter), 0, 2
+        )
         grid.addWidget(self.lbl_goal_days, 1, 2)
 
         dashboard_layout.addLayout(grid)
@@ -1665,6 +1683,7 @@ class UeberstundenApp(QMainWindow):
             self.auto_calculate_goal_hours()
 
     def setup_calendar_tab(self):
+        """Erstellt den Tab für die Kalender-Heatmap."""
         layout = QVBoxLayout(self.tab_calendar)
 
         cal_toolbar = QHBoxLayout()
@@ -1695,7 +1714,9 @@ class UeberstundenApp(QMainWindow):
 
         self.cal_table = QTableWidget(6, 7)
 
-        self.cal_table.setHorizontalHeaderLabels(["Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag", "Samstag", "Sonntag"])
+        self.cal_table.setHorizontalHeaderLabels(
+            ["Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag", "Samstag", "Sonntag"]
+        )
         self.cal_table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
         self.cal_table.verticalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
         self.cal_table.verticalHeader().hide()
@@ -1706,16 +1727,19 @@ class UeberstundenApp(QMainWindow):
         layout.addWidget(self.cal_table)
 
     def cal_go_prev_month(self):
+        """Navigiert im Kalender einen Monat zurück."""
         idx = self.cal_month_filter.currentIndex()
         if idx < self.cal_month_filter.count() - 1:
             self.cal_month_filter.setCurrentIndex(idx + 1)
 
     def cal_go_next_month(self):
+        """Navigiert im Kalender einen Monat vor."""
         idx = self.cal_month_filter.currentIndex()
         if idx > 0:
             self.cal_month_filter.setCurrentIndex(idx - 1)
 
     def setup_stats_tab(self):
+        """Erstellt den Tab für das Diagramm und die Statistik."""
         self.stats_layout = QVBoxLayout(self.tab_stats)
         self.figure = Figure(figsize=(8, 4))
         self.canvas = FigureCanvasQTAgg(self.figure)
@@ -1723,9 +1747,11 @@ class UeberstundenApp(QMainWindow):
 
     # --- ZIELE & KALENDER LOGIK ---
     def auto_calculate_goal_hours(self):
+        """Berechnet die benötigten Überstunden automatisch anhand des gewählten Zeitraums."""
         start_d = self.goal_start_edit.date()
         end_d = self.goal_end_edit.date()
-        if start_d > end_d: return
+        if start_d > end_d:
+            return
 
         total_target_mins = 0
         curr = start_d
@@ -1743,6 +1769,7 @@ class UeberstundenApp(QMainWindow):
         self.on_goal_changed()
 
     def on_goal_changed(self):
+        """Wird aufgerufen, wenn sich die Ziel-Einstellungen ändern."""
         self.settings["goal_active"] = self.goal_active_cb.isChecked()
         self.settings["goal_start_date"] = self.goal_start_edit.date().toString("yyyy-MM-dd")
         self.settings["goal_end_date"] = self.goal_end_edit.date().toString("yyyy-MM-dd")
@@ -1758,7 +1785,9 @@ class UeberstundenApp(QMainWindow):
             self.update_goal_status()
 
     def update_goal_status(self):
-        if not self.goal_active_cb.isChecked(): return
+        """Aktualisiert die Anzeige des Fortschritts-Dashboards."""
+        if not self.goal_active_cb.isChecked():
+            return
 
         target_start_date = self.goal_start_edit.date()
         target_mins = self.goal_hours_spin.value() * 60
@@ -1766,8 +1795,10 @@ class UeberstundenApp(QMainWindow):
 
         progress_saldo = max(0, current_saldo)
 
-        if target_mins == 0: percentage = 100
-        else: percentage = min(100, int((progress_saldo / target_mins) * 100))
+        if target_mins == 0:
+            percentage = 100
+        else:
+            percentage = min(100, int((progress_saldo / target_mins) * 100))
 
         self.goal_progress_bar.setValue(percentage)
         self.goal_progress_bar.setFormat(f"{percentage}% erreicht")
@@ -1778,7 +1809,9 @@ class UeberstundenApp(QMainWindow):
         if missing_mins <= 0:
             self.lbl_goal_missing.setText("0h 0m")
             self.lbl_goal_days.setText("-")
-            self.lbl_goal_action.setText("🎉 Herzlichen Glückwunsch! Du hast genug Überstunden für diesen Zeitraum angespart!")
+            self.lbl_goal_action.setText(
+                "🎉 Herzlichen Glückwunsch! Du hast genug Überstunden für diesen Zeitraum angespart!"
+            )
             self.lbl_goal_action.setStyleSheet("color: #10b981; font-weight: bold;")
             return
 
@@ -1787,11 +1820,12 @@ class UeberstundenApp(QMainWindow):
         today = QDate.currentDate()
         if target_start_date <= today:
             self.lbl_goal_days.setText("0")
-            self.lbl_goal_action.setText("⚠️ Der gewünschte Zeitraum hat bereits begonnen oder ist heute!")
+            self.lbl_goal_action.setText(
+                "⚠️ Der gewünschte Zeitraum hat bereits begonnen oder ist heute!"
+            )
             self.lbl_goal_action.setStyleSheet("color: #ef4444; font-weight: bold;")
             return
 
-        state = self.settings.get("state", "TH")
         workdays = 0
         curr = today.addDays(1)
 
@@ -1808,11 +1842,14 @@ class UeberstundenApp(QMainWindow):
         else:
             extra_per_day = missing_mins / workdays
             self.lbl_goal_action.setText(
-                f"Tipp: Wenn du ab sofort jeden Tag <b>{int(extra_per_day)} Minuten</b> länger machst, erreichst du dein Ziel punktgenau."
+                f"Tipp: Wenn du ab sofort jeden Tag "
+                f"<b>{int(extra_per_day)} Minuten</b> länger machst, "
+                "erreichst du dein Ziel punktgenau."
             )
             self.lbl_goal_action.setStyleSheet("color: #3b82f6;")
 
     def update_calendar_heatmap(self):
+        """Aktualisiert die Kalender-Heatmap für den ausgewählten Monat."""
         self.cal_month_filter.blockSignals(True)
         current_cal_filter = self.cal_month_filter.currentData()
         self.cal_month_filter.clear()
@@ -1824,19 +1861,25 @@ class UeberstundenApp(QMainWindow):
 
         months = sorted(list(months_set), reverse=True)
 
-        for m in months: self.cal_month_filter.addItem(f"{m[-2:]}/{m[:4]}", m)
+        for m in months:
+            self.cal_month_filter.addItem(f"{m[-2:]}/{m[:4]}", m)
 
         idx = self.cal_month_filter.findData(current_cal_filter)
-        if idx < 0: idx = self.cal_month_filter.findData(today.toString("yyyy-MM"))
-        if idx >= 0: self.cal_month_filter.setCurrentIndex(idx)
+        if idx < 0:
+            idx = self.cal_month_filter.findData(today.toString("yyyy-MM"))
+        if idx >= 0:
+            self.cal_month_filter.setCurrentIndex(idx)
 
-        self.btn_cal_prev.setEnabled(self.cal_month_filter.currentIndex() < self.cal_month_filter.count() - 1)
+        self.btn_cal_prev.setEnabled(
+            self.cal_month_filter.currentIndex() < self.cal_month_filter.count() - 1
+        )
         self.btn_cal_next.setEnabled(self.cal_month_filter.currentIndex() > 0)
 
         self.cal_month_filter.blockSignals(False)
 
         sel_date_str = self.cal_month_filter.currentData()
-        if not sel_date_str: sel_date_str = today.toString("yyyy-MM")
+        if not sel_date_str:
+            sel_date_str = today.toString("yyyy-MM")
 
         year, month = map(int, sel_date_str.split('-'))
         cal = calendar.monthcalendar(year, month)
@@ -1852,8 +1895,9 @@ class UeberstundenApp(QMainWindow):
                 day_mins[e.date] = day_mins.get(e.date, 0) + e.minutes
                 monthly_sum += e.minutes
 
-        sign = "+" if monthly_sum > 0 else ""
-        self.lbl_cal_month_sum.setText(f"Monats-Saldo: {self.format_time(monthly_sum, show_plus=True)}")
+        self.lbl_cal_month_sum.setText(
+            f"Monats-Saldo: {self.format_time(monthly_sum, show_plus=True)}"
+        )
         if monthly_sum > 0:
             self.lbl_cal_month_sum.setStyleSheet("color: #10b981;")
         elif monthly_sum < 0:
@@ -1916,7 +1960,9 @@ class UeberstundenApp(QMainWindow):
                         item.setData(Qt.ItemDataRole.UserRole + 1, True)
                         hol_suffix = f"\n{holidays[date_str]}" if date_str in holidays else ""
                         if mins != 0:
-                            item.setText(f"{day}\nHeute{hol_suffix}\n({'+' if mins > 0 else ''}{mins}m)")
+                            item.setText(
+                                f"{day}\nHeute{hol_suffix}\n({'+' if mins > 0 else ''}{mins}m)"
+                            )
                         else:
                             item.setText(f"{day}\nHeute{hol_suffix}")
                         item.setBackground(QColor("#1e3a8a"))
@@ -1928,6 +1974,7 @@ class UeberstundenApp(QMainWindow):
 
     # --- ALLGEMEINE LOGIK ---
     def on_list_filter_changed(self):
+        """Wird aufgerufen, wenn der Monatsfilter in der Listenansicht geändert wird."""
         filter_val = self.month_filter.currentData()
         if filter_val and filter_val != "ALL":
             idx = self.cal_month_filter.findData(filter_val)
@@ -1938,6 +1985,7 @@ class UeberstundenApp(QMainWindow):
         self.update_ui()
 
     def on_cal_filter_changed(self):
+        """Wird aufgerufen, wenn der Monatsfilter im Kalender geändert wird."""
         cal_val = self.cal_month_filter.currentData()
         if cal_val:
             idx = self.month_filter.findData(cal_val)
@@ -1948,6 +1996,7 @@ class UeberstundenApp(QMainWindow):
         self.update_calendar_heatmap()
 
     def open_settings(self):
+        """Öffnet den Einstellungs-Dialog und übernimmt geänderte Einstellungen."""
         dialog = SettingsDialog(self.settings, self)
         if dialog.exec():
             self.settings.update(dialog.get_settings())
@@ -1984,27 +2033,30 @@ class UeberstundenApp(QMainWindow):
         # geben wir einfach die Startzeit zurück (0 Min. Dauer für den neuen Eintrag).
         # Die Live-Vorschau wird dann korrekt 0m oder den aktuellen Stand anzeigen.
 
-        # Wir suchen die kleinste Dauer G (in Minuten), die das Soll erfüllt.
-        for G in range(0, max_mins * 2 + 1):
+        # Wir suchen die kleinste Dauer (in Minuten), die das Soll erfüllt.
+        for duration_mins in range(0, max_mins * 2 + 1):
             temp = WorkEntry(
                 id=-1,
                 date=curr_date_str,
                 start=new_start.toString("HH:mm"),
-                end=new_start.addSecs(G * 60).toString("HH:mm"),
+                end=new_start.addSecs(duration_mins * 60).toString("HH:mm"),
                 pause=self.pause_spin.value() if not is_auto else 0,
                 minutes=0,
                 reason=""
             )
             # calculate_timed_entries liefert uns das Netto der Zeiteinträge (timed_existing + temp)
-            _, total_net_timed = calculate_timed_entries(timed_existing + [temp], target_mins, max_mins, is_auto)
+            _, total_net_timed = calculate_timed_entries(
+                timed_existing + [temp], target_mins, max_mins, is_auto
+            )
 
             # Das gesamte Tagessaldo ist Netto-Zeit + manuelle Korrekturen
             if (total_net_timed + manual_sum) >= target_mins:
                 break
 
-        return new_start.addSecs(G * 60)
+        return new_start.addSecs(duration_mins * 60)
 
     def on_start_time_changed(self, new_start_time):
+        """Wird aufgerufen, wenn die Startzeit geändert wird; aktualisiert die Endzeit-Vorschau."""
         today = QDate.currentDate().toString("yyyy-MM-dd")
         self.settings["last_date"] = today
         self.settings["last_start"] = new_start_time.toString("HH:mm")
@@ -2015,6 +2067,7 @@ class UeberstundenApp(QMainWindow):
         self.update_live_calc()
 
     def update_live_calc(self):
+        """Berechnet die Überstunden-Vorschau live und zeigt sie im Label an."""
         curr_date_str = self.date_edit.date().toString("yyyy-MM-dd")
         target_mins = self.get_target_minutes_for_date(curr_date_str)
         max_mins = self.get_max_minutes()
@@ -2047,20 +2100,29 @@ class UeberstundenApp(QMainWindow):
 
         final_total_overtime = (total_net - target_mins) + manual_sum
 
-        calc_text = f"Netto (Tag): {self.format_time(total_net)} ➔ <b>{self.format_time(final_total_overtime, show_plus=True)} Überstunden (Tag-Saldo)</b>"
+        calc_text = (
+            f"Netto (Tag): {self.format_time(total_net)} ➔ "
+            f"<b>{self.format_time(final_total_overtime, show_plus=True)}"
+            " Überstunden (Tag-Saldo)</b>"
+        )
         warnings = []
-        if total_net >= max_mins: warnings.append(f"⚠️ Max. {max_mins // 60}h erreicht!")
+        if total_net >= max_mins:
+            warnings.append(f"⚠️ Max. {max_mins // 60}h erreicht!")
 
         # Ruhezeit-Check (Lücke zum Vortag/letzten Eintrag davor)
         prev_entry = self.db.get_last_entry_before(curr_date_str)
         if prev_entry and prev_entry.end:
             try:
                 dt_prev = datetime.strptime(f"{prev_entry.date} {prev_entry.end}", "%Y-%m-%d %H:%M")
-                dt_curr = datetime.strptime(f"{curr_date_str} {self.time_start.time().toString('HH:mm')}", "%Y-%m-%d %H:%M")
+                start_str_curr = self.time_start.time().toString('HH:mm')
+                dt_curr = datetime.strptime(
+                    f"{curr_date_str} {start_str_curr}", "%Y-%m-%d %H:%M"
+                )
                 rest_hours = (dt_curr - dt_prev).total_seconds() / 3600
                 if 0 < rest_hours < 11:
                     warnings.append(f"⚠️ Ruhezeit verletzt ({rest_hours:.1f}h < 11h)")
-            except ValueError: pass
+            except ValueError:
+                pass
 
         if warnings:
             calc_text += f" <span style='color: #ef4444;'>{' | '.join(warnings)}</span>"
@@ -2073,10 +2135,12 @@ class UeberstundenApp(QMainWindow):
         """Verteilt Pausen und Überstunden für alle Zeiteinträge eines Tages neu.
         Manuelle Einträge (ohne Start-/Endzeit) werden nicht angefasst."""
         day_entries = [e for e in self.entries if e.date == date_str]
-        if not day_entries: return
+        if not day_entries:
+            return
 
         timed = [e for e in day_entries if e.start and e.end]
-        if not timed: return
+        if not timed:
+            return
 
         target_mins = self.get_target_minutes_for_date(date_str)
         max_mins = self.get_max_minutes()
@@ -2114,6 +2178,7 @@ class UeberstundenApp(QMainWindow):
         return None
 
     def add_entry(self):
+        """Liest die Eingabefelder aus, prüft auf Überlappung und fügt den Eintrag in die DB ein."""
         date_str = self.date_edit.date().toString("yyyy-MM-dd")
         start_str = self.time_start.time().toString("HH:mm")
         end_str = self.time_end.time().toString("HH:mm")
@@ -2121,8 +2186,11 @@ class UeberstundenApp(QMainWindow):
         # Überlappungs-Check
         overlap = self.check_overlap(date_str, start_str, end_str)
         if overlap:
-            QMessageBox.warning(self, "Überschneidung",
-                f"Dieser Zeitraum überschneidet sich mit einem existierenden Eintrag:\n\n{overlap}\n\nBitte korrigiere die Zeiten.")
+            QMessageBox.warning(
+                self, "Überschneidung",
+                f"Dieser Zeitraum überschneidet sich mit einem existierenden Eintrag:"
+                f"\n\n{overlap}\n\nBitte korrigiere die Zeiten."
+            )
             return
 
         entry = WorkEntry(
@@ -2133,7 +2201,10 @@ class UeberstundenApp(QMainWindow):
             pause=self.current_calculated_pause,
             minutes=self.current_calculated_overtime,
             reason=self.reason_edit.text().strip(),
-            target_minutes=(self.custom_target_time.time().hour() * 60 + self.custom_target_time.time().minute()) if self.custom_target_cb.isChecked() else -1
+            target_minutes=(
+                self.custom_target_time.time().hour() * 60
+                + self.custom_target_time.time().minute()
+            ) if self.custom_target_cb.isChecked() else -1
         )
         self.db.insert(entry)
         self.reason_edit.clear()
@@ -2146,6 +2217,7 @@ class UeberstundenApp(QMainWindow):
         self.load_data()
 
     def delete_entry(self, entry: WorkEntry):
+        """Fragt den Benutzer nach Bestätigung und löscht dann den übergebenen Eintrag."""
         date_str = entry.date
         d = QDate.fromString(date_str, "yyyy-MM-dd").toString("dd.MM.yyyy")
         reply = QMessageBox.question(self, "Löschen bestätigen",
@@ -2158,23 +2230,36 @@ class UeberstundenApp(QMainWindow):
             self.recalculate_day(date_str)
             self.load_data()
 
-    def edit_entry(self, row, column):
+    def edit_entry(self, row, _column):
+        """Öffnet den Bearbeitungs-Dialog für den Eintrag in der angeklickten Zeile."""
         entry_idx = self.table.item(row, 0).data(Qt.ItemDataRole.UserRole)
         entry = self.entries[entry_idx]
         old_date = entry.date
 
-        dialog = EditDialog(entry, self.entries, self.get_target_minutes(), self.get_max_minutes(), self.settings.get("auto_break", True), self)
+        dialog = EditDialog(
+            entry, self.entries, self.get_target_minutes(),
+            self.get_max_minutes(), self.settings.get("auto_break", True), self
+        )
         if dialog.exec():
             # Bevor wir anwenden: Überlappungs-Check (mit den neuen Werten aus dem Dialog)
             # Wir holen uns die Werte temporär
             new_date = dialog.date_edit.date().toString("yyyy-MM-dd")
-            new_start = dialog.time_start.time().toString("HH:mm") if dialog.has_times_cb.isChecked() else ""
-            new_end = dialog.time_end.time().toString("HH:mm") if dialog.has_times_cb.isChecked() else ""
+            new_start = (
+                dialog.time_start.time().toString("HH:mm")
+                if dialog.has_times_cb.isChecked() else ""
+            )
+            new_end = (
+                dialog.time_end.time().toString("HH:mm")
+                if dialog.has_times_cb.isChecked() else ""
+            )
 
             overlap = self.check_overlap(new_date, new_start, new_end, exclude_id=entry.id)
             if overlap:
-                QMessageBox.warning(self, "Überschneidung",
-                    f"Die Änderungen überschneiden sich mit einem anderen Eintrag:\n\n{overlap}\n\nBitte korrigiere die Zeiten.")
+                QMessageBox.warning(
+                    self, "Überschneidung",
+                    f"Die Änderungen überschneiden sich mit einem anderen Eintrag:"
+                    f"\n\n{overlap}\n\nBitte korrigiere die Zeiten."
+                )
                 return
 
             dialog.apply_to_entry()
@@ -2199,15 +2284,20 @@ class UeberstundenApp(QMainWindow):
         return f"{sign}{abs_m // 60}h {abs_m % 60}m"
 
     def update_ui(self):
+        """Aktualisiert die Eintrags-Tabelle und den Gesamtsaldo entsprechend dem aktiven Filter."""
         self.month_filter.blockSignals(True)
         current_filter = self.month_filter.currentData()
         self.month_filter.clear()
         self.month_filter.addItem("Alle", "ALL")
 
-        months = sorted(list(set(e.date[:7] for e in self.entries if len(e.date) >= 7)), reverse=True)
-        for m in months: self.month_filter.addItem(f"{m[-2:]}/{m[:4]}", m)
+        months = sorted(
+            list(set(e.date[:7] for e in self.entries if len(e.date) >= 7)), reverse=True
+        )
+        for m in months:
+            self.month_filter.addItem(f"{m[-2:]}/{m[:4]}", m)
         idx = self.month_filter.findData(current_filter)
-        if idx >= 0: self.month_filter.setCurrentIndex(idx)
+        if idx >= 0:
+            self.month_filter.setCurrentIndex(idx)
         self.month_filter.blockSignals(False)
 
         self.table.setRowCount(0)
@@ -2216,21 +2306,29 @@ class UeberstundenApp(QMainWindow):
 
         row = 0
         for i, e in enumerate(self.entries):
-            if filter_val != "ALL" and not e.date.startswith(filter_val): continue
+            if filter_val != "ALL" and not e.date.startswith(filter_val):
+                continue
 
             self.table.insertRow(row)
-            item_date = QTableWidgetItem(QDate.fromString(e.date, "yyyy-MM-dd").toString("dd.MM.yyyy"))
+            item_date = QTableWidgetItem(
+                QDate.fromString(e.date, "yyyy-MM-dd").toString("dd.MM.yyyy")
+            )
             item_date.setData(Qt.ItemDataRole.UserRole, i)
             item_date.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
 
-            z_str = f"{e.start} - {e.end}" + (f" (-{e.pause}m)" if e.pause > 0 else "") if e.start else "-"
+            z_str = (
+                f"{e.start} - {e.end}" + (f" (-{e.pause}m)" if e.pause > 0 else "")
+                if e.start else "-"
+            )
             item_zeit = QTableWidgetItem(z_str)
             item_zeit.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
 
             item_min = QTableWidgetItem(self.format_time(e.minutes, show_plus=True))
             item_min.setTextAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
-            if e.minutes > 0: item_min.setForeground(QColor("#10b981"))
-            elif e.minutes < 0: item_min.setForeground(QColor("#ef4444"))
+            if e.minutes > 0:
+                item_min.setForeground(QColor("#10b981"))
+            elif e.minutes < 0:
+                item_min.setForeground(QColor("#ef4444"))
 
             btn_del = QPushButton("Löschen")
             btn_del.clicked.connect(lambda checked, ent=e: self.delete_entry(ent))
@@ -2243,9 +2341,15 @@ class UeberstundenApp(QMainWindow):
             row += 1
 
         self.lbl_saldo.setText(self.format_time(total_overall))
-        self.lbl_saldo.setStyleSheet("color: #10b981;" if total_overall > 0 else ("color: #ef4444;" if total_overall < 0 else ""))
+        if total_overall > 0:
+            self.lbl_saldo.setStyleSheet("color: #10b981;")
+        elif total_overall < 0:
+            self.lbl_saldo.setStyleSheet("color: #ef4444;")
+        else:
+            self.lbl_saldo.setStyleSheet("")
 
     def update_stats_chart(self):
+        """Zeichnet das monatliche Balkendiagramm der Überstunden neu."""
         monthly_totals = {}
         for e in reversed(self.entries):
             if len(e.date) >= 7:
@@ -2261,7 +2365,8 @@ class UeberstundenApp(QMainWindow):
         ax = self.figure.add_subplot(111)
         ax.set_facecolor(bg_color)
         ax.tick_params(colors=text_color)
-        for spine in ax.spines.values(): spine.set_edgecolor(text_color)
+        for spine in ax.spines.values():
+            spine.set_edgecolor(text_color)
 
         if not monthly_totals:
             ax.text(0.5, 0.5, "Keine Daten vorhanden", color=text_color, ha='center', va='center')
@@ -2298,6 +2403,7 @@ class UeberstundenApp(QMainWindow):
 
     # --- EXPORT ---
     def export_csv(self):
+        """Exportiert die aktuell gefilterten Einträge als CSV-Datei."""
         file_name, _ = QFileDialog.getSaveFileName(
             self, "CSV Export", "ueberstunden_export.csv", "CSV Dateien (*.csv)")
         if not file_name:
@@ -2313,10 +2419,11 @@ class UeberstundenApp(QMainWindow):
                 total = sum(e.minutes for e in export_entries)
                 writer.writerow(["Gesamt", "", "", self.format_time(total), ""])
             QMessageBox.information(self, "Erfolg", "CSV erfolgreich exportiert!")
-        except Exception as ex:
+        except Exception as ex:  # pylint: disable=broad-except
             QMessageBox.critical(self, "Fehler", f"Fehler beim CSV-Export:\n{str(ex)}")
 
     def export_xlsx(self):
+        """Exportiert die aktuell gefilterten Einträge als Excel-Datei (xlsx)."""
         if not _OPENPYXL:
             QMessageBox.critical(self, "Fehler",
                 "openpyxl ist nicht installiert.\nBitte ausführen: pip install openpyxl")
@@ -2383,12 +2490,14 @@ class UeberstundenApp(QMainWindow):
 
             wb.save(file_name)
             QMessageBox.information(self, "Erfolg", "Excel-Datei erfolgreich exportiert!")
-        except Exception as ex:
+        except Exception as ex:  # pylint: disable=broad-except
             QMessageBox.critical(self, "Fehler", f"Fehler beim Excel-Export:\n{str(ex)}")
 
     def export_pdf(self):
+        """Exportiert die aktuell gefilterten Einträge als PDF-Datei."""
+        # pylint: disable=import-outside-toplevel
         from PyQt6.QtPrintSupport import QPrinter
-        from PyQt6.QtGui import QTextDocument, QPageSize
+        from PyQt6.QtGui import QTextDocument
         from PyQt6.QtCore import QSizeF
 
         file_name, _ = QFileDialog.getSaveFileName(
@@ -2412,7 +2521,8 @@ class UeberstundenApp(QMainWindow):
                 rows_html += (
                     f"<tr style='background:{bg}'>"
                     f"<td>{d}</td><td>{zeitraum}</td>"
-                    f"<td style='color:{color};text-align:right'>{self.format_time(e.minutes, show_plus=True)}</td>"
+                    f"<td style='color:{color};text-align:right'>"
+                    f"{self.format_time(e.minutes, show_plus=True)}</td>"
                     f"<td>{e.reason}</td></tr>"
                 )
 
@@ -2434,7 +2544,8 @@ class UeberstundenApp(QMainWindow):
               {rows_html}
               <tr class="sum">
                 <td colspan="2">Gesamtsumme:</td>
-                <td style='text-align:right'>{self.format_time(total_min, show_plus=True)}</td><td></td>
+                <td style='text-align:right'>
+                  {self.format_time(total_min, show_plus=True)}</td><td></td>
               </tr>
             </table>
             </body></html>"""
@@ -2449,10 +2560,11 @@ class UeberstundenApp(QMainWindow):
             doc.print(printer)
 
             QMessageBox.information(self, "Erfolg", "PDF erfolgreich exportiert!")
-        except Exception as ex:
+        except Exception as ex:  # pylint: disable=broad-except
             QMessageBox.critical(self, "Fehler", f"Fehler beim PDF-Export:\n{str(ex)}")
 
     def import_csv(self):
+        """Importiert Einträge aus einer CSV-Datei und fügt sie zur Datenbank hinzu."""
         file_name, _ = QFileDialog.getOpenFileName(self, "CSV Import", "", "CSV Dateien (*.csv)")
         if not file_name:
             return
@@ -2498,7 +2610,10 @@ class UeberstundenApp(QMainWindow):
                         if not parsed_date:
                             parsed_date = date_str # Fallback
 
-                        pending.append(WorkEntry(id=None, date=parsed_date, start=start_str, end=end_str, pause=pause, minutes=minutes, reason=reason))
+                        pending.append(WorkEntry(
+                            id=None, date=parsed_date, start=start_str,
+                            end=end_str, pause=pause, minutes=minutes, reason=reason
+                        ))
                         affected_dates.add(parsed_date)
 
             if not pending:
@@ -2510,9 +2625,12 @@ class UeberstundenApp(QMainWindow):
                 preview_lines.append(f"  … und {len(pending) - 5} weitere")
             preview = "\n".join(preview_lines)
 
-            reply = QMessageBox.question(self, "Import bestätigen",
-                f"{len(pending)} Einträge gefunden:\n\n{preview}\n\nJetzt importieren?\n(Überstunden werden automatisch für jeden Tag berechnet/konsolidiert)",
-                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
+            reply = QMessageBox.question(
+                self, "Import bestätigen",
+                f"{len(pending)} Einträge gefunden:\n\n{preview}\n\nJetzt importieren?\n"
+                "(Überstunden werden automatisch für jeden Tag berechnet/konsolidiert)",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+            )
             if reply != QMessageBox.StandardButton.Yes:
                 return
 
@@ -2528,9 +2646,13 @@ class UeberstundenApp(QMainWindow):
                 self.recalculate_day(d)
 
             self.load_data()
-            QMessageBox.information(self, "Erfolg", f"{len(pending)} Einträge importiert!\nTagessalden wurden automatisch berechnet.\nBackup der Datenbank angelegt.")
+            QMessageBox.information(
+                self, "Erfolg",
+                f"{len(pending)} Einträge importiert!\n"
+                "Tagessalden wurden automatisch berechnet.\nBackup der Datenbank angelegt."
+            )
 
-        except Exception as ex:
+        except Exception as ex:  # pylint: disable=broad-except
             QMessageBox.critical(self, "Fehler", f"Fehler beim Import:\n{str(ex)}")
 
 

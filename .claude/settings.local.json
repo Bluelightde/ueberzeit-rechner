@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(source venv/bin/activate.fish)",
+      "Bash(pylint ueberstunden.py)",
+      "Bash(source venv/bin/activate)",
+      "Bash(python3 -m pylint ueberstunden.py)",
+      "Bash(pip install:*)"
+    ]
+  }
+}

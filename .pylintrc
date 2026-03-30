@@ -1,0 +1,5 @@
+[MESSAGES CONTROL]
+# PyQt6 and matplotlib are C-extensions / optional runtime deps;
+# pylint cannot inspect their internals in most CI environments.
+disable=import-error,
+        no-name-in-module
