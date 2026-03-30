@@ -1345,25 +1345,25 @@ class UeberstundenApp(QMainWindow):
 
     def apply_theme(self):
         """Wendet das aktuelle Theme (Hell/Dunkel) auf die gesamte Anwendung an."""
-        app = QApplication.instance()
+        qt_app = QApplication.instance()
         is_dark = self.settings.get("dark_mode", False)
 
         # Auf Linux im Entwicklungsmodus: natives Breeze-Theme nutzen
         if not getattr(sys, 'frozen', False) and sys.platform.startswith('linux'):
-            app.setStyle("Breeze")
-            app.setPalette(self.get_dark_palette() if is_dark else self.get_light_palette())
+            qt_app.setStyle("Breeze")
+            qt_app.setPalette(self.get_dark_palette() if is_dark else self.get_light_palette())
             return
 
         # Alle anderen Fälle (kompiliert oder Windows/macOS): Fusion + modernes Stylesheet
-        app.setStyle("Fusion")
-        app.setPalette(self.get_dark_palette() if is_dark else self.get_light_palette())
+        qt_app.setStyle("Fusion")
+        qt_app.setPalette(self.get_dark_palette() if is_dark else self.get_light_palette())
         icon_dir = self._create_arrow_icons()
         sheet = (
             self.get_dark_stylesheet(icon_dir) if is_dark else self.get_light_stylesheet(icon_dir)
         )
-        app.setStyleSheet(sheet)
+        qt_app.setStyleSheet(sheet)
 
-    def closeEvent(self, event):
+    def closeEvent(self, event):  # pylint: disable=invalid-name
         """
         Wird beim Schließen der Anwendung aufgerufen. Speichert Einstellungen und schließt die DB.
         """
