@@ -28,6 +28,7 @@ MANIFEST
 #  Usually these files are written by a python script, before or during the generation of a standalone executable
 *.manifest
 *.spec
+!ueberstunden.spec
 
 # Installer logs
 pip-log.txt

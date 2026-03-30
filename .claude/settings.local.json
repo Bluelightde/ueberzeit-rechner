@@ -5,7 +5,14 @@
       "Bash(pylint ueberstunden.py)",
       "Bash(source venv/bin/activate)",
       "Bash(python3 -m pylint ueberstunden.py)",
-      "Bash(pip install:*)"
+      "Bash(pip install:*)",
+      "Read(//home/miw/**)",
+      "Read(//home/miw/Dokumente/Github/**)",
+      "Bash(cp \"/home/miw/Nextcloud_Combase/Programme/Überstundenrechner_experimentell/build.py\" /home/miw/Dokumente/Github/ueberstundenrechnerpro/build.py)",
+      "Bash(cp \"/home/miw/Nextcloud_Combase/Programme/Überstundenrechner_experimentell/create_icon.py\" /home/miw/Dokumente/Github/ueberstundenrechnerpro/create_icon.py)",
+      "Bash(cp \"/home/miw/Nextcloud_Combase/Programme/Überstundenrechner_experimentell/icon.png\" /home/miw/Dokumente/Github/ueberstundenrechnerpro/icon.png)",
+      "Bash(cp \"/home/miw/Nextcloud_Combase/Programme/Überstundenrechner_experimentell/icon.ico\" /home/miw/Dokumente/Github/ueberstundenrechnerpro/icon.ico)",
+      "Bash(cp \"/home/miw/Nextcloud_Combase/Programme/Überstundenrechner_experimentell/icon.icns\" /home/miw/Dokumente/Github/ueberstundenrechnerpro/icon.icns)"
     ]
   }
 }
