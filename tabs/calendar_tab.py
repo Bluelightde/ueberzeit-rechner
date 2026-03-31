@@ -10,7 +10,7 @@ from PyQt6.QtWidgets import (
 )
 
 from logic import get_holidays, format_time
-from ui_components import HeatmapDelegate
+from ui_components import HeatmapDelegate, overtime_qcolor, set_overtime_color
 
 
 class CalendarTab(QWidget):
@@ -159,12 +159,7 @@ class CalendarTab(QWidget):
                 monthly_sum += e.minutes
 
         self.lbl_cal_month_sum.setText(f"Monats-Saldo: {format_time(monthly_sum, show_plus=True)}")
-        if monthly_sum > 0:
-            self.lbl_cal_month_sum.setStyleSheet("color: #10b981;")
-        elif monthly_sum < 0:
-            self.lbl_cal_month_sum.setStyleSheet("color: #ef4444;")
-        else:
-            self.lbl_cal_month_sum.setStyleSheet("")
+        set_overtime_color(self.lbl_cal_month_sum, monthly_sum)
 
         self.cal_table.setRowCount(len(cal))
         is_dark = self.settings.get("dark_mode", False)
@@ -196,20 +191,16 @@ class CalendarTab(QWidget):
                         if mins == 0:
                             item.setBackground(QColor("#1e3a8a" if is_dark else "#bfdbfe"))
                             item.setForeground(QColor("#60a5fa" if is_dark else "#1d4ed8"))
-                        elif mins > 0:
-                            item.setBackground(QColor(16, 185, 129, min(255, 60 + (mins * 2))))
                         else:
-                            item.setBackground(QColor(239, 68, 68, min(255, 60 + (abs(mins) * 2))))
+                            item.setBackground(overtime_qcolor(mins))
                     else:
                         if mins == 0:
                             if not is_workday:
                                 item.setBackground(QColor("#2d3748" if is_dark else "#e5e7eb"))
                             else:
                                 item.setBackground(QColor("#333333" if is_dark else "#ffffff"))
-                        elif mins > 0:
-                            item.setBackground(QColor(16, 185, 129, min(255, 60 + (mins * 2))))
                         else:
-                            item.setBackground(QColor(239, 68, 68, min(255, 60 + (abs(mins) * 2))))
+                            item.setBackground(overtime_qcolor(mins))
 
                     is_today = (
                         year == today.year() and month == today.month() and day == today.day()

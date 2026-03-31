@@ -5,6 +5,8 @@ from PyQt6.QtWidgets import QVBoxLayout, QWidget
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg
 from matplotlib.figure import Figure
 
+from logic import COLOR_POSITIVE, COLOR_NEGATIVE
+
 
 class StatsTab(QWidget):
     """Zeigt ein monatliches Balkendiagramm der Überstunden."""
@@ -61,7 +63,7 @@ class StatsTab(QWidget):
         else:
             months = list(monthly_totals.keys())
             values = [v / 60 for v in monthly_totals.values()]
-            colors = ['#10b981' if v >= 0 else '#ef4444' for v in values]
+            colors = [COLOR_POSITIVE if v >= 0 else COLOR_NEGATIVE for v in values]
             ax.bar(months, values, color=colors)
             ax.set_ylabel("Überstunden (in Stunden)", color=text_color)
             ax.set_title("Monatlicher Überstunden-Verlauf", color=text_color)

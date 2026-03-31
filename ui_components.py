@@ -1,10 +1,47 @@
 
 """
-Benutzerdefinierte UI-Komponenten und Delegaten.
+Benutzerdefinierte UI-Komponenten, Delegaten und UI-Hilfsfunktionen.
 """
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QColor, QPainter, QPen
 from PyQt6.QtWidgets import QStyledItemDelegate
+
+from logic import COLOR_POSITIVE, COLOR_NEGATIVE
+
+
+def overtime_qcolor(minutes):
+    """Gibt eine halb-transparente QColor für Heatmap-Zellen zurück.
+
+    Positive Minuten → Grün, negative → Rot.
+    Die Transparenz steigt mit dem Betrag der Minuten.
+
+    Args:
+        minutes: Überstunden-Minuten (positiv oder negativ, nicht 0).
+
+    Returns:
+        QColor mit passendem Farbton und Alpha-Kanal.
+    """
+    alpha = min(255, 60 + abs(minutes) * 2)
+    if minutes > 0:
+        return QColor(16, 185, 129, alpha)   # #10b981
+    return QColor(239, 68, 68, alpha)        # #ef4444
+
+
+def set_overtime_color(widget, minutes):
+    """Setzt die Textfarbe eines Widgets anhand des Überstunden-Vorzeichens.
+
+    Positiv → grün, negativ → rot, null → Standard (kein Stylesheet).
+
+    Args:
+        widget:  QWidget mit setStyleSheet()-Methode (z.B. QLabel).
+        minutes: Überstunden-Minuten.
+    """
+    if minutes > 0:
+        widget.setStyleSheet(f"color: {COLOR_POSITIVE};")
+    elif minutes < 0:
+        widget.setStyleSheet(f"color: {COLOR_NEGATIVE};")
+    else:
+        widget.setStyleSheet("")
 
 # pylint: disable=too-few-public-methods
 class HeatmapDelegate(QStyledItemDelegate):

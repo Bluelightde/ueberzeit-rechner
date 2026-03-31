@@ -2,9 +2,12 @@
 Eigenständiges Widget für den Haupt-Tab (Eingabe & Liste).
 """
 import csv
+import logging
 import os
 import shutil
 from datetime import datetime
+
+logger = logging.getLogger(__name__)
 
 from PyQt6.QtCore import QDate, Qt, QTime, pyqtSignal
 from PyQt6.QtGui import QColor, QFont
@@ -20,9 +23,11 @@ from config import DB_FILE
 from models import WorkEntry
 from logic import (
     calculate_timed_entries, get_login_time,
-    format_time, get_target_minutes, get_max_minutes, get_target_minutes_for_date
+    format_time, get_target_minutes, get_max_minutes, get_target_minutes_for_date,
+    COLOR_POSITIVE, COLOR_NEGATIVE,
 )
 from dialogs import EditDialog
+from ui_components import set_overtime_color
 
 try:
     from openpyxl import Workbook
@@ -311,9 +316,9 @@ class MainTab(QWidget):
                 Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter
             )
             if e.minutes > 0:
-                item_min.setForeground(QColor("#10b981"))
+                item_min.setForeground(QColor(COLOR_POSITIVE))
             elif e.minutes < 0:
-                item_min.setForeground(QColor("#ef4444"))
+                item_min.setForeground(QColor(COLOR_NEGATIVE))
 
             btn_del = QPushButton("Löschen")
             btn_del.clicked.connect(lambda checked, ent=e: self.delete_entry(ent))
@@ -326,12 +331,7 @@ class MainTab(QWidget):
             row += 1
 
         self.lbl_saldo.setText(format_time(total_overall))
-        if total_overall > 0:
-            self.lbl_saldo.setStyleSheet("color: #10b981;")
-        elif total_overall < 0:
-            self.lbl_saldo.setStyleSheet("color: #ef4444;")
-        else:
-            self.lbl_saldo.setStyleSheet("")
+        set_overtime_color(self.lbl_saldo, total_overall)
 
     # --- Input helpers ---
 
@@ -448,12 +448,13 @@ class MainTab(QWidget):
                 rest_hours = (dt_curr - dt_prev).total_seconds() / 3600
                 if 0 < rest_hours < 11:
                     warnings.append(f"⚠️ Ruhezeit verletzt ({rest_hours:.1f}h < 11h)")
-            except ValueError:
-                pass
+            except ValueError as exc:
+                logger.debug("Ruhezeit konnte nicht berechnet werden (ungültige Zeitdaten): %s",
+                             exc)
 
         if warnings:
-            calc_text += f" <span style='color: #ef4444;'>{' | '.join(warnings)}</span>"
-            self.lbl_live_calc.setStyleSheet("color: #ef4444;")
+            calc_text += f" <span style='color: {COLOR_NEGATIVE};'>{' | '.join(warnings)}</span>"
+            self.lbl_live_calc.setStyleSheet(f"color: {COLOR_NEGATIVE};")
         else:
             self.lbl_live_calc.setStyleSheet("")
         self.lbl_live_calc.setText(calc_text)
@@ -806,6 +807,10 @@ class MainTab(QWidget):
                             except ValueError:
                                 pass
                         if not parsed_date:
+                            logger.warning(
+                                "Datum '%s' konnte in keinem Format geparst werden, "
+                                "wird unverändert übernommen", date_str
+                            )
                             parsed_date = date_str
 
                         pending.append(WorkEntry(

@@ -4,10 +4,13 @@ Geschäftslogik zur Feiertagsberechnung, Zeitauswertung und Login-Ermittlung.
 Enthält außerdem gemeinsam genutzte Hilfsfunktionen für alle Tab-Widgets.
 """
 import getpass
+import logging
 import re
 import subprocess
 import sys
 from PyQt6.QtCore import QDate, QTime
+
+logger = logging.getLogger(__name__)
 
 # pylint: disable=too-many-locals
 def get_holidays(year, state):
@@ -98,8 +101,9 @@ def calculate_timed_entries(timed_entries, target_mins, max_mins, is_auto):
                         gap += 24 * 60
                     total_accumulated_gap += max(0, gap)
                 last_end_qtime = en
-            except (ValueError, TypeError):
-                pass
+            except (ValueError, TypeError) as exc:
+                logger.warning("Ungültige Zeitdaten in Eintrag %s, wird übersprungen: %s",
+                               e.id, exc)
 
         total_accumulated_gross += current_gross
 
@@ -143,8 +147,8 @@ def _get_login_time_linux():
             m = re.search(r"T(\d{2}):(\d{2}):", r.stdout.strip().split("\n")[-1])
             if m:
                 return QTime(int(m.group(1)), int(m.group(2)))
-    except (subprocess.SubprocessError, OSError):
-        pass
+    except (subprocess.SubprocessError, OSError) as exc:
+        logger.debug("journalctl-Abfrage fehlgeschlagen, versuche 'who': %s", exc)
 
     # Fallback: who
     try:
@@ -156,8 +160,8 @@ def _get_login_time_linux():
                     m = re.search(r"(\d{2}:\d{2})", line)
                     if m:
                         return QTime.fromString(m.group(1), "HH:mm")
-    except (subprocess.SubprocessError, OSError):
-        pass
+    except (subprocess.SubprocessError, OSError) as exc:
+        logger.debug("'who'-Abfrage (Linux) fehlgeschlagen: %s", exc)
     return None
 
 # pylint: disable=too-many-locals, too-many-branches
@@ -171,8 +175,8 @@ def _get_login_time_darwin():
             m = re.search(r"\s(\d{1,2}:\d{2})\s", r.stdout.split("\n")[0])
             if m:
                 return QTime.fromString(m.group(1).zfill(5), "HH:mm")
-    except (subprocess.SubprocessError, OSError):
-        pass
+    except (subprocess.SubprocessError, OSError) as exc:
+        logger.debug("'last'-Abfrage (macOS) fehlgeschlagen, versuche 'who': %s", exc)
 
     # Fallback: who
     try:
@@ -184,8 +188,8 @@ def _get_login_time_darwin():
                     m = re.search(r"(\d{1,2}:\d{2})", line)
                     if m:
                         return QTime.fromString(m.group(1).zfill(5), "HH:mm")
-    except (subprocess.SubprocessError, OSError):
-        pass
+    except (subprocess.SubprocessError, OSError) as exc:
+        logger.debug("'who'-Abfrage (macOS) fehlgeschlagen: %s", exc)
     return None
 
 # pylint: disable=too-many-locals, too-many-branches
@@ -205,9 +209,15 @@ def _get_login_time_win32():
         )
         if r.returncode == 0 and r.stdout.strip():
             return QTime.fromString(r.stdout.strip(), "HH:mm")
-    except (subprocess.SubprocessError, OSError):
-        pass
+    except (subprocess.SubprocessError, OSError) as exc:
+        logger.debug("PowerShell-Abfrage (Windows) fehlgeschlagen: %s", exc)
     return None
+
+# --- Semantische Farbkonstanten (UI-übergreifend) ---
+COLOR_POSITIVE = "#10b981"  # Grün: Überstunden / positiver Saldo
+COLOR_NEGATIVE = "#ef4444"  # Rot:  Minus / negativer Saldo
+COLOR_INFO     = "#3b82f6"  # Blau: Hinweise / Tipps
+
 
 def format_time(total_minutes, show_plus=False):
     """Formatiert Minuten in lesbare Zeitangabe.

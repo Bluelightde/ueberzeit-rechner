@@ -22,6 +22,7 @@ else:
 
 DB_FILE = os.path.join(BASE_DIR, "ueberstunden_daten.db")
 SETTINGS_FILE = os.path.join(BASE_DIR, "ueberstunden_settings.json")
+LOG_FILE = os.path.join(BASE_DIR, "ueberstunden.log")
 ICON_PATH = os.path.join(BUNDLE_DIR, "icon.png")
 
 BUNDESLAENDER = {

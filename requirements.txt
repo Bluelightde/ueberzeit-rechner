@@ -1,5 +1,11 @@
-PyQt6
-matplotlib
-openpyxl
-pyinstaller
-Pillow
+# Laufzeit-Abhängigkeiten
+PyQt6==6.10.2
+matplotlib==3.10.1
+openpyxl==3.1.5
+Pillow==11.3.0
+
+# Build
+pyinstaller==6.19.0
+
+# Tests
+pytest==9.0.2

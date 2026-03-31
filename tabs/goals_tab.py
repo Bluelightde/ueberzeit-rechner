@@ -9,7 +9,7 @@ from PyQt6.QtWidgets import (
     QLabel, QDateEdit, QSpinBox, QProgressBar, QGridLayout, QWidget
 )
 
-from logic import format_time, get_target_minutes_for_date
+from logic import format_time, get_target_minutes_for_date, COLOR_POSITIVE, COLOR_NEGATIVE, COLOR_INFO
 
 
 class GoalsTab(QWidget):
@@ -203,7 +203,7 @@ class GoalsTab(QWidget):
             self.lbl_goal_action.setText(
                 "🎉 Herzlichen Glückwunsch! Du hast genug Überstunden für diesen Zeitraum angespart!"
             )
-            self.lbl_goal_action.setStyleSheet("color: #10b981; font-weight: bold;")
+            self.lbl_goal_action.setStyleSheet(f"color: {COLOR_POSITIVE}; font-weight: bold;")
             return
 
         self.lbl_goal_missing.setText(format_time(missing_mins))
@@ -214,7 +214,7 @@ class GoalsTab(QWidget):
             self.lbl_goal_action.setText(
                 "⚠️ Der gewünschte Zeitraum hat bereits begonnen oder ist heute!"
             )
-            self.lbl_goal_action.setStyleSheet("color: #ef4444; font-weight: bold;")
+            self.lbl_goal_action.setStyleSheet(f"color: {COLOR_NEGATIVE}; font-weight: bold;")
             return
 
         workdays = 0
@@ -229,7 +229,7 @@ class GoalsTab(QWidget):
         self.lbl_goal_days.setText(str(workdays))
         if workdays == 0:
             self.lbl_goal_action.setText("Keine regulären Arbeitstage mehr zum Ansparen übrig!")
-            self.lbl_goal_action.setStyleSheet("color: #ef4444;")
+            self.lbl_goal_action.setStyleSheet(f"color: {COLOR_NEGATIVE};")
         else:
             extra_per_day = missing_mins / workdays
             self.lbl_goal_action.setText(
@@ -237,4 +237,4 @@ class GoalsTab(QWidget):
                 f"<b>{int(extra_per_day)} Minuten</b> länger machst, "
                 "erreichst du dein Ziel punktgenau."
             )
-            self.lbl_goal_action.setStyleSheet("color: #3b82f6;")
+            self.lbl_goal_action.setStyleSheet(f"color: {COLOR_INFO};")

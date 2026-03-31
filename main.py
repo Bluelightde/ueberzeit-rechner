@@ -2,6 +2,8 @@
 Überstundenrechner Pro - Ein Tool zur Erfassung und Berechnung von Arbeitsstunden.
 """
 import json
+import logging
+import logging.handlers
 import os
 import shutil
 import sys
@@ -14,7 +16,7 @@ from PyQt6.QtWidgets import (
 
 # Configuration must be imported before matplotlib for MPLCONFIGDIR
 # pylint: disable=wrong-import-position, wrong-import-order
-from config import BASE_DIR, DB_FILE, SETTINGS_FILE, ICON_PATH
+from config import BASE_DIR, DB_FILE, SETTINGS_FILE, ICON_PATH, LOG_FILE
 from database import DBManager
 from dialogs import SettingsDialog
 
@@ -23,6 +25,27 @@ from tabs.goals_tab import GoalsTab
 from tabs.calendar_tab import CalendarTab
 from tabs.stats_tab import StatsTab
 # pylint: enable=wrong-import-position, wrong-import-order
+
+logger = logging.getLogger(__name__)
+
+
+def setup_logging():
+    """Richtet das App-weite Logging in eine rotierende Log-Datei ein.
+
+    Jede Log-Datei wächst bis zu 1 MB, danach wird sie rotiert (max. 2 Backups).
+    Alle Level ab DEBUG werden erfasst — so sind vollständige Diagnosen möglich,
+    ohne dass die Dateigröße aus dem Ruder läuft.
+    """
+    handler = logging.handlers.RotatingFileHandler(
+        LOG_FILE, maxBytes=1_000_000, backupCount=2, encoding="utf-8"
+    )
+    handler.setFormatter(logging.Formatter(
+        "%(asctime)s %(levelname)-8s %(name)s: %(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S",
+    ))
+    root = logging.getLogger()
+    root.setLevel(logging.DEBUG)
+    root.addHandler(handler)
 
 
 # --- HAUPTANWENDUNG ---
@@ -155,8 +178,9 @@ class UeberstundenApp(QMainWindow):
             try:
                 with open(SETTINGS_FILE, "r", encoding="utf-8") as f:
                     defaults.update(json.load(f))
-            except (json.JSONDecodeError, OSError):
-                pass
+            except (json.JSONDecodeError, OSError) as exc:
+                logger.warning("Einstellungsdatei konnte nicht gelesen werden, "
+                               "Standardwerte werden verwendet: %s", exc)
         return defaults
 
     def save_settings(self):
@@ -164,8 +188,8 @@ class UeberstundenApp(QMainWindow):
         try:
             with open(SETTINGS_FILE, "w", encoding="utf-8") as f:
                 json.dump(self.settings, f)
-        except OSError:
-            pass
+        except OSError as exc:
+            logger.error("Einstellungen konnten nicht gespeichert werden: %s", exc)
 
     # --- Theme ---
 
@@ -714,6 +738,8 @@ class UeberstundenApp(QMainWindow):
 
 
 if __name__ == "__main__":
+    setup_logging()
+    logger.info("Anwendung gestartet")
     QApplication.setHighDpiScaleFactorRoundingPolicy(
         Qt.HighDpiScaleFactorRoundingPolicy.PassThrough
     )

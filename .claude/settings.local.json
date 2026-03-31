@@ -22,7 +22,17 @@
       "Bash(/home/miw/Dokumente/GitHub/ueberstundenrechnerpro/venv/bin/python -m pytest tests/ -v)",
       "Bash(/home/miw/Dokumente/GitHub/ueberstundenrechnerpro/venv/bin/python -m ensurepip)",
       "Bash(/home/miw/Dokumente/GitHub/ueberstundenrechnerpro/venv/bin/python -m pip install pytest -q)",
-      "Bash(/home/miw/Dokumente/GitHub/ueberstundenrechnerpro/venv/bin/pytest tests/ -v 2>&1)"
+      "Bash(/home/miw/Dokumente/GitHub/ueberstundenrechnerpro/venv/bin/pytest tests/ -v 2>&1)",
+      "Bash(/home/miw/Dokumente/GitHub/ueberstundenrechnerpro/venv/bin/python -m pip freeze)",
+      "Bash(/home/miw/Dokumente/GitHub/ueberstundenrechnerpro/venv/bin/pip show:*)",
+      "Bash(pip show:*)",
+      "Bash(python3 -m pip show matplotlib openpyxl Pillow)",
+      "Bash(/home/miw/Dokumente/GitHub/ueberstundenrechnerpro/venv/bin/pytest tests/ -q)",
+      "Bash(grep -rn \"except\\\\|: pass\\\\|: print\" main.py logic.py tabs/*.py database.py --include=\"*.py\")",
+      "Bash(grep -E \"except|pass$|print\\\\\\(\")",
+      "Bash(grep -E \"pass$|print\\\\\\(\")",
+      "Bash(python -m pytest tests/ -q)",
+      "Bash(venv/bin/python -m pytest tests/ -q 2>&1)"
     ]
   }
 }
