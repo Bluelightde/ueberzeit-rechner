@@ -2,6 +2,7 @@
 Eigenständiges Widget für den Diagramm- und Statistik-Tab.
 """
 from PyQt6.QtWidgets import QVBoxLayout, QWidget
+from i18n import tr
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg
 from matplotlib.figure import Figure
 
@@ -58,15 +59,15 @@ class StatsTab(QWidget):
             spine.set_edgecolor(text_color)
 
         if not monthly_totals:
-            ax.text(0.5, 0.5, "Keine Daten vorhanden",
+            ax.text(0.5, 0.5, tr("Keine Daten vorhanden"),
                     color=text_color, ha='center', va='center')
         else:
             months = list(monthly_totals.keys())
             values = [v / 60 for v in monthly_totals.values()]
             colors = [COLOR_POSITIVE if v >= 0 else COLOR_NEGATIVE for v in values]
             ax.bar(months, values, color=colors)
-            ax.set_ylabel("Überstunden (in Stunden)", color=text_color)
-            ax.set_title("Monatlicher Überstunden-Verlauf", color=text_color)
+            ax.set_ylabel(tr("Überstunden (in Stunden)"), color=text_color)
+            ax.set_title(tr("Monatlicher Überstunden-Verlauf"), color=text_color)
             self.figure.autofmt_xdate()
 
         self.canvas.draw()

@@ -3,6 +3,8 @@ PyQt6==6.10.2
 matplotlib==3.10.1
 openpyxl==3.1.5
 Pillow==11.3.0
+holidays
+pycountry
 
 # Build
 pyinstaller==6.19.0

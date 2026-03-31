@@ -3,6 +3,7 @@ Eigenständiges Widget für den Ziele- und Dashboard-Tab.
 """
 import math
 from PyQt6.QtCore import QDate, Qt
+from i18n import tr
 from PyQt6.QtGui import QFont
 from PyQt6.QtWidgets import (
     QVBoxLayout, QGroupBox, QHBoxLayout, QCheckBox,
@@ -43,11 +44,11 @@ class GoalsTab(QWidget):
         layout.setSpacing(20)
 
         # 1. Konfigurations-Bereich
-        settings_group = QGroupBox("Zeitraum und Überstunden-Ziel konfigurieren")
+        settings_group = QGroupBox(tr("Zeitraum und Überstunden-Ziel konfigurieren"))
         settings_layout = QVBoxLayout(settings_group)
 
         goal_header_layout = QHBoxLayout()
-        self.goal_active_cb = QCheckBox("Gleitzeit-Ziel aktivieren (Urlaubs-Sparer)")
+        self.goal_active_cb = QCheckBox(tr("Gleitzeit-Ziel aktivieren (Urlaubs-Sparer)"))
         self.goal_active_cb.setChecked(self.settings.get("goal_active", False))
         self.goal_active_cb.stateChanged.connect(self.on_goal_changed)
         goal_header_layout.addWidget(self.goal_active_cb)
@@ -56,7 +57,7 @@ class GoalsTab(QWidget):
 
         goal_inputs_layout = QHBoxLayout()
 
-        goal_inputs_layout.addWidget(QLabel("Urlaub / Frei von:"))
+        goal_inputs_layout.addWidget(QLabel(tr("Urlaub / Frei von:")))
         self.goal_start_edit = QDateEdit()
         self.goal_start_edit.setCalendarPopup(True)
         self.goal_start_edit.setDate(
@@ -65,7 +66,7 @@ class GoalsTab(QWidget):
         self.goal_start_edit.dateChanged.connect(self.auto_calculate_goal_hours)
         goal_inputs_layout.addWidget(self.goal_start_edit)
 
-        goal_inputs_layout.addWidget(QLabel("bis:"))
+        goal_inputs_layout.addWidget(QLabel(tr("bis:")))
         self.goal_end_edit = QDateEdit()
         self.goal_end_edit.setCalendarPopup(True)
         self.goal_end_edit.setDate(
@@ -74,7 +75,7 @@ class GoalsTab(QWidget):
         self.goal_end_edit.dateChanged.connect(self.auto_calculate_goal_hours)
         goal_inputs_layout.addWidget(self.goal_end_edit)
 
-        goal_inputs_layout.addWidget(QLabel(" | Benötigte Überstunden:"))
+        goal_inputs_layout.addWidget(QLabel(tr(" | Benötigte Überstunden:")))
         self.goal_hours_spin = QSpinBox()
         self.goal_hours_spin.setRange(0, 5000)
         self.goal_hours_spin.setValue(self.settings.get("goal_hours", 0))
@@ -88,7 +89,7 @@ class GoalsTab(QWidget):
         layout.addWidget(settings_group)
 
         # 2. Dashboard-Bereich
-        self.dashboard_group = QGroupBox("Fortschritts-Dashboard")
+        self.dashboard_group = QGroupBox(tr("Fortschritts-Dashboard"))
         dashboard_layout = QVBoxLayout(self.dashboard_group)
 
         self.goal_progress_bar = QProgressBar()
@@ -105,20 +106,20 @@ class GoalsTab(QWidget):
         self.lbl_goal_current = QLabel("0h 0m")
         self.lbl_goal_current.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.lbl_goal_current.setFont(QFont("Arial", 20, QFont.Weight.Bold))
-        grid.addWidget(QLabel("Aktueller Stand", alignment=Qt.AlignmentFlag.AlignCenter), 0, 0)
+        grid.addWidget(QLabel(tr("Aktueller Stand"), alignment=Qt.AlignmentFlag.AlignCenter), 0, 0)
         grid.addWidget(self.lbl_goal_current, 1, 0)
 
         self.lbl_goal_missing = QLabel("0h 0m")
         self.lbl_goal_missing.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.lbl_goal_missing.setFont(QFont("Arial", 20, QFont.Weight.Bold))
-        grid.addWidget(QLabel("Es fehlen noch", alignment=Qt.AlignmentFlag.AlignCenter), 0, 1)
+        grid.addWidget(QLabel(tr("Es fehlen noch"), alignment=Qt.AlignmentFlag.AlignCenter), 0, 1)
         grid.addWidget(self.lbl_goal_missing, 1, 1)
 
         self.lbl_goal_days = QLabel("0")
         self.lbl_goal_days.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.lbl_goal_days.setFont(QFont("Arial", 20, QFont.Weight.Bold))
         grid.addWidget(
-            QLabel("Arbeitstage zum Ansparen", alignment=Qt.AlignmentFlag.AlignCenter), 0, 2
+            QLabel(tr("Arbeitstage zum Ansparen"), alignment=Qt.AlignmentFlag.AlignCenter), 0, 2
         )
         grid.addWidget(self.lbl_goal_days, 1, 2)
 
@@ -193,16 +194,17 @@ class GoalsTab(QWidget):
             percentage = min(100, int((progress_saldo / target_mins) * 100))
 
         self.goal_progress_bar.setValue(percentage)
-        self.goal_progress_bar.setFormat(f"{percentage}% erreicht")
+        self.goal_progress_bar.setFormat(tr("{p}% erreicht").format(p=percentage))
         self.lbl_goal_current.setText(format_time(current_saldo))
 
         missing_mins = target_mins - current_saldo
         if missing_mins <= 0:
             self.lbl_goal_missing.setText("0h 0m")
             self.lbl_goal_days.setText("-")
-            self.lbl_goal_action.setText(
-                "🎉 Herzlichen Glückwunsch! Du hast genug Überstunden für diesen Zeitraum angespart!"
-            )
+            self.lbl_goal_action.setText(tr(
+                "🎉 Herzlichen Glückwunsch! "
+                "Du hast genug Überstunden für diesen Zeitraum angespart!"
+            ))
             self.lbl_goal_action.setStyleSheet(f"color: {COLOR_POSITIVE}; font-weight: bold;")
             return
 
@@ -212,7 +214,7 @@ class GoalsTab(QWidget):
         if target_start_date <= today:
             self.lbl_goal_days.setText("0")
             self.lbl_goal_action.setText(
-                "⚠️ Der gewünschte Zeitraum hat bereits begonnen oder ist heute!"
+                tr("⚠️ Der gewünschte Zeitraum hat bereits begonnen oder ist heute!")
             )
             self.lbl_goal_action.setStyleSheet(f"color: {COLOR_NEGATIVE}; font-weight: bold;")
             return
@@ -228,13 +230,17 @@ class GoalsTab(QWidget):
 
         self.lbl_goal_days.setText(str(workdays))
         if workdays == 0:
-            self.lbl_goal_action.setText("Keine regulären Arbeitstage mehr zum Ansparen übrig!")
+            self.lbl_goal_action.setText(
+                tr("Keine regulären Arbeitstage mehr zum Ansparen übrig!")
+            )
             self.lbl_goal_action.setStyleSheet(f"color: {COLOR_NEGATIVE};")
         else:
             extra_per_day = missing_mins / workdays
             self.lbl_goal_action.setText(
-                f"Tipp: Wenn du ab sofort jeden Tag "
-                f"<b>{int(extra_per_day)} Minuten</b> länger machst, "
-                "erreichst du dein Ziel punktgenau."
+                tr(
+                    "Tipp: Wenn du ab sofort jeden Tag "
+                    "<b>{m} Minuten</b> länger machst, "
+                    "erreichst du dein Ziel punktgenau."
+                ).format(m=int(extra_per_day))
             )
             self.lbl_goal_action.setStyleSheet(f"color: {COLOR_INFO};")

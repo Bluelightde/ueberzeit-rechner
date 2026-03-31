@@ -8,76 +8,51 @@ import logging
 import re
 import subprocess
 import sys
-from PyQt6.QtCore import QDate, QTime
+import holidays as holidays_lib
+from PyQt6.QtCore import QDate, QLocale, QTime
+from i18n import get_locale
 
 logger = logging.getLogger(__name__)
 
-# pylint: disable=too-many-locals
-def get_holidays(year, state):
+
+def get_holidays(year, country, subdiv=None):
+    """Gibt gesetzliche Feiertage als {yyyy-MM-dd: name} zurück.
+
+    Nutzt die holidays-Bibliothek für internationale Unterstützung.
+    country: ISO 3166-1 Alpha-2 Code (z.B. 'DE', 'FR', 'US')
+    subdiv:  Regions-/Bundeslandcode (z.B. 'TH' für Thüringen), oder None
     """
-    Berechnet die gesetzlichen Feiertage für ein gegebenes Jahr und Bundesland.
-    """
-    a = year % 19
-    b = year // 100
-    c = year % 100
-    d = b // 4
-    e = b % 4
-    f = (b + 8) // 25
-    g = (b - f + 1) // 3
-    h = (19 * a + b - d - g + 15) % 30
-    i = c // 4
-    k = c % 4
-    l = (32 + 2 * e + 2 * i - h - k) % 7
-    m = (a + 11 * h + 22 * l) // 451
-    month = (h + l - 7 * m + 114) // 31
-    day = ((h + l - 7 * m + 114) % 31) + 1
-    easter = QDate(year, month, day)
-
-    holidays = {
-        f"{year}-01-01": "Neujahr",
-        easter.addDays(-2).toString("yyyy-MM-dd"): "Karfreitag",
-        easter.addDays(1).toString("yyyy-MM-dd"): "Ostermontag",
-        f"{year}-05-01": "Tag der Arbeit",
-        easter.addDays(39).toString("yyyy-MM-dd"): "Christi Himmelfahrt",
-        easter.addDays(50).toString("yyyy-MM-dd"): "Pfingstmontag",
-        f"{year}-10-03": "Tag d. Dt. Einheit",
-        f"{year}-12-25": "1. Weihnachtstag",
-        f"{year}-12-26": "2. Weihnachtstag",
-    }
-
-    if state in ["BW", "BY", "ST"]:
-        holidays[f"{year}-01-06"] = "Hl. Drei Könige"
-    if state in ["BE", "MV"]:
-        holidays[f"{year}-03-08"] = "Int. Frauentag"
-    if state in ["BW", "HE", "NW", "RP", "SL"] or (state == "BY"):
-        holidays[easter.addDays(60).toString("yyyy-MM-dd")] = "Fronleichnam"
-    if state in ["BY", "SL"]:
-        holidays[f"{year}-08-15"] = "Mariä Himmelfahrt"
-    if state == "TH":
-        holidays[f"{year}-09-20"] = "Weltkindertag"
-    if state in ["BB", "HB", "HH", "MV", "NI", "SH", "SN", "ST", "TH"]:
-        holidays[f"{year}-10-31"] = "Reformationstag"
-    if state in ["BW", "BY", "NW", "RP", "SL"]:
-        holidays[f"{year}-11-01"] = "Allerheiligen"
-    if state == "SN":
-        d = QDate(year, 11, 22)
-        while d.dayOfWeek() != 3:
-            d = d.addDays(-1)
-        holidays[d.toString("yyyy-MM-dd")] = "Buß- und Bettag"
-
-    return holidays
+    try:
+        h = holidays_lib.country_holidays(country, subdiv=subdiv, years=year)
+        return {d.strftime("%Y-%m-%d"): name for d, name in h.items()}
+    except (KeyError, NotImplementedError) as exc:
+        logger.warning("Feiertage für %s/%s konnten nicht geladen werden: %s",
+                       country, subdiv, exc)
+        return {}
 
 # pylint: disable=too-many-locals, too-many-branches
-def calculate_timed_entries(timed_entries, target_mins, max_mins, is_auto):
+DEFAULT_BREAK_RULES = [
+    {"after": 360, "break": 30},   # >6h → 30 Min (deutsches ArbZG)
+    {"after": 540, "break": 45},   # >9h → 45 Min (deutsches ArbZG)
+]
+
+
+def calculate_timed_entries(timed_entries, target_mins, max_mins, is_auto, break_rules=None):
     """Berechnet Pause und Überstunden für die Zeiteinträge eines Tages.
 
     Gibt ein Tupel (results, total_net) zurück:
-      results   — dict {entry.id: (pause_min, overtime_min)}
-      total_net — tatsächliche Netto-Arbeitszeit des Tages (nach Cap) in Minuten
+      results    — dict {entry.id: (pause_min, overtime_min)}
+      total_net  — tatsächliche Netto-Arbeitszeit des Tages (nach Cap) in Minuten
 
+    break_rules — Liste von {"after": Minuten, "break": Minuten}, nach "after" absteigend
+                  geprüft. None verwendet DEFAULT_BREAK_RULES (deutsches ArbZG).
     Nur der letzte Eintrag nach Startzeit erhält die Überstunden; alle anderen 0.
     Manuelle Einträge (ohne Start-/Endzeit) werden nicht übergeben und bleiben unberührt.
     """
+    rules = sorted(
+        break_rules if break_rules is not None else DEFAULT_BREAK_RULES,
+        key=lambda r: r["after"], reverse=True
+    )
     sorted_entries = sorted(timed_entries, key=lambda x: x.start or "00:00")
     results = {}
     total_accumulated_gross = 0
@@ -108,12 +83,11 @@ def calculate_timed_entries(timed_entries, target_mins, max_mins, is_auto):
         total_accumulated_gross += current_gross
 
         if is_auto:
-            if total_accumulated_gross > 9 * 60:
-                req = 45
-            elif total_accumulated_gross > 6 * 60:
-                req = 30
-            else:
-                req = 0
+            req = 0
+            for rule in rules:
+                if total_accumulated_gross > rule["after"]:
+                    req = rule["break"]
+                    break
             current_total_pause_needed = max(0, req - total_accumulated_gap)
             current_break = max(0, current_total_pause_needed - recorded_pause_distributed)
         else:
@@ -219,6 +193,22 @@ COLOR_NEGATIVE = "#ef4444"  # Rot:  Minus / negativer Saldo
 COLOR_INFO     = "#3b82f6"  # Blau: Hinweise / Tipps
 
 
+def fmt_date(date_str: str) -> str:
+    """Konvertiert yyyy-MM-dd in das lokale Kurzformat (z.B. 03/15/24 oder 15.03.24)."""
+    d = QDate.fromString(date_str, "yyyy-MM-dd")
+    if not d.isValid():
+        return date_str
+    return get_locale().toString(d, QLocale.FormatType.ShortFormat)
+
+
+def fmt_time_hhmm(time_str: str) -> str:
+    """Konvertiert HH:mm in das lokale Kurzformat (z.B. 2:30 PM oder 14:30)."""
+    t = QTime.fromString(time_str, "HH:mm")
+    if not t.isValid():
+        return time_str
+    return get_locale().toString(t, QLocale.FormatType.ShortFormat)
+
+
 def format_time(total_minutes, show_plus=False):
     """Formatiert Minuten in lesbare Zeitangabe.
     Unter 60 Min → '45m', ab 60 Min → '1h 5m'.
@@ -264,8 +254,9 @@ def get_target_minutes_for_date(date_str, entries, settings):
             return t.hour() * 60 + t.minute()
 
     year = qdate.year()
-    state = settings.get("state", "TH")
-    holidays = get_holidays(year, state)
+    country = settings.get("country", "DE")
+    subdiv = settings.get("state")
+    holidays = get_holidays(year, country, subdiv)
 
     if date_str in holidays:
         return 0

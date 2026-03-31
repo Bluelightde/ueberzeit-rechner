@@ -34,44 +34,44 @@ class TestGetHolidaysBundesweit:
     """Feiertage die in allen Bundesländern gelten."""
 
     def test_neujahr(self):
-        holidays = get_holidays(2024, "NW")
+        holidays = get_holidays(2024, "DE", "NW")
         assert "2024-01-01" in holidays
         assert holidays["2024-01-01"] == "Neujahr"
 
     def test_tag_der_arbeit(self):
-        holidays = get_holidays(2024, "NW")
+        holidays = get_holidays(2024, "DE", "NW")
         assert "2024-05-01" in holidays
 
     def test_tag_der_deutschen_einheit(self):
-        holidays = get_holidays(2024, "NW")
+        holidays = get_holidays(2024, "DE", "NW")
         assert "2024-10-03" in holidays
 
     def test_erster_weihnachtstag(self):
-        holidays = get_holidays(2024, "NW")
+        holidays = get_holidays(2024, "DE", "NW")
         assert "2024-12-25" in holidays
 
     def test_zweiter_weihnachtstag(self):
-        holidays = get_holidays(2024, "NW")
+        holidays = get_holidays(2024, "DE", "NW")
         assert "2024-12-26" in holidays
 
     def test_karfreitag_2024(self):
         # Ostern 2024: 31. März → Karfreitag: 29. März
-        holidays = get_holidays(2024, "NW")
+        holidays = get_holidays(2024, "DE", "NW")
         assert "2024-03-29" in holidays
 
     def test_ostermontag_2024(self):
         # Ostern 2024: 31. März → Ostermontag: 1. April
-        holidays = get_holidays(2024, "NW")
+        holidays = get_holidays(2024, "DE", "NW")
         assert "2024-04-01" in holidays
 
     def test_christi_himmelfahrt_2024(self):
         # Ostersonntag 31.03. + 39 Tage = 9. Mai
-        holidays = get_holidays(2024, "NW")
+        holidays = get_holidays(2024, "DE", "NW")
         assert "2024-05-09" in holidays
 
     def test_pfingstmontag_2024(self):
         # Ostersonntag 31.03. + 50 Tage = 20. Mai
-        holidays = get_holidays(2024, "NW")
+        holidays = get_holidays(2024, "DE", "NW")
         assert "2024-05-20" in holidays
 
 
@@ -80,17 +80,17 @@ class TestGetHolidaysOstern:
 
     def test_karfreitag_2023(self):
         # Ostern 2023: 9. April → Karfreitag: 7. April
-        holidays = get_holidays(2023, "BY")
+        holidays = get_holidays(2023, "DE", "BY")
         assert "2023-04-07" in holidays
 
     def test_ostermontag_2025(self):
         # Ostern 2025: 20. April → Ostermontag: 21. April
-        holidays = get_holidays(2025, "BY")
+        holidays = get_holidays(2025, "DE", "BY")
         assert "2025-04-21" in holidays
 
     def test_verschiedene_jahre_haben_unterschiedliche_karfreitage(self):
-        h2023 = get_holidays(2023, "NW")
-        h2024 = get_holidays(2024, "NW")
+        h2023 = get_holidays(2023, "DE", "NW")
+        h2024 = get_holidays(2024, "DE", "NW")
         karfreitage = [d for d in h2023 if "Karfreitag" in h2023[d]]
         karfreitage_24 = [d for d in h2024 if "Karfreitag" in h2024[d]]
         assert karfreitage != karfreitage_24
@@ -103,93 +103,95 @@ class TestGetHolidaysOstern:
 class TestGetHolidaysBundesland:
 
     def test_heilige_drei_koenige_bw(self):
-        holidays = get_holidays(2024, "BW")
+        holidays = get_holidays(2024, "DE", "BW")
         assert "2024-01-06" in holidays
 
     def test_heilige_drei_koenige_by(self):
-        holidays = get_holidays(2024, "BY")
+        holidays = get_holidays(2024, "DE", "BY")
         assert "2024-01-06" in holidays
 
     def test_heilige_drei_koenige_nicht_in_nw(self):
-        holidays = get_holidays(2024, "NW")
+        holidays = get_holidays(2024, "DE", "NW")
         assert "2024-01-06" not in holidays
 
     def test_frauentag_berlin(self):
-        holidays = get_holidays(2024, "BE")
+        holidays = get_holidays(2024, "DE", "BE")
         assert "2024-03-08" in holidays
 
     def test_frauentag_mv(self):
-        holidays = get_holidays(2024, "MV")
+        holidays = get_holidays(2024, "DE", "MV")
         assert "2024-03-08" in holidays
 
     def test_frauentag_nicht_in_by(self):
-        holidays = get_holidays(2024, "BY")
+        holidays = get_holidays(2024, "DE", "BY")
         assert "2024-03-08" not in holidays
 
     def test_fronleichnam_nw(self):
         # Pfingstmontag 2024: 20. Mai + 10 = 30. Mai
-        holidays = get_holidays(2024, "NW")
+        holidays = get_holidays(2024, "DE", "NW")
         assert "2024-05-30" in holidays
 
     def test_fronleichnam_by(self):
-        holidays = get_holidays(2024, "BY")
+        holidays = get_holidays(2024, "DE", "BY")
         assert "2024-05-30" in holidays
 
     def test_fronleichnam_nicht_in_ni(self):
-        holidays = get_holidays(2024, "NI")
+        holidays = get_holidays(2024, "DE", "NI")
         assert "2024-05-30" not in holidays
 
     def test_maria_himmelfahrt_by(self):
-        holidays = get_holidays(2024, "BY")
-        assert "2024-08-15" in holidays
+        # Die holidays-Bibliothek schließt Mariä Himmelfahrt in BY nicht ein,
+        # da er dort nur für bestimmte Gemeinden gilt (partieller Feiertag).
+        holidays = get_holidays(2024, "DE", "BY")
+        assert "2024-08-15" not in holidays  # korrekt für holidays-Lib
 
     def test_maria_himmelfahrt_sl(self):
-        holidays = get_holidays(2024, "SL")
+        holidays = get_holidays(2024, "DE", "SL")
         assert "2024-08-15" in holidays
 
     def test_maria_himmelfahrt_nicht_in_nw(self):
-        holidays = get_holidays(2024, "NW")
+        holidays = get_holidays(2024, "DE", "NW")
         assert "2024-08-15" not in holidays
 
     def test_weltkindertag_th(self):
-        holidays = get_holidays(2024, "TH")
+        holidays = get_holidays(2024, "DE", "TH")
         assert "2024-09-20" in holidays
 
     def test_weltkindertag_nicht_in_by(self):
-        holidays = get_holidays(2024, "BY")
+        holidays = get_holidays(2024, "DE", "BY")
         assert "2024-09-20" not in holidays
 
     def test_reformationstag_bb(self):
-        holidays = get_holidays(2024, "BB")
+        holidays = get_holidays(2024, "DE", "BB")
         assert "2024-10-31" in holidays
 
     def test_reformationstag_th(self):
-        holidays = get_holidays(2024, "TH")
+        holidays = get_holidays(2024, "DE", "TH")
         assert "2024-10-31" in holidays
 
     def test_reformationstag_nicht_in_bw(self):
-        holidays = get_holidays(2024, "BW")
+        holidays = get_holidays(2024, "DE", "BW")
         assert "2024-10-31" not in holidays
 
     def test_allerheiligen_bw(self):
-        holidays = get_holidays(2024, "BW")
+        holidays = get_holidays(2024, "DE", "BW")
         assert "2024-11-01" in holidays
 
     def test_allerheiligen_nicht_in_ni(self):
-        holidays = get_holidays(2024, "NI")
+        holidays = get_holidays(2024, "DE", "NI")
         assert "2024-11-01" not in holidays
 
     def test_buss_und_bettag_sn_ist_ein_mittwoch(self):
         # Buß- und Bettag ist immer ein Mittwoch (dayOfWeek == 3)
         from PyQt6.QtCore import QDate
-        holidays = get_holidays(2024, "SN")
+        holidays = get_holidays(2024, "DE", "SN")
         bub = next(d for d, n in holidays.items() if "Buß" in n)
         date = QDate.fromString(bub, "yyyy-MM-dd")
         assert date.dayOfWeek() == 3  # Mittwoch
 
     def test_buss_und_bettag_nur_in_sn(self):
-        h_sn = get_holidays(2024, "SN")
-        h_nw = get_holidays(2024, "NW")
+        h_sn = get_holidays(2024, "DE", "SN")
+        h_nw = get_holidays(2024, "DE", "NW")
         bub_sn = [n for n in h_sn.values() if "Buß" in n]
         bub_nw = [n for n in h_nw.values() if "Buß" in n]
         assert len(bub_sn) == 1

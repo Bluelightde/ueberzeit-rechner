@@ -2,12 +2,13 @@
 Eigenständiges Widget für den Kalender-Heatmap-Tab.
 """
 import calendar
-from PyQt6.QtCore import QDate, Qt, pyqtSignal
+from PyQt6.QtCore import QDate, QLocale, Qt, pyqtSignal
 from PyQt6.QtGui import QFont, QColor
 from PyQt6.QtWidgets import (
     QVBoxLayout, QHBoxLayout, QPushButton, QComboBox,
     QLabel, QTableWidget, QHeaderView, QTableWidgetItem, QWidget
 )
+from i18n import get_locale, tr
 
 from logic import get_holidays, format_time
 from ui_components import HeatmapDelegate, overtime_qcolor, set_overtime_color
@@ -37,21 +38,21 @@ class CalendarTab(QWidget):
         layout = QVBoxLayout(self)
 
         cal_toolbar = QHBoxLayout()
-        self.btn_cal_prev = QPushButton("< Vorheriger")
+        self.btn_cal_prev = QPushButton(tr("< Vorheriger"))
         self.btn_cal_prev.clicked.connect(self._go_prev_month)
-        self.btn_cal_next = QPushButton("Nächster >")
+        self.btn_cal_next = QPushButton(tr("Nächster >"))
         self.btn_cal_next.clicked.connect(self._go_next_month)
 
         self.cal_month_filter = QComboBox()
         self.cal_month_filter.currentIndexChanged.connect(self._on_filter_changed)
 
-        cal_toolbar.addWidget(QLabel("Monat:"))
+        cal_toolbar.addWidget(QLabel(tr("Monat:")))
         cal_toolbar.addWidget(self.btn_cal_prev)
         cal_toolbar.addWidget(self.cal_month_filter)
         cal_toolbar.addWidget(self.btn_cal_next)
         cal_toolbar.addStretch()
 
-        self.lbl_cal_month_sum = QLabel("Monats-Saldo: 0h 0m")
+        self.lbl_cal_month_sum = QLabel(tr("Monats-Saldo: {s}").format(s="0h 0m"))
         font = QFont()
         font.setPointSize(12)
         font.setBold(True)
@@ -60,9 +61,9 @@ class CalendarTab(QWidget):
         layout.addLayout(cal_toolbar)
 
         self.cal_table = QTableWidget(6, 7)
-        self.cal_table.setHorizontalHeaderLabels(
-            ["Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag", "Samstag", "Sonntag"]
-        )
+        self.cal_table.setHorizontalHeaderLabels([
+            get_locale().dayName(i, QLocale.FormatType.LongFormat) for i in range(1, 8)
+        ])
         self.cal_table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
         self.cal_table.verticalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
         self.cal_table.verticalHeader().hide()
@@ -148,8 +149,9 @@ class CalendarTab(QWidget):
         year, month = map(int, sel_date_str.split('-'))
         cal = calendar.monthcalendar(year, month)
 
-        state = self.settings.get("state", "TH")
-        holidays = get_holidays(year, state)
+        country = self.settings.get("country", "DE")
+        subdiv = self.settings.get("state")
+        holidays = get_holidays(year, country, subdiv)
 
         day_mins = {}
         monthly_sum = 0
@@ -158,7 +160,9 @@ class CalendarTab(QWidget):
                 day_mins[e.date] = day_mins.get(e.date, 0) + e.minutes
                 monthly_sum += e.minutes
 
-        self.lbl_cal_month_sum.setText(f"Monats-Saldo: {format_time(monthly_sum, show_plus=True)}")
+        self.lbl_cal_month_sum.setText(
+            tr("Monats-Saldo: {s}").format(s=format_time(monthly_sum, show_plus=True))
+        )
         set_overtime_color(self.lbl_cal_month_sum, monthly_sum)
 
         self.cal_table.setRowCount(len(cal))

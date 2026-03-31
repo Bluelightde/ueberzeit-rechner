@@ -20,6 +20,7 @@ from config import BASE_DIR, DB_FILE, SETTINGS_FILE, ICON_PATH, LOG_FILE
 from database import DBManager
 from dialogs import SettingsDialog
 
+from i18n import setup_i18n, tr
 from tabs.main_tab import MainTab
 from tabs.goals_tab import GoalsTab
 from tabs.calendar_tab import CalendarTab
@@ -61,7 +62,7 @@ class UeberstundenApp(QMainWindow):
     def __init__(self):
         """Initialisiert die Anwendung, lädt Einstellungen und baut die UI auf."""
         super().__init__()
-        self.setWindowTitle("Überstunden-Rechner Pro")
+        self.setWindowTitle(tr("Überstunden-Rechner Pro"))
         self.resize(1000, 750)
 
         if os.path.exists(ICON_PATH):
@@ -91,10 +92,10 @@ class UeberstundenApp(QMainWindow):
         self.tab_stats = StatsTab(settings=self.settings)
 
         tabs = QTabWidget()
-        tabs.addTab(self.tab_main,     "Eingabe && Liste")
-        tabs.addTab(self.tab_goals,    "Ziele && Dashboard")
-        tabs.addTab(self.tab_calendar, "Kalender-Heatmap")
-        tabs.addTab(self.tab_stats,    "Diagramm && Statistik")
+        tabs.addTab(self.tab_main,     tr("Eingabe && Liste"))
+        tabs.addTab(self.tab_goals,    tr("Ziele && Dashboard"))
+        tabs.addTab(self.tab_calendar, tr("Kalender-Heatmap"))
+        tabs.addTab(self.tab_stats,    tr("Diagramm && Statistik"))
         self.setCentralWidget(tabs)
 
         # Signals verbinden: Datenänderungen im Haupt-Tab → alle Tabs aktualisieren
@@ -120,20 +121,20 @@ class UeberstundenApp(QMainWindow):
         if db_path == DB_FILE:
             return db_path
         msg = QMessageBox(self)
-        msg.setWindowTitle("Datenbank nicht gefunden")
-        msg.setText(
-            f"Die Datenbankdatei wurde nicht gefunden:\n{db_path}\n\n"
+        msg.setWindowTitle(tr("Datenbank nicht gefunden"))
+        msg.setText(tr(
+            "Die Datenbankdatei wurde nicht gefunden:\n{path}\n\n"
             "Bitte wähle eine vorhandene Datenbankdatei oder einen neuen Speicherort."
-        )
-        btn_select = msg.addButton("Datei auswählen…", QMessageBox.ButtonRole.AcceptRole)
-        btn_new = msg.addButton("Neu erstellen", QMessageBox.ButtonRole.ActionRole)
-        msg.addButton("Abbrechen", QMessageBox.ButtonRole.RejectRole)
+        ).format(path=db_path))
+        btn_select = msg.addButton(tr("Datei auswählen…"), QMessageBox.ButtonRole.AcceptRole)
+        btn_new = msg.addButton(tr("Neu erstellen"), QMessageBox.ButtonRole.ActionRole)
+        msg.addButton(tr("Abbrechen"), QMessageBox.ButtonRole.RejectRole)
         msg.exec()
         clicked = msg.clickedButton()
         if clicked == btn_select:
             path, _ = QFileDialog.getOpenFileName(
-                self, "Datenbankdatei auswählen", DB_FILE,
-                "SQLite-Datenbank (*.db);;Alle Dateien (*)"
+                self, tr("Datenbankdatei auswählen"), DB_FILE,
+                tr("SQLite-Datenbank (*.db);;Alle Dateien (*)")
             )
             if path:
                 self.settings["db_path"] = path
@@ -141,8 +142,8 @@ class UeberstundenApp(QMainWindow):
                 return path
         elif clicked == btn_new:
             path, _ = QFileDialog.getSaveFileName(
-                self, "Neue Datenbankdatei anlegen", DB_FILE,
-                "SQLite-Datenbank (*.db);;Alle Dateien (*)"
+                self, tr("Neue Datenbankdatei anlegen"), DB_FILE,
+                tr("SQLite-Datenbank (*.db);;Alle Dateien (*)")
             )
             if path:
                 self.settings["db_path"] = path
@@ -159,7 +160,13 @@ class UeberstundenApp(QMainWindow):
         defaults = {
             "default_start": "07:00",
             "target_work_time": "08:00",
+            "language": "",
+            "country": "DE",
             "state": "TH",
+            "break_rules": [
+                {"after": 360, "break": 30},
+                {"after": 540, "break": 45},
+            ],
             "dark_mode": self.system_is_dark,
             "auto_break": True,
             "use_login_time": False,
@@ -696,9 +703,11 @@ class UeberstundenApp(QMainWindow):
             if new_db_path != old_db_path:
                 if os.path.exists(old_db_path) and not os.path.exists(new_db_path):
                     reply = QMessageBox.question(
-                        self, "Datenbank verschieben?",
-                        "Soll die bestehende Datenbank an den neuen Ort verschoben werden?\n"
-                        "(Bei 'Nein' wird am neuen Ort eine neue, leere Datenbank erstellt.)",
+                        self, tr("Datenbank verschieben?"),
+                        tr(
+                            "Soll die bestehende Datenbank an den neuen Ort verschoben werden?\n"
+                            "(Bei 'Nein' wird am neuen Ort eine neue, leere Datenbank erstellt.)"
+                        ),
                         QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No |
                         QMessageBox.StandardButton.Cancel
                     )
@@ -708,8 +717,8 @@ class UeberstundenApp(QMainWindow):
                         try:
                             shutil.move(old_db_path, new_db_path)
                         except OSError as e:
-                            QMessageBox.critical(self, "Fehler",
-                                               f"Datenbank konnte nicht verschoben werden:\n{e}")
+                            QMessageBox.critical(self, tr("Fehler"),
+                                tr("Datenbank konnte nicht verschoben werden:\n{e}").format(e=e))
                             return
 
                 self.db.close()
@@ -726,6 +735,8 @@ class UeberstundenApp(QMainWindow):
 
             # Tabs über Einstellungsänderung informieren und UI neu laden
             self.tab_main.on_settings_changed()
+            # Filter zurücksetzen, damit alle Einträge sichtbar sind
+            self.tab_main.set_filter("ALL")
             self._on_data_changed()
 
     # --- Lebenszyklus ---
@@ -744,6 +755,16 @@ if __name__ == "__main__":
         Qt.HighDpiScaleFactorRoundingPolicy.PassThrough
     )
     app = QApplication(sys.argv)
+    # Einstellungen früh laden um gespeicherte Sprache zu kennen
+    _early_settings = {}
+    if os.path.exists(SETTINGS_FILE):
+        try:
+            import json as _json
+            with open(SETTINGS_FILE, "r", encoding="utf-8") as _f:
+                _early_settings = _json.load(_f)
+        except Exception:  # pylint: disable=broad-except
+            pass
+    setup_i18n(_early_settings.get("language"))
     window = UeberstundenApp()
     window.show()
     sys.exit(app.exec())

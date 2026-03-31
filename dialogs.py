@@ -2,14 +2,15 @@
 """
 Dialog-Fenster für Einstellungen und zum Bearbeiten von Einträgen.
 """
-from PyQt6.QtCore import QDate, QTime
+from PyQt6.QtCore import QDate, QLocale, QTime
 from PyQt6.QtWidgets import (
     QCheckBox, QComboBox, QDateEdit, QDialog,
     QFileDialog, QHBoxLayout, QHeaderView, QLabel,
     QLineEdit, QPushButton, QSpinBox,
     QTableWidget, QTimeEdit, QVBoxLayout
 )
-from config import BUNDESLAENDER, DB_FILE
+from config import DB_FILE, get_country_list, get_subdivisions
+from i18n import available_languages, get_locale, tr
 from models import WorkEntry
 from logic import calculate_timed_entries
 
@@ -24,18 +25,18 @@ class SettingsDialog(QDialog):
         Initialisiert den Einstellungsdialog mit den aktuellen Werten.
         """
         super().__init__(parent)
-        self.setWindowTitle("Einstellungen")
-        self.resize(380, 480)
+        self.setWindowTitle(tr("Einstellungen"))
+        self.resize(400, 540)
         layout = QVBoxLayout(self)
 
-        layout.addWidget(QLabel("<b>Tages-Standardwerte:</b>"))
+        layout.addWidget(QLabel(f"<b>{tr('Tages-Standardwerte:')}</b>"))
 
-        self.login_time_cb = QCheckBox("Login-Zeit als Startzeit verwenden")
-        self.login_time_cb.setToolTip(
+        self.login_time_cb = QCheckBox(tr("Login-Zeit als Startzeit verwenden"))
+        self.login_time_cb.setToolTip(tr(
             "Liest beim Programmstart die letzte Anmeldezeit des Benutzers aus.\n"
             "Die Standard-Startzeit dient als Fallback, falls die Anmeldezeit\n"
             "nicht ermittelt werden kann."
-        )
+        ))
         self.login_time_cb.setChecked(current_settings.get("use_login_time", False))
         layout.addWidget(self.login_time_cb)
 
@@ -43,22 +44,22 @@ class SettingsDialog(QDialog):
         self._setup_time_settings_ui(layout, current_settings)
 
         layout.addSpacing(10)
-        layout.addWidget(QLabel("<b>Pausen-Regelung:</b>"))
-        self.auto_break_cb = QCheckBox("Automatische Pausen-Berechnung")
-        self.auto_break_cb.setToolTip("6-9h: 30 Min, >9h: 45 Min")
+        layout.addWidget(QLabel(f"<b>{tr('Pausen-Regelung:')}</b>"))
+        self.auto_break_cb = QCheckBox(tr("Automatische Pausen-Berechnung"))
         self.auto_break_cb.setChecked(current_settings.get("auto_break", True))
         layout.addWidget(self.auto_break_cb)
+        self._setup_break_rules_ui(layout, current_settings)
 
         self._setup_regional_ui(layout, current_settings)
         self._setup_special_days_ui(layout, current_settings)
 
         layout.addSpacing(10)
-        layout.addWidget(QLabel("<b>Darstellung:</b>"))
-        self.dark_mode_cb = QCheckBox("Dark Mode aktivieren")
+        layout.addWidget(QLabel(f"<b>{tr('Darstellung:')}</b>"))
+        self.dark_mode_cb = QCheckBox(tr("Dark Mode aktivieren"))
         self.dark_mode_cb.setChecked(current_settings.get("dark_mode", False))
         layout.addWidget(self.dark_mode_cb)
 
-        self.btn_save = QPushButton("Speichern")
+        self.btn_save = QPushButton(tr("Speichern"))
         self.btn_save.clicked.connect(self.accept)
 
         self._setup_db_path_ui(layout, current_settings)
@@ -68,10 +69,11 @@ class SettingsDialog(QDialog):
 
     def _setup_workdays_ui(self, layout, current_settings):
         layout.addSpacing(10)
-        layout.addWidget(QLabel("<b>Arbeitstage (Soll-Tage):</b>"))
+        layout.addWidget(QLabel(f"<b>{tr('Arbeitstage (Soll-Tage):')}</b>"))
         self.workday_checkboxes = []
         workdays_layout = QHBoxLayout()
-        days = ["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"]
+        days = [get_locale().dayName(i + 1, QLocale.FormatType.ShortFormat)
+                for i in range(7)]
         selected_workdays = current_settings.get("workdays", [0, 1, 2, 3, 4])
         for i, day_name in enumerate(days):
             cb = QCheckBox(day_name)
@@ -84,12 +86,14 @@ class SettingsDialog(QDialog):
         layout.addSpacing(10)
         time_layout = QHBoxLayout()
         self.time_start = QTimeEdit()
-        self.time_start.setDisplayFormat("HH:mm")
+        self.time_start.setDisplayFormat(
+            get_locale().timeFormat(QLocale.FormatType.ShortFormat)
+        )
         default_start = current_settings.get("default_start", "07:00")
         self.time_start.setTime(QTime.fromString(default_start, "HH:mm"))
         self.time_start.setEnabled(not current_settings.get("use_login_time", False))
         self.login_time_cb.stateChanged.connect(self._on_login_time_state_changed)
-        time_layout.addWidget(QLabel("Fallback Startzeit:"))
+        time_layout.addWidget(QLabel(tr("Fallback Startzeit:")))
         time_layout.addWidget(self.time_start)
         layout.addLayout(time_layout)
 
@@ -98,7 +102,7 @@ class SettingsDialog(QDialog):
         self.time_target.setDisplayFormat("HH:mm")
         target_work_time = current_settings.get("target_work_time", "08:00")
         self.time_target.setTime(QTime.fromString(target_work_time, "HH:mm"))
-        target_layout.addWidget(QLabel("Regelarbeitszeit (Soll):"))
+        target_layout.addWidget(QLabel(tr("Regelarbeitszeit (Soll):")))
         target_layout.addWidget(self.time_target)
         layout.addLayout(target_layout)
 
@@ -107,30 +111,122 @@ class SettingsDialog(QDialog):
         self.max_hours_spin.setRange(6, 24)
         self.max_hours_spin.setSuffix(" h")
         self.max_hours_spin.setValue(current_settings.get("max_work_hours", 10))
-        max_layout.addWidget(QLabel("Max. anrechenbare Arbeitszeit:"))
+        max_layout.addWidget(QLabel(tr("Max. anrechenbare Arbeitszeit:")))
         max_layout.addWidget(self.max_hours_spin)
         layout.addLayout(max_layout)
 
+    def _setup_break_rules_ui(self, layout, current_settings):
+        self.break_rules_table = QTableWidget(0, 2)
+        self.break_rules_table.setHorizontalHeaderLabels(
+            [tr("Ab Arbeitszeit (h:mm)"), tr("Pause (min)")]
+        )
+        self.break_rules_table.horizontalHeader().setSectionResizeMode(
+            QHeaderView.ResizeMode.Stretch
+        )
+        self.break_rules_table.setFixedHeight(100)
+        layout.addWidget(self.break_rules_table)
+
+        btn_layout = QHBoxLayout()
+        btn_add = QPushButton(tr("Hinzufügen"))
+        btn_add.clicked.connect(self.add_break_rule_row)
+        btn_remove = QPushButton(tr("Löschen"))
+        btn_remove.clicked.connect(self.remove_break_rule_row)
+        btn_layout.addWidget(btn_add)
+        btn_layout.addWidget(btn_remove)
+        layout.addLayout(btn_layout)
+
+        rules = current_settings.get("break_rules", [
+            {"after": 360, "break": 30},
+            {"after": 540, "break": 45},
+        ])
+        for rule in sorted(rules, key=lambda r: r["after"]):
+            self.add_break_rule_row(rule)
+
+    def add_break_rule_row(self, data=None):
+        if not isinstance(data, dict):
+            data = None
+        row = self.break_rules_table.rowCount()
+        self.break_rules_table.insertRow(row)
+
+        after_edit = QTimeEdit()
+        after_edit.setDisplayFormat("HH:mm")
+        after_mins = data["after"] if data else 360
+        after_edit.setTime(QTime(after_mins // 60, after_mins % 60))
+        self.break_rules_table.setCellWidget(row, 0, after_edit)
+
+        break_spin = QSpinBox()
+        break_spin.setRange(0, 120)
+        break_spin.setSuffix(" min")
+        break_spin.setValue(data["break"] if data else 30)
+        self.break_rules_table.setCellWidget(row, 1, break_spin)
+
+    def remove_break_rule_row(self):
+        curr = self.break_rules_table.currentRow()
+        if curr >= 0:
+            self.break_rules_table.removeRow(curr)
+
     def _setup_regional_ui(self, layout, current_settings):
         layout.addSpacing(10)
-        layout.addWidget(QLabel("<b>Regionales:</b>"))
-        state_layout = QHBoxLayout()
-        self.state_combo = QComboBox()
-        for code, name in BUNDESLAENDER.items():
-            self.state_combo.addItem(name, code)
-        curr_state = current_settings.get("state", "TH")
-        idx = self.state_combo.findData(curr_state)
+        layout.addWidget(QLabel(f"<b>{tr('Regionales:')}</b>"))
+
+        lang_layout = QHBoxLayout()
+        self.lang_combo = QComboBox()
+        for code, name in available_languages():
+            self.lang_combo.addItem(name, code)
+        curr_lang = current_settings.get("language", "")
+        idx = self.lang_combo.findData(curr_lang)
         if idx >= 0:
-            self.state_combo.setCurrentIndex(idx)
-        state_layout.addWidget(QLabel("Bundesland (für Feiertage):"))
-        state_layout.addWidget(self.state_combo)
-        layout.addLayout(state_layout)
+            self.lang_combo.setCurrentIndex(idx)
+        lang_layout.addWidget(QLabel(tr("Sprache:")))
+        lang_layout.addWidget(self.lang_combo)
+        lang_layout.addWidget(QLabel(f"<i>{tr('(Neustart erforderlich)')}</i>"))
+        layout.addLayout(lang_layout)
+
+        country_layout = QHBoxLayout()
+        self.country_combo = QComboBox()
+        for code, name in get_country_list():
+            self.country_combo.addItem(name, code)
+        curr_country = current_settings.get("country", "DE")
+        idx = self.country_combo.findData(curr_country)
+        if idx >= 0:
+            self.country_combo.setCurrentIndex(idx)
+        country_layout.addWidget(QLabel(tr("Land:")))
+        country_layout.addWidget(self.country_combo)
+        layout.addLayout(country_layout)
+
+        subdiv_layout = QHBoxLayout()
+        self.state_combo = QComboBox()
+        subdiv_layout.addWidget(QLabel(tr("Region (für Feiertage):")))
+        subdiv_layout.addWidget(self.state_combo)
+        layout.addLayout(subdiv_layout)
+
+        self._update_subdiv_combo(curr_country, current_settings.get("state"))
+        self.country_combo.currentIndexChanged.connect(self._on_country_changed)
+
+    def _on_country_changed(self):
+        self._update_subdiv_combo(self.country_combo.currentData())
+
+    def _update_subdiv_combo(self, country, current_subdiv=None):
+        self.state_combo.clear()
+        subdivs = get_subdivisions(country)
+        if subdivs:
+            for code, name in subdivs:
+                self.state_combo.addItem(name, code)
+            if current_subdiv:
+                idx = self.state_combo.findData(current_subdiv)
+                if idx >= 0:
+                    self.state_combo.setCurrentIndex(idx)
+            self.state_combo.setEnabled(True)
+        else:
+            self.state_combo.setEnabled(False)
 
     def _setup_special_days_ui(self, layout, current_settings):
         layout.addSpacing(10)
-        layout.addWidget(QLabel("<b>Sonder-Arbeitstage (z.B. 24.12.):</b>"))
+        layout.addWidget(QLabel(f"<b>{tr('Sonder-Arbeitstage (z.B. 24.12.):')}</b>"))
         self.special_days_table = QTableWidget(0, 3)
-        self.special_days_table.setHorizontalHeaderLabels(["Tag", "Monat", "Soll-Zeit"])
+        self.special_days_table.setHorizontalHeaderLabels(
+            [tr("Tag"), tr("Monat"), tr("Soll-Zeit")]
+        )
         self.special_days_table.horizontalHeader().setSectionResizeMode(
             QHeaderView.ResizeMode.Stretch
         )
@@ -138,9 +234,9 @@ class SettingsDialog(QDialog):
         layout.addWidget(self.special_days_table)
 
         special_btn_layout = QHBoxLayout()
-        btn_add_special = QPushButton("Hinzufügen")
+        btn_add_special = QPushButton(tr("Hinzufügen"))
         btn_add_special.clicked.connect(self.add_special_day_row)
-        btn_remove_special = QPushButton("Löschen")
+        btn_remove_special = QPushButton(tr("Löschen"))
         btn_remove_special.clicked.connect(self.remove_special_day_row)
         special_btn_layout.addWidget(btn_add_special)
         special_btn_layout.addWidget(btn_remove_special)
@@ -152,12 +248,12 @@ class SettingsDialog(QDialog):
 
     def _setup_db_path_ui(self, layout, current_settings):
         layout.addSpacing(10)
-        layout.addWidget(QLabel("<b>Speicherort der Datenbank:</b>"))
+        layout.addWidget(QLabel(f"<b>{tr('Speicherort der Datenbank:')}</b>"))
         db_path_layout = QHBoxLayout()
         self.db_path_edit = QLineEdit()
         self.db_path_edit.setText(current_settings.get("db_path", DB_FILE))
         self.db_path_edit.setReadOnly(True)
-        btn_browse_db = QPushButton("Durchsuchen…")
+        btn_browse_db = QPushButton(tr("Durchsuchen…"))
         btn_browse_db.clicked.connect(self.browse_db_path)
         db_path_layout.addWidget(self.db_path_edit)
         db_path_layout.addWidget(btn_browse_db)
@@ -206,9 +302,9 @@ class SettingsDialog(QDialog):
         Öffnet einen Dateidialog zur Auswahl des Speicherorts der Datenbank.
         """
         path, _ = QFileDialog.getSaveFileName(
-            self, "Datenbank speichern unter",
+            self, tr("Datenbank speichern unter"),
             self.db_path_edit.text(),
-            "SQLite Datenbank (*.db);;Alle Dateien (*)"
+            tr("SQLite Datenbank (*.db);;Alle Dateien (*)")
         )
         if path:
             self.db_path_edit.setText(path)
@@ -225,16 +321,26 @@ class SettingsDialog(QDialog):
             target = self.special_days_table.cellWidget(r, 2).time().toString("HH:mm")
             special_days.append({"day": day, "month": month, "target": target})
 
+        break_rules = []
+        for r in range(self.break_rules_table.rowCount()):
+            t = self.break_rules_table.cellWidget(r, 0).time()
+            after = t.hour() * 60 + t.minute()
+            pause = self.break_rules_table.cellWidget(r, 1).value()
+            break_rules.append({"after": after, "break": pause})
+
         return {
             "default_start": self.time_start.time().toString("HH:mm"),
             "target_work_time": self.time_target.time().toString("HH:mm"),
-            "state": self.state_combo.currentData(),
+            "language": self.lang_combo.currentData(),
+            "country": self.country_combo.currentData(),
+            "state": self.state_combo.currentData() if self.state_combo.isEnabled() else None,
             "dark_mode": self.dark_mode_cb.isChecked(),
             "max_work_hours": self.max_hours_spin.value(),
             "auto_break": self.auto_break_cb.isChecked(),
             "use_login_time": self.login_time_cb.isChecked(),
             "workdays": workdays,
             "special_days": special_days,
+            "break_rules": break_rules,
             "db_path": self.db_path_edit.text()
         }
 
@@ -245,25 +351,27 @@ class EditDialog(QDialog):
     Dialog zum Bearbeiten oder Hinzufügen eines Arbeitseintrags.
     """
     def __init__(self, entry: WorkEntry, all_entries: list, target_minutes: int,
-                 max_minutes: int = 600, auto_break: bool = True, parent=None):
+                 max_minutes: int = 600, auto_break: bool = True,
+                 break_rules=None, parent=None):
         """
         Initialisiert den Bearbeitungsdialog.
         """
         super().__init__(parent)
-        self.setWindowTitle("Eintrag bearbeiten")
+        self.setWindowTitle(tr("Eintrag bearbeiten"))
         self.resize(450, 300)
         self.entry = entry
         self.all_entries = all_entries  # All entries to filter by date
         self.target_minutes = target_minutes
         self.max_minutes = max_minutes
         self.auto_break = auto_break
+        self.break_rules = break_rules
         layout = QVBoxLayout(self)
 
         self._setup_date_and_times_ui(layout)
         self._setup_minutes_and_reason_ui(layout)
         self._setup_custom_target_ui(layout)
 
-        btn_save = QPushButton("Speichern")
+        btn_save = QPushButton(tr("Speichern"))
         btn_save.clicked.connect(self.accept)
         layout.addWidget(btn_save)
 
@@ -273,26 +381,30 @@ class EditDialog(QDialog):
     def _setup_date_and_times_ui(self, layout):
         self.date_edit = QDateEdit()
         self.date_edit.setCalendarPopup(True)
+        self.date_edit.setDisplayFormat(
+            get_locale().dateFormat(QLocale.FormatType.ShortFormat)
+        )
         if self.entry.date:
             self.date_edit.setDate(QDate.fromString(self.entry.date, "yyyy-MM-dd"))
-        layout.addWidget(QLabel("Datum:"))
+        layout.addWidget(QLabel(tr("Datum:")))
         layout.addWidget(self.date_edit)
 
-        self.has_times_cb = QCheckBox("Start- und Endzeit verwenden")
+        self.has_times_cb = QCheckBox(tr("Start- und Endzeit verwenden"))
         has_times = bool(self.entry.start and self.entry.end)
         self.has_times_cb.setChecked(has_times)
         self.has_times_cb.stateChanged.connect(self.toggle_times)
         layout.addWidget(self.has_times_cb)
 
         time_layout = QHBoxLayout()
+        _time_fmt = get_locale().timeFormat(QLocale.FormatType.ShortFormat)
         self.time_start = QTimeEdit()
-        self.time_start.setDisplayFormat("HH:mm")
-        time_layout.addWidget(QLabel("Start:"))
+        self.time_start.setDisplayFormat(_time_fmt)
+        time_layout.addWidget(QLabel(tr("Start:")))
         time_layout.addWidget(self.time_start)
 
         self.time_end = QTimeEdit()
-        self.time_end.setDisplayFormat("HH:mm")
-        time_layout.addWidget(QLabel("Ende:"))
+        self.time_end.setDisplayFormat(_time_fmt)
+        time_layout.addWidget(QLabel(tr("Ende:")))
         time_layout.addWidget(self.time_end)
 
         self.pause_spin = QSpinBox()
@@ -300,7 +412,7 @@ class EditDialog(QDialog):
         self.pause_spin.setSuffix(" Min")
         self.pause_spin.setValue(self.entry.pause)
         self.pause_spin.setEnabled(not self.auto_break)
-        time_layout.addWidget(QLabel("Pause:"))
+        time_layout.addWidget(QLabel(tr("Pause:")))
         time_layout.addWidget(self.pause_spin)
         layout.addLayout(time_layout)
 
@@ -323,16 +435,16 @@ class EditDialog(QDialog):
         self.min_spinbox = QSpinBox()
         self.min_spinbox.setRange(-2000, 2000)
         self.min_spinbox.setValue(self.entry.minutes)
-        layout.addWidget(QLabel("Minuten (Überstunden):"))
+        layout.addWidget(QLabel(tr("Minuten (Überstunden):")))
         layout.addWidget(self.min_spinbox)
 
         self.reason_edit = QLineEdit()
         self.reason_edit.setText(self.entry.reason)
-        layout.addWidget(QLabel("Anlass:"))
+        layout.addWidget(QLabel(tr("Anlass:")))
         layout.addWidget(self.reason_edit)
 
     def _setup_custom_target_ui(self, layout):
-        self.custom_target_cb = QCheckBox("Individuelles Tagessoll für diesen Tag")
+        self.custom_target_cb = QCheckBox(tr("Individuelles Tagessoll für diesen Tag"))
         self.custom_target_cb.setChecked(self.entry.target_minutes != -1)
         self.custom_target_time = QTimeEdit()
         self.custom_target_time.setDisplayFormat("HH:mm")
@@ -394,7 +506,8 @@ class EditDialog(QDialog):
         other_timed = [e for e in self.all_entries
                        if e.date == curr_date_str and e.id != self.entry.id and e.start and e.end]
         results, _ = calculate_timed_entries(other_timed + [current_temp],
-                                             target_mins, self.max_minutes, self.auto_break)
+                                             target_mins, self.max_minutes, self.auto_break,
+                                             self.break_rules)
         entry_pause, entry_overtime = results[self.entry.id]
 
         if self.auto_break:

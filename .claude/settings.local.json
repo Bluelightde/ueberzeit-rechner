@@ -32,7 +32,13 @@
       "Bash(grep -E \"except|pass$|print\\\\\\(\")",
       "Bash(grep -E \"pass$|print\\\\\\(\")",
       "Bash(python -m pytest tests/ -q)",
-      "Bash(venv/bin/python -m pytest tests/ -q 2>&1)"
+      "Bash(venv/bin/python -m pytest tests/ -q 2>&1)",
+      "Bash(git checkout:*)",
+      "Bash(python -m pytest tests/test_logic.py -v)",
+      "Bash(python -m pytest tests/test_logic.py -q)",
+      "Bash(python3:*)",
+      "Bash(python -m pytest tests/ -x -q)",
+      "Bash(python -c \":*)"
     ]
   }
 }
