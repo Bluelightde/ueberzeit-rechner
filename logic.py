@@ -124,6 +124,85 @@ def calculate_timed_entries(timed_entries, target_mins, max_mins, is_auto):
     total_net = min(max_mins, total_accumulated_gross - recorded_pause_distributed)
     return results, total_net
 
+def _get_login_time_linux():
+    """Linux-spezifische Ermittlung der Login-Zeit."""
+    # Primär: journalctl mit --output=short-iso für zuverlässiges Parsing
+    try:
+        user = getpass.getuser()
+        r = subprocess.run(
+            ["journalctl", "-u", "systemd-logind",
+             "--grep", f"New session.*{user}",
+             "-n", "1", "--output=short-iso", "--no-pager"],
+            capture_output=True, text=True, timeout=5, check=False
+        )
+        if r.returncode == 0 and r.stdout.strip():
+            m = re.search(r"T(\d{2}):(\d{2}):", r.stdout.strip().split("\n")[-1])
+            if m:
+                return QTime(int(m.group(1)), int(m.group(2)))
+    except (subprocess.SubprocessError, OSError):
+        pass
+
+    # Fallback: who
+    try:
+        user = getpass.getuser()
+        r = subprocess.run(["who"], capture_output=True, text=True, timeout=3, check=False)
+        if r.returncode == 0:
+            for line in r.stdout.strip().splitlines():
+                if line.startswith(user + " ") or line.startswith(user + "\t"):
+                    m = re.search(r"(\d{2}:\d{2})", line)
+                    if m:
+                        return QTime.fromString(m.group(1), "HH:mm")
+    except (subprocess.SubprocessError, OSError):
+        pass
+    return None
+
+def _get_login_time_darwin():
+    """macOS-spezifische Ermittlung der Login-Zeit."""
+    try:
+        user = getpass.getuser()
+        r = subprocess.run(["last", "-1", user],
+                           capture_output=True, text=True, timeout=5, check=False)
+        if r.returncode == 0 and r.stdout:
+            m = re.search(r"\s(\d{1,2}:\d{2})\s", r.stdout.split("\n")[0])
+            if m:
+                return QTime.fromString(m.group(1).zfill(5), "HH:mm")
+    except (subprocess.SubprocessError, OSError):
+        pass
+
+    # Fallback: who
+    try:
+        user = getpass.getuser()
+        r = subprocess.run(["who"], capture_output=True, text=True, timeout=3, check=False)
+        if r.returncode == 0:
+            for line in r.stdout.strip().splitlines():
+                if line.startswith(user):
+                    m = re.search(r"(\d{1,2}:\d{2})", line)
+                    if m:
+                        return QTime.fromString(m.group(1).zfill(5), "HH:mm")
+    except (subprocess.SubprocessError, OSError):
+        pass
+    return None
+
+def _get_login_time_win32():
+    """Windows-spezifische Ermittlung der Login-Zeit."""
+    _no_win = {"creationflags": subprocess.CREATE_NO_WINDOW}
+    try:
+        ps_cmd = (
+            "(Get-CimInstance Win32_LogonSession | "
+            "Where-Object {$_.LogonType -in 2,10} | "
+            "Sort-Object StartTime -Descending | "
+            "Select-Object -First 1).StartTime.ToString('HH:mm')"
+        )
+        r = subprocess.run(
+            ["powershell", "-NoProfile", "-NonInteractive", "-Command", ps_cmd],
+            capture_output=True, text=True, timeout=8, check=False, **_no_win
+        )
+        if r.returncode == 0 and r.stdout.strip():
+            return QTime.fromString(r.stdout.strip(), "HH:mm")
+    except (subprocess.SubprocessError, OSError):
+        pass
+    return None
+
 def get_login_time():
     """Ermittelt die letzte Anmeldezeit des aktuellen Benutzers als QTime.
     Gibt None zurück wenn die Zeit nicht ermittelt werden kann.
@@ -132,80 +211,11 @@ def get_login_time():
     macOS  : last, Fallback: who
     Windows: PowerShell (Win32_LogonSession)
     """
-    _no_win = {"creationflags": subprocess.CREATE_NO_WINDOW} if sys.platform == "win32" else {}
-
     if sys.platform.startswith("linux"):
-        # Primär: journalctl mit --output=short-iso für zuverlässiges Parsing
-        try:
-            user = getpass.getuser()
-            r = subprocess.run(
-                ["journalctl", "-u", "systemd-logind",
-                 "--grep", f"New session.*{user}",
-                 "-n", "1", "--output=short-iso", "--no-pager"],
-                capture_output=True, text=True, timeout=5, check=False
-            )
-            if r.returncode == 0 and r.stdout.strip():
-                m = re.search(r"T(\d{2}):(\d{2}):", r.stdout.strip().split("\n")[-1])
-                if m:
-                    return QTime(int(m.group(1)), int(m.group(2)))
-        except (subprocess.SubprocessError, OSError):
-            pass
-
-        # Fallback: who
-        try:
-            user = getpass.getuser()
-            r = subprocess.run(["who"], capture_output=True, text=True, timeout=3, check=False)
-            if r.returncode == 0:
-                for line in r.stdout.strip().splitlines():
-                    if line.startswith(user + " ") or line.startswith(user + "\t"):
-                        m = re.search(r"(\d{2}:\d{2})", line)
-                        if m:
-                            return QTime.fromString(m.group(1), "HH:mm")
-        except (subprocess.SubprocessError, OSError):
-            pass
-
-    elif sys.platform == "darwin":
-        # macOS: last -1 <user>
-        try:
-            user = getpass.getuser()
-            r = subprocess.run(["last", "-1", user],
-                               capture_output=True, text=True, timeout=5, check=False)
-            if r.returncode == 0 and r.stdout:
-                m = re.search(r"\s(\d{1,2}:\d{2})\s", r.stdout.split("\n")[0])
-                if m:
-                    return QTime.fromString(m.group(1).zfill(5), "HH:mm")
-        except (subprocess.SubprocessError, OSError):
-            pass
-
-        # Fallback: who
-        try:
-            user = getpass.getuser()
-            r = subprocess.run(["who"], capture_output=True, text=True, timeout=3, check=False)
-            if r.returncode == 0:
-                for line in r.stdout.strip().splitlines():
-                    if line.startswith(user):
-                        m = re.search(r"(\d{1,2}:\d{2})", line)
-                        if m:
-                            return QTime.fromString(m.group(1).zfill(5), "HH:mm")
-        except (subprocess.SubprocessError, OSError):
-            pass
-
-    elif sys.platform == "win32":
-        # Windows: PowerShell — neueste interaktive Session (LogonType 2 oder 10)
-        try:
-            ps_cmd = (
-                "(Get-CimInstance Win32_LogonSession | "
-                "Where-Object {$_.LogonType -in 2,10} | "
-                "Sort-Object StartTime -Descending | "
-                "Select-Object -First 1).StartTime.ToString('HH:mm')"
-            )
-            r = subprocess.run(
-                ["powershell", "-NoProfile", "-NonInteractive", "-Command", ps_cmd],
-                capture_output=True, text=True, timeout=8, check=False, **_no_win
-            )
-            if r.returncode == 0 and r.stdout.strip():
-                return QTime.fromString(r.stdout.strip(), "HH:mm")
-        except (subprocess.SubprocessError, OSError):
-            pass
-
+        return _get_login_time_linux()
+    if sys.platform == "darwin":
+        return _get_login_time_darwin()
+    if sys.platform == "win32":
+        return _get_login_time_win32()
     return None
+

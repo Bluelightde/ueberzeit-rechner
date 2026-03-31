@@ -1,0 +1,789 @@
+"""
+Modul für die Tabs der Anwendung.
+"""
+import csv
+import os
+import shutil
+from datetime import datetime
+
+from PyQt6.QtCore import QDate, Qt, QTime
+from PyQt6.QtGui import QColor, QFont
+from PyQt6.QtWidgets import (
+    QCheckBox, QComboBox, QDateEdit,
+    QFileDialog, QFrame, QHBoxLayout, QHeaderView, QLabel,
+    QLineEdit, QMenu, QMessageBox, QPushButton, QSpinBox,
+    QTableWidget, QTableWidgetItem, QTimeEdit,
+    QVBoxLayout
+)
+
+from config import DB_FILE
+from models import WorkEntry
+from logic import calculate_timed_entries, get_login_time
+from dialogs import EditDialog
+
+try:
+    from openpyxl import Workbook
+    from openpyxl.styles import Alignment, Font, PatternFill
+    _OPENPYXL = True
+except ImportError:
+    _OPENPYXL = False
+
+
+class MainTabMixin:
+    """Mixin for the main input and list tab."""
+
+    def setup_main_tab(self):
+        """
+        Erstellt das Layout und die Steuerelemente für den Haupt-Tab (Eingabe & Liste).
+        """
+        layout = QVBoxLayout(self.tab_main)
+
+        self.lbl_saldo = QLabel("0h 0m")
+        self.lbl_saldo.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        font = QFont()
+        font.setPointSize(28)
+        font.setBold(True)
+        self.lbl_saldo.setFont(font)
+        layout.addWidget(QLabel("<b>Gesamt-Saldo:</b>",
+                                alignment=Qt.AlignmentFlag.AlignCenter))
+        layout.addWidget(self.lbl_saldo)
+
+        frame_input = QFrame()
+        frame_layout = QVBoxLayout(frame_input)
+
+        input_row1 = QHBoxLayout()
+        self.date_edit = QDateEdit()
+        self.date_edit.setCalendarPopup(True)
+        self.date_edit.setDate(QDate.currentDate())
+        self.date_edit.dateChanged.connect(self.update_live_calc)
+        input_row1.addWidget(QLabel("Datum:"))
+        input_row1.addWidget(self.date_edit)
+
+        start_to_use = self._get_default_start_time()
+
+        self.time_start = QTimeEdit()
+        self.time_start.setDisplayFormat("HH:mm")
+        self.time_start.setTime(start_to_use)
+        input_row1.addWidget(QLabel("Start:"))
+        input_row1.addWidget(self.time_start)
+        btn_now_start = QPushButton("Jetzt")
+        btn_now_start.setFixedWidth(50)
+        btn_now_start.setToolTip("Aktuelle Uhrzeit als Startzeit setzen")
+        btn_now_start.clicked.connect(lambda: self.time_start.setTime(QTime.currentTime()))
+        input_row1.addWidget(btn_now_start)
+
+        self.time_end = QTimeEdit()
+        self.time_end.setDisplayFormat("HH:mm")
+        input_row1.addWidget(QLabel("Ende:"))
+        input_row1.addWidget(self.time_end)
+        btn_now_end = QPushButton("Jetzt")
+        btn_now_end.setFixedWidth(50)
+        btn_now_end.setToolTip("Aktuelle Uhrzeit als Endzeit setzen")
+        btn_now_end.clicked.connect(self.set_now_as_end)
+        input_row1.addWidget(btn_now_end)
+
+        self.pause_spin = QSpinBox()
+        self.pause_spin.setRange(0, 300)
+        self.pause_spin.setSuffix(" Min")
+        self.pause_spin.setEnabled(not self.settings.get("auto_break", True))
+        input_row1.addWidget(QLabel("Pause:"))
+        input_row1.addWidget(self.pause_spin)
+
+        self.reason_edit = QLineEdit()
+        self.reason_edit.setPlaceholderText("z.B. Regulär")
+        input_row1.addWidget(QLabel("Anlass:"))
+        input_row1.addWidget(self.reason_edit)
+
+        btn_add = QPushButton("Eintragen")
+        btn_add.clicked.connect(self.add_entry)
+        input_row1.addWidget(btn_add)
+
+        frame_layout.addLayout(input_row1)
+
+        input_row2 = QHBoxLayout()
+        self.custom_target_cb = QCheckBox("Indiv. Tagessoll:")
+        self.custom_target_time = QTimeEdit()
+        self.custom_target_time.setDisplayFormat("HH:mm")
+        def_target = self.settings.get("target_work_time", "08:00")
+        self.custom_target_time.setTime(QTime.fromString(def_target, "HH:mm"))
+        self.custom_target_time.setEnabled(False)
+        self.custom_target_cb.stateChanged.connect(
+            lambda: self.custom_target_time.setEnabled(self.custom_target_cb.isChecked())
+        )
+        self.custom_target_cb.stateChanged.connect(self.update_live_calc)
+        self.custom_target_time.timeChanged.connect(self.update_live_calc)
+
+        input_row2.addWidget(self.custom_target_cb)
+        input_row2.addWidget(self.custom_target_time)
+        input_row2.addStretch()
+        frame_layout.addLayout(input_row2)
+
+        self.lbl_live_calc = QLabel("Berechne...")
+        self.lbl_live_calc.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        frame_layout.addWidget(self.lbl_live_calc)
+        layout.addWidget(frame_input)
+
+        self.time_start.timeChanged.connect(self.on_start_time_changed)
+        self.time_end.timeChanged.connect(self.update_live_calc)
+        self.pause_spin.valueChanged.connect(self.update_live_calc)
+
+        toolbar_layout = QHBoxLayout()
+        self.month_filter = QComboBox()
+        self.month_filter.addItem("Alle", "ALL")
+        self.month_filter.currentIndexChanged.connect(self.on_list_filter_changed)
+        toolbar_layout.addWidget(QLabel("Filter:"))
+        toolbar_layout.addWidget(self.month_filter)
+        toolbar_layout.addStretch()
+
+        btn_import = QPushButton("CSV Import")
+        btn_import.clicked.connect(self.import_csv)
+        toolbar_layout.addWidget(btn_import)
+
+        btn_export = QPushButton("Export")
+        export_menu = QMenu(self)
+        export_menu.addAction("CSV  (.csv)",  self.export_csv)
+        export_menu.addAction("Excel (.xlsx)", self.export_xlsx)
+        export_menu.addAction("PDF  (.pdf)",  self.export_pdf)
+        btn_export.setMenu(export_menu)
+        toolbar_layout.addWidget(btn_export)
+
+        btn_settings = QPushButton("Einstellungen")
+        btn_settings.clicked.connect(self.open_settings)
+        toolbar_layout.addWidget(btn_settings)
+        layout.addLayout(toolbar_layout)
+
+        self.table = QTableWidget(0, 5)
+        self.table.setHorizontalHeaderLabels(
+            ["Datum", "Zeitraum", "Überstunden", "Anlass", "Aktion"]
+        )
+        header = self.table.horizontalHeader()
+        header.setSectionResizeMode(3, QHeaderView.ResizeMode.Stretch)
+        self.table.setColumnWidth(1, 160)
+
+        self.table.cellDoubleClicked.connect(self.edit_entry)
+        layout.addWidget(self.table)
+
+        self.on_start_time_changed(start_to_use)
+
+    def load_data(self):
+        """
+        Lädt alle Daten aus der Datenbank und aktualisiert die Benutzeroberfläche.
+        """
+        self.entries = self.db.load_all()
+        self.update_ui()
+        self.update_stats_chart()
+        self.on_goal_changed()
+        self.update_calendar_heatmap()
+
+    def update_ui(self):
+        """Aktualisiert die Eintrags-Tabelle und den Gesamtsaldo entsprechend dem aktiven Filter."""
+        self.month_filter.blockSignals(True)
+        current_filter = self.month_filter.currentData()
+        self.month_filter.clear()
+        self.month_filter.addItem("Alle", "ALL")
+
+        months = sorted(
+            list(set(e.date[:7] for e in self.entries if len(e.date) >= 7)), reverse=True
+        )
+        for m in months:
+            self.month_filter.addItem(f"{m[-2:]}/{m[:4]}", m)
+        idx = self.month_filter.findData(current_filter)
+        if idx >= 0:
+            self.month_filter.setCurrentIndex(idx)
+        self.month_filter.blockSignals(False)
+
+        self.table.setRowCount(0)
+        filter_val = self.month_filter.currentData()
+        total_overall = sum(e.minutes for e in self.entries)
+
+        row = 0
+        for i, e in enumerate(self.entries):
+            if filter_val != "ALL" and not e.date.startswith(filter_val):
+                continue
+
+            self.table.insertRow(row)
+            item_date = QTableWidgetItem(
+                QDate.fromString(e.date, "yyyy-MM-dd").toString("dd.MM.yyyy")
+            )
+            item_date.setData(Qt.ItemDataRole.UserRole, i)
+            item_date.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+
+            z_str = (
+                f"{e.start} - {e.end}" + (f" (-{e.pause}m)" if e.pause > 0 else "")
+                if e.start else "-"
+            )
+            item_zeit = QTableWidgetItem(z_str)
+            item_zeit.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+
+            item_min = QTableWidgetItem(self.format_time(e.minutes, show_plus=True))
+            item_min.setTextAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+            if e.minutes > 0:
+                item_min.setForeground(QColor("#10b981"))
+            elif e.minutes < 0:
+                item_min.setForeground(QColor("#ef4444"))
+
+            btn_del = QPushButton("Löschen")
+            btn_del.clicked.connect(lambda checked, ent=e: self.delete_entry(ent))
+
+            self.table.setItem(row, 0, item_date)
+            self.table.setItem(row, 1, item_zeit)
+            self.table.setItem(row, 2, item_min)
+            self.table.setItem(row, 3, QTableWidgetItem(e.reason))
+            self.table.setCellWidget(row, 4, btn_del)
+            row += 1
+
+        self.lbl_saldo.setText(self.format_time(total_overall))
+        if total_overall > 0:
+            self.lbl_saldo.setStyleSheet("color: #10b981;")
+        elif total_overall < 0:
+            self.lbl_saldo.setStyleSheet("color: #ef4444;")
+        else:
+            self.lbl_saldo.setStyleSheet("")
+
+    def _get_default_start_time(self):
+        """Ermittelt die Startzeit für die Eingabemaske.
+        Wenn Login-Zeit aktiv: Login-Zeit → default_start (Fallback).
+        Sonst: last_start (heute) → default_start."""
+        if self.settings.get("use_login_time", False):
+            t = get_login_time()
+            if t and t.isValid():
+                return t
+            return QTime.fromString(self.settings.get("default_start", "07:00"), "HH:mm")
+        today = QDate.currentDate().toString("yyyy-MM-dd")
+        if self.settings.get("last_date") == today and self.settings.get("last_start"):
+            return QTime.fromString(self.settings["last_start"], "HH:mm")
+        return QTime.fromString(self.settings.get("default_start", "07:00"), "HH:mm")
+
+    def _compute_target_end_time(self, new_start: "QTime") -> "QTime":
+        """Berechnet die Endzeit so dass das Tagessoll (Regelarbeitszeit) erreicht wird.
+        Berücksichtigt bereits gespeicherte Einträge (auch manuelle) für das Datum."""
+        curr_date_str = self.date_edit.date().toString("yyyy-MM-dd")
+        all_day = [e for e in self.entries if e.date == curr_date_str]
+        timed_existing = [e for e in all_day if e.start and e.end]
+        manual_sum = sum(e.minutes for e in all_day if not (e.start and e.end))
+
+        target_mins = self.get_target_minutes_for_date(curr_date_str)
+        max_mins = self.get_max_minutes()
+        is_auto = self.settings.get("auto_break", True)
+
+        # Wir suchen die kleinste Dauer (in Minuten), die das Soll erfüllt.
+        for duration_mins in range(0, max_mins * 2 + 1):
+            temp = WorkEntry(
+                id=-1,
+                date=curr_date_str,
+                start=new_start.toString("HH:mm"),
+                end=new_start.addSecs(duration_mins * 60).toString("HH:mm"),
+                pause=self.pause_spin.value() if not is_auto else 0,
+                minutes=0,
+                reason=""
+            )
+            # calculate_timed_entries liefert uns das Netto der Zeiteinträge (timed_existing + temp)
+            _, total_net_timed = calculate_timed_entries(
+                timed_existing + [temp], target_mins, max_mins, is_auto
+            )
+
+            # Das gesamte Tagessaldo ist Netto-Zeit + manuelle Korrekturen
+            if (total_net_timed + manual_sum) >= target_mins:
+                break
+
+        return new_start.addSecs(duration_mins * 60)
+
+    def on_start_time_changed(self, new_start_time):
+        """Wird aufgerufen, wenn die Startzeit geändert wird; aktualisiert die Endzeit-Vorschau."""
+        today = QDate.currentDate().toString("yyyy-MM-dd")
+        self.settings["last_date"] = today
+        self.settings["last_start"] = new_start_time.toString("HH:mm")
+
+        self.time_end.blockSignals(True)
+        self.time_end.setTime(self._compute_target_end_time(new_start_time))
+        self.time_end.blockSignals(False)
+        self.update_live_calc()
+
+    def update_live_calc(self):
+        """Berechnet die Überstunden-Vorschau live und zeigt sie im Label an."""
+        curr_date_str = self.date_edit.date().toString("yyyy-MM-dd")
+        target_mins = self.get_target_minutes_for_date(curr_date_str)
+        max_mins = self.get_max_minutes()
+        is_auto = self.settings.get("auto_break", True)
+
+        current_temp = WorkEntry(
+            id=-1,
+            date=curr_date_str,
+            start=self.time_start.time().toString("HH:mm"),
+            end=self.time_end.time().toString("HH:mm"),
+            pause=self.pause_spin.value() if not is_auto else 0,
+            minutes=0,
+            reason=""
+        )
+
+        all_day = [e for e in self.entries if e.date == curr_date_str]
+        timed = [e for e in all_day if e.start and e.end] + [current_temp]
+        manual_sum = sum(e.minutes for e in all_day if not (e.start and e.end))
+
+        results, total_net = calculate_timed_entries(timed, target_mins, max_mins, is_auto)
+        entry_pause, entry_overtime = results[-1]
+
+        if is_auto:
+            self.pause_spin.blockSignals(True)
+            self.pause_spin.setValue(entry_pause)
+            self.pause_spin.blockSignals(False)
+
+        self.current_calculated_pause = entry_pause
+        self.current_calculated_overtime = entry_overtime
+
+        final_total_overtime = (total_net - target_mins) + manual_sum
+
+        calc_text = (
+            f"Netto (Tag): {self.format_time(total_net)} ➔ "
+            f"<b>{self.format_time(final_total_overtime, show_plus=True)}"
+            " Überstunden (Tag-Saldo)</b>"
+        )
+        warnings = []
+        if total_net >= max_mins:
+            warnings.append(f"⚠️ Max. {max_mins // 60}h erreicht!")
+
+        # Ruhezeit-Check (Lücke zum Vortag/letzten Eintrag davor)
+        prev_entry = self.db.get_last_entry_before(curr_date_str)
+        if prev_entry and prev_entry.end:
+            try:
+                dt_prev = datetime.strptime(f"{prev_entry.date} {prev_entry.end}", "%Y-%m-%d %H:%M")
+                start_str_curr = self.time_start.time().toString('HH:mm')
+                dt_curr = datetime.strptime(
+                    f"{curr_date_str} {start_str_curr}", "%Y-%m-%d %H:%M"
+                )
+                rest_hours = (dt_curr - dt_prev).total_seconds() / 3600
+                if 0 < rest_hours < 11:
+                    warnings.append(f"⚠️ Ruhezeit verletzt ({rest_hours:.1f}h < 11h)")
+            except ValueError:
+                pass
+
+        if warnings:
+            calc_text += f" <span style='color: #ef4444;'>{' | '.join(warnings)}</span>"
+            self.lbl_live_calc.setStyleSheet("color: #ef4444;")
+        else:
+            self.lbl_live_calc.setStyleSheet("")
+        self.lbl_live_calc.setText(calc_text)
+
+    def set_now_as_end(self):
+        """Setzt die Endzeit auf die aktuelle Uhrzeit."""
+        self.time_end.setTime(QTime.currentTime())
+
+    def add_entry(self):
+        """Liest die Eingabefelder aus, prüft auf Überlappung und fügt den Eintrag in die DB ein."""
+        date_str = self.date_edit.date().toString("yyyy-MM-dd")
+        start_str = self.time_start.time().toString("HH:mm")
+        end_str = self.time_end.time().toString("HH:mm")
+
+        # Überlappungs-Check
+        overlap = self.check_overlap(date_str, start_str, end_str)
+        if overlap:
+            QMessageBox.warning(
+                self, "Überschneidung",
+                f"Dieser Zeitraum überschneidet sich mit einem existierenden Eintrag:"
+                f"\n\n{overlap}\n\nBitte korrigiere die Zeiten."
+            )
+            return
+
+        entry = WorkEntry(
+            id=None,
+            date=date_str,
+            start=start_str,
+            end=end_str,
+            pause=self.current_calculated_pause,
+            minutes=self.current_calculated_overtime,
+            reason=self.reason_edit.text().strip(),
+            target_minutes=(
+                self.custom_target_time.time().hour() * 60
+                + self.custom_target_time.time().minute()
+            ) if self.custom_target_cb.isChecked() else -1
+        )
+        self.db.insert(entry)
+        self.reason_edit.clear()
+        self.custom_target_cb.setChecked(False)
+        self.date_edit.setDate(QDate.currentDate())
+
+        # Alle Einträge neu laden und den betroffenen Tag glattziehen
+        self.entries = self.db.load_all()
+        self.recalculate_day(date_str)
+        self.load_data()
+
+    def edit_entry(self, row, _column):
+        """Öffnet den Bearbeitungs-Dialog für den Eintrag in der angeklickten Zeile."""
+        entry_idx = self.table.item(row, 0).data(Qt.ItemDataRole.UserRole)
+        entry = self.entries[entry_idx]
+        old_date = entry.date
+
+        dialog = EditDialog(
+            entry, self.entries, self.get_target_minutes(),
+            self.get_max_minutes(), self.settings.get("auto_break", True), self
+        )
+        if dialog.exec():
+            # Bevor wir anwenden: Überlappungs-Check (mit den neuen Werten aus dem Dialog)
+            # Wir holen uns die Werte temporär
+            new_date = dialog.date_edit.date().toString("yyyy-MM-dd")
+            new_start = (
+                dialog.time_start.time().toString("HH:mm")
+                if dialog.has_times_cb.isChecked() else ""
+            )
+            new_end = (
+                dialog.time_end.time().toString("HH:mm")
+                if dialog.has_times_cb.isChecked() else ""
+            )
+
+            overlap = self.check_overlap(new_date, new_start, new_end, exclude_id=entry.id)
+            if overlap:
+                QMessageBox.warning(
+                    self, "Überschneidung",
+                    f"Die Änderungen überschneiden sich mit einem anderen Eintrag:"
+                    f"\n\n{overlap}\n\nBitte korrigiere die Zeiten."
+                )
+                return
+
+            dialog.apply_to_entry()
+            self.db.update(entry)
+
+            # Neu laden und beide betroffenen Tage (alt/neu) neu berechnen
+            self.entries = self.db.load_all()
+            self.recalculate_day(old_date)
+            if entry.date != old_date:
+                self.recalculate_day(entry.date)
+            self.load_data()
+
+    def delete_entry(self, entry: WorkEntry):
+        """Fragt den Benutzer nach Bestätigung und löscht dann den übergebenen Eintrag."""
+        date_str = entry.date
+        d = QDate.fromString(date_str, "yyyy-MM-dd").toString("dd.MM.yyyy")
+        reply = QMessageBox.question(self, "Löschen bestätigen",
+            f"Eintrag vom {d} wirklich löschen?",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
+        if reply == QMessageBox.StandardButton.Yes:
+            self.db.delete(entry.id)
+            # Nach Löschen: Tag neu berechnen
+            self.entries = [e for e in self.entries if e.id != entry.id]
+            self.recalculate_day(date_str)
+            self.load_data()
+
+    def recalculate_day(self, date_str):
+        """Verteilt Pausen und Überstunden für alle Zeiteinträge eines Tages neu.
+        Manuelle Einträge (ohne Start-/Endzeit) werden nicht angefasst."""
+        day_entries = [e for e in self.entries if e.date == date_str]
+        if not day_entries:
+            return
+
+        timed = [e for e in day_entries if e.start and e.end]
+        if not timed:
+            return
+
+        target_mins = self.get_target_minutes_for_date(date_str)
+        max_mins = self.get_max_minutes()
+        is_auto = self.settings.get("auto_break", True)
+
+        results, _ = calculate_timed_entries(timed, target_mins, max_mins, is_auto)
+
+        for e in timed:
+            e.pause, e.minutes = results[e.id]
+            self.db.update(e)
+
+    def check_overlap(self, date_str, start_str, end_str, exclude_id=None):
+        """Prüft, ob sich der Zeitraum mit bestehenden Einträgen am selben Tag überschneidet."""
+        if not start_str or not end_str:
+            return None
+
+        s_new = QTime.fromString(start_str, "HH:mm")
+        e_new = QTime.fromString(end_str, "HH:mm")
+
+        # Falls Mitternacht überschritten wird, ist die Logik komplexer,
+        # hier vereinfacht für den gleichen Tag:
+        for e in self.entries:
+            if e.date == date_str and e.start and e.end and e.id != exclude_id:
+                s_old = QTime.fromString(e.start, "HH:mm")
+                e_old = QTime.fromString(e.end, "HH:mm")
+
+                # Standard Überlappungs-Check: (StartA < EndeB) und (EndeA > StartB)
+                # Wir nutzen secsTo für den Vergleich
+                if s_new.secsTo(e_old) > 0 and s_old.secsTo(e_new) > 0:
+                    return f"{e.start} - {e.end} ({e.reason or 'Ohne Anlass'})"
+        return None
+
+    def on_list_filter_changed(self):
+        """Wird aufgerufen, wenn der Monatsfilter in der Listenansicht geändert wird."""
+        filter_val = self.month_filter.currentData()
+        if filter_val and filter_val != "ALL":
+            idx = self.cal_month_filter.findData(filter_val)
+            if idx >= 0:
+                self.cal_month_filter.blockSignals(True)
+                self.cal_month_filter.setCurrentIndex(idx)
+                self.cal_month_filter.blockSignals(False)
+        self.update_ui()
+
+    def _get_export_entries(self):
+        filter_val = self.month_filter.currentData()
+        return [e for e in self.entries if filter_val == "ALL" or e.date.startswith(filter_val)]
+
+    def _get_export_title(self):
+        filter_val = self.month_filter.currentData()
+        return "Alle Einträge" if filter_val == "ALL" else f"Monat {filter_val}"
+
+    def _export_row_data(self, e):
+        """Gibt (datum_str, zeitraum_str) für einen Eintrag zurück."""
+        d = QDate.fromString(e.date, "yyyy-MM-dd").toString("dd.MM.yyyy") if e.date else ""
+        if e.start and e.end:
+            pause_str = f" (-{e.pause}m)" if e.pause > 0 else ""
+            zeitraum = f"{e.start} – {e.end}{pause_str}"
+        else:
+            zeitraum = "–"
+        return d, zeitraum
+
+    def export_csv(self):
+        """Exportiert die aktuell gefilterten Einträge als CSV-Datei."""
+        file_name, _ = QFileDialog.getSaveFileName(
+            self, "CSV Export", "ueberstunden_export.csv", "CSV Dateien (*.csv)")
+        if not file_name:
+            return
+        try:
+            export_entries = self._get_export_entries()
+            with open(file_name, "w", newline="", encoding="utf-8") as f:
+                writer = csv.writer(f, delimiter=";")
+                writer.writerow(["Datum", "Zeitraum", "Minuten", "Dauer", "Anlass"])
+                for e in export_entries:
+                    d, zeitraum = self._export_row_data(e)
+                    writer.writerow([d, zeitraum, e.minutes, self.format_time(e.minutes), e.reason])
+                total = sum(e.minutes for e in export_entries)
+                writer.writerow(["Gesamt", "", "", self.format_time(total), ""])
+            QMessageBox.information(self, "Erfolg", "CSV erfolgreich exportiert!")
+        except Exception as ex:  # pylint: disable=broad-except
+            QMessageBox.critical(self, "Fehler", f"Fehler beim CSV-Export:\n{str(ex)}")
+
+    def export_xlsx(self):
+        """Exportiert die aktuell gefilterten Einträge als Excel-Datei (xlsx)."""
+        if not _OPENPYXL:
+            QMessageBox.critical(self, "Fehler",
+                "openpyxl ist nicht installiert.\nBitte ausführen: pip install openpyxl")
+            return
+
+        file_name, _ = QFileDialog.getSaveFileName(
+            self, "Excel Export", "ueberstunden_export.xlsx", "Excel Dateien (*.xlsx)")
+        if not file_name:
+            return
+        try:
+            export_entries = self._get_export_entries()
+            total_min = sum(e.minutes for e in export_entries)
+
+            wb = Workbook()
+            ws = wb.active
+            ws.title = "Überstunden"
+
+            # Titel
+            ws.merge_cells("A1:E1")
+            ws["A1"] = f"Überstunden-Nachweis – {self._get_export_title()}"
+            ws["A1"].font = Font(bold=True, size=13)
+            ws["A1"].alignment = Alignment(horizontal="center")
+
+            # Kopfzeile
+            hdr_fill = PatternFill("solid", fgColor="3b82f6")
+            hdr_font = Font(bold=True, color="FFFFFF")
+            hdr_align = Alignment(horizontal="center")
+            for col, text in enumerate(["Datum", "Zeitraum", "Minuten", "Dauer", "Anlass"], 1):
+                c = ws.cell(row=3, column=col, value=text)
+                c.font = hdr_font
+                c.fill = hdr_fill
+                c.alignment = hdr_align
+
+            # Datenzeilen
+            alt_fill = PatternFill("solid", fgColor="f3f4f6")
+            for i, e in enumerate(export_entries):
+                row = i + 4
+                d, zeitraum = self._export_row_data(e)
+                values = [d, zeitraum, e.minutes, self.format_time(e.minutes), e.reason]
+                for col, val in enumerate(values, 1):
+                    c = ws.cell(row=row, column=col, value=val)
+                    if i % 2 == 1:
+                        c.fill = alt_fill
+                ovt_cell = ws.cell(row=row, column=3)
+                if e.minutes > 0:
+                    ovt_cell.font = Font(color="059669")
+                elif e.minutes < 0:
+                    ovt_cell.font = Font(color="dc2626")
+
+            # Summenzeile
+            sum_row = len(export_entries) + 4
+            sum_fill = PatternFill("solid", fgColor="dbeafe")
+            ws.merge_cells(f"A{sum_row}:C{sum_row}")
+            ws[f"A{sum_row}"] = "Gesamtsumme:"
+            ws[f"D{sum_row}"] = self.format_time(total_min)
+            for col in range(1, 6):
+                c = ws.cell(row=sum_row, column=col)
+                c.font = Font(bold=True)
+                c.fill = sum_fill
+
+            # Spaltenbreiten
+            for col, width in zip("ABCDE", [14, 24, 18, 12, 32]):
+                ws.column_dimensions[col].width = width
+
+            wb.save(file_name)
+            QMessageBox.information(self, "Erfolg", "Excel-Datei erfolgreich exportiert!")
+        except Exception as ex:  # pylint: disable=broad-except
+            QMessageBox.critical(self, "Fehler", f"Fehler beim Excel-Export:\n{str(ex)}")
+
+    def export_pdf(self):
+        """Exportiert die aktuell gefilterten Einträge als PDF-Datei."""
+        # pylint: disable=import-outside-toplevel
+        from PyQt6.QtPrintSupport import QPrinter
+        from PyQt6.QtGui import QTextDocument
+        from PyQt6.QtCore import QSizeF
+
+        file_name, _ = QFileDialog.getSaveFileName(
+            self, "PDF Export", "ueberstunden_export.pdf", "PDF Dateien (*.pdf)")
+        if not file_name:
+            return
+        try:
+            export_entries = self._get_export_entries()
+            total_min = sum(e.minutes for e in export_entries)
+
+            rows_html = ""
+            for i, e in enumerate(export_entries):
+                d, zeitraum = self._export_row_data(e)
+                bg = "#f9fafb" if i % 2 == 1 else "#ffffff"
+                if e.minutes > 0:
+                    color = "#059669"
+                elif e.minutes < 0:
+                    color = "#dc2626"
+                else:
+                    color = "inherit"
+                rows_html += (
+                    f"<tr style='background:{bg}'>"
+                    f"<td>{d}</td><td>{zeitraum}</td>"
+                    f"<td style='color:{color};text-align:right'>"
+                    f"{self.format_time(e.minutes, show_plus=True)}</td>"
+                    f"<td>{e.reason}</td></tr>"
+                )
+
+            html = f"""
+            <html><head><meta charset="utf-8"><style>
+                body {{ font-family: Arial, sans-serif; font-size: 11px; color: #111; }}
+                h2 {{ font-size: 14px; margin-bottom: 4px; }}
+                p.sub {{ color: #666; font-size: 10px; margin-top: 0; }}
+                table {{ width: 100%; border-collapse: collapse; margin-top: 12px; }}
+                th {{ background: #3b82f6; color: #fff; padding: 5px 8px; text-align: left; }}
+                td {{ border-bottom: 1px solid #e5e7eb; padding: 4px 8px; }}
+                tr.sum td {{ background: #dbeafe; font-weight: bold; }}
+            </style></head><body>
+            <h2>Überstunden-Nachweis</h2>
+            <p class="sub">{self._get_export_title()} &nbsp;·&nbsp;
+               Erstellt am {QDate.currentDate().toString("dd.MM.yyyy")}</p>
+            <table>
+              <tr><th>Datum</th><th>Zeitraum</th><th>Überstunden</th><th>Anlass</th></tr>
+              {rows_html}
+              <tr class="sum">
+                <td colspan="2">Gesamtsumme:</td>
+                <td style='text-align:right'>
+                  {self.format_time(total_min, show_plus=True)}</td><td></td>
+              </tr>
+            </table>
+            </body></html>"""
+
+            printer = QPrinter(QPrinter.PrinterMode.HighResolution)
+            printer.setOutputFormat(QPrinter.OutputFormat.PdfFormat)
+            printer.setOutputFileName(file_name)
+
+            doc = QTextDocument()
+            doc.setHtml(html)
+            doc.setPageSize(QSizeF(printer.pageRect(QPrinter.Unit.Point).size()))
+            doc.print(printer)
+
+            QMessageBox.information(self, "Erfolg", "PDF erfolgreich exportiert!")
+        except Exception as ex:  # pylint: disable=broad-except
+            QMessageBox.critical(self, "Fehler", f"Fehler beim PDF-Export:\n{str(ex)}")
+
+    def import_csv(self):
+        """Importiert Einträge aus einer CSV-Datei und fügt sie zur Datenbank hinzu."""
+        file_name, _ = QFileDialog.getOpenFileName(self, "CSV Import", "", "CSV Dateien (*.csv)")
+        if not file_name:
+            return
+        try:
+            with open(file_name, newline="", encoding="utf-8", errors="replace") as csvfile:
+                content = csvfile.read()
+                if not content:
+                    return
+                delimiter = ";" if ";" in content.split("\n")[0] else ","
+                csvfile.seek(0)
+                reader = csv.reader(csvfile, delimiter=delimiter)
+
+                pending = []
+                affected_dates = set()
+                for row in reader:
+                    if len(row) >= 1:
+                        date_str = row[0].strip()
+                        if date_str.lower() in ["datum", "date"] or not date_str:
+                            continue
+
+                        # Minuten optional behandeln
+                        try:
+                            minutes = int(row[1].strip()) if len(row) > 1 and row[1].strip() else 0
+                        except ValueError:
+                            minutes = 0
+
+                        reason = row[2].strip() if len(row) > 2 else ""
+                        start_str = row[3].strip() if len(row) > 3 else ""
+                        end_str = row[4].strip() if len(row) > 4 else ""
+                        try:
+                            pause = int(row[5].strip()) if len(row) > 5 else 0
+                        except ValueError:
+                            pause = 0
+
+                        parsed_date = ""
+                        for fmt in ("%d.%m.%y", "%d.%m.%Y", "%Y-%m-%d"):
+                            try:
+                                parsed_date = datetime.strptime(date_str, fmt).strftime("%Y-%m-%d")
+                                break
+                            except ValueError:
+                                pass
+
+                        if not parsed_date:
+                            parsed_date = date_str # Fallback
+
+                        pending.append(WorkEntry(
+                            id=None, date=parsed_date, start=start_str,
+                            end=end_str, pause=pause, minutes=minutes, reason=reason
+                        ))
+                        affected_dates.add(parsed_date)
+
+            if not pending:
+                QMessageBox.information(self, "Import", "Keine importierbaren Einträge gefunden.")
+                return
+
+            preview_lines = [f"  {e.date}  {e.start}-{e.end}  {e.reason}" for e in pending[:5]]
+            if len(pending) > 5:
+                preview_lines.append(f"  … und {len(pending) - 5} weitere")
+            preview = "\n".join(preview_lines)
+
+            reply = QMessageBox.question(
+                self, "Import bestätigen",
+                f"{len(pending)} Einträge gefunden:\n\n{preview}\n\nJetzt importieren?\n"
+                "(Überstunden werden automatisch für jeden Tag berechnet/konsolidiert)",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+            )
+            if reply != QMessageBox.StandardButton.Yes:
+                return
+
+            current_db = self.settings.get("db_path", DB_FILE)
+            if os.path.exists(current_db):
+                shutil.copy2(current_db, current_db + ".backup")
+
+            for entry in pending:
+                self.db.insert(entry)
+
+            # Alle Einträge neu laden und alle betroffenen Tage glattziehen
+            self.entries = self.db.load_all()
+            for d in sorted(list(affected_dates)):
+                self.recalculate_day(d)
+
+            self.load_data()
+            QMessageBox.information(
+                self, "Erfolg",
+                f"{len(pending)} Einträge importiert!\n"
+                "Tagessalden wurden automatisch berechnet.\nBackup der Datenbank angelegt."
+            )
+
+        except Exception as ex:  # pylint: disable=broad-except
+            QMessageBox.critical(self, "Fehler", f"Fehler beim Import:\n{str(ex)}")

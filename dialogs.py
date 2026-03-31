@@ -257,15 +257,27 @@ class EditDialog(QDialog):
         self.auto_break = auto_break
         layout = QVBoxLayout(self)
 
+        self._setup_date_and_times_ui(layout)
+        self._setup_minutes_and_reason_ui(layout)
+        self._setup_custom_target_ui(layout)
+
+        btn_save = QPushButton("Speichern")
+        btn_save.clicked.connect(self.accept)
+        layout.addWidget(btn_save)
+
+        if bool(self.entry.start and self.entry.end):
+            self.recalc_minutes()
+
+    def _setup_date_and_times_ui(self, layout):
         self.date_edit = QDateEdit()
         self.date_edit.setCalendarPopup(True)
-        if entry.date:
-            self.date_edit.setDate(QDate.fromString(entry.date, "yyyy-MM-dd"))
+        if self.entry.date:
+            self.date_edit.setDate(QDate.fromString(self.entry.date, "yyyy-MM-dd"))
         layout.addWidget(QLabel("Datum:"))
         layout.addWidget(self.date_edit)
 
         self.has_times_cb = QCheckBox("Start- und Endzeit verwenden")
-        has_times = bool(entry.start and entry.end)
+        has_times = bool(self.entry.start and self.entry.end)
         self.has_times_cb.setChecked(has_times)
         self.has_times_cb.stateChanged.connect(self.toggle_times)
         layout.addWidget(self.has_times_cb)
@@ -284,15 +296,15 @@ class EditDialog(QDialog):
         self.pause_spin = QSpinBox()
         self.pause_spin.setRange(0, 300)
         self.pause_spin.setSuffix(" Min")
-        self.pause_spin.setValue(entry.pause)
+        self.pause_spin.setValue(self.entry.pause)
         self.pause_spin.setEnabled(not self.auto_break)
         time_layout.addWidget(QLabel("Pause:"))
         time_layout.addWidget(self.pause_spin)
         layout.addLayout(time_layout)
 
         if has_times:
-            self.time_start.setTime(QTime.fromString(entry.start, "HH:mm"))
-            self.time_end.setTime(QTime.fromString(entry.end, "HH:mm"))
+            self.time_start.setTime(QTime.fromString(self.entry.start, "HH:mm"))
+            self.time_end.setTime(QTime.fromString(self.entry.end, "HH:mm"))
         else:
             self.time_start.setTime(QTime(7, 0))
             self.time_end.setTime(QTime(15, 30))
@@ -305,33 +317,32 @@ class EditDialog(QDialog):
         self.pause_spin.valueChanged.connect(self.recalc_minutes)
         self.date_edit.dateChanged.connect(self.recalc_minutes)
 
+    def _setup_minutes_and_reason_ui(self, layout):
         self.min_spinbox = QSpinBox()
         self.min_spinbox.setRange(-2000, 2000)
-        self.min_spinbox.setValue(entry.minutes)
+        self.min_spinbox.setValue(self.entry.minutes)
         layout.addWidget(QLabel("Minuten (Überstunden):"))
         layout.addWidget(self.min_spinbox)
 
         self.reason_edit = QLineEdit()
-        self.reason_edit.setText(entry.reason)
+        self.reason_edit.setText(self.entry.reason)
         layout.addWidget(QLabel("Anlass:"))
         layout.addWidget(self.reason_edit)
 
-        # Custom Target Time for this entry
+    def _setup_custom_target_ui(self, layout):
         self.custom_target_cb = QCheckBox("Individuelles Tagessoll für diesen Tag")
-        self.custom_target_cb.setChecked(entry.target_minutes != -1)
+        self.custom_target_cb.setChecked(self.entry.target_minutes != -1)
         self.custom_target_time = QTimeEdit()
         self.custom_target_time.setDisplayFormat("HH:mm")
-        if entry.target_minutes != -1:
-            self.custom_target_time.setTime(QTime(entry.target_minutes // 60,
-                                                  entry.target_minutes % 60))
+        if self.entry.target_minutes != -1:
+            self.custom_target_time.setTime(QTime(self.entry.target_minutes // 60,
+                                                  self.entry.target_minutes % 60))
         else:
             def_target = self.parent().settings.get("target_work_time", "08:00")
             self.custom_target_time.setTime(QTime.fromString(def_target, "HH:mm"))
 
         self.custom_target_time.setEnabled(self.custom_target_cb.isChecked())
-        self.custom_target_cb.stateChanged.connect(
-            self._on_custom_target_changed
-        )
+        self.custom_target_cb.stateChanged.connect(self._on_custom_target_changed)
         self.custom_target_cb.stateChanged.connect(self.recalc_minutes)
         self.custom_target_time.timeChanged.connect(self.recalc_minutes)
 
@@ -340,12 +351,6 @@ class EditDialog(QDialog):
         target_layout.addWidget(self.custom_target_time)
         layout.addLayout(target_layout)
 
-        btn_save = QPushButton("Speichern")
-        btn_save.clicked.connect(self.accept)
-        layout.addWidget(btn_save)
-
-        if has_times:
-            self.recalc_minutes()
 
     def _on_custom_target_changed(self):
         """
