@@ -9,7 +9,7 @@ import sys
 from PyQt6.QtCore import QDate, Qt, QTime, QPoint
 from PyQt6.QtGui import QColor, QIcon, QPalette, QPainter, QPixmap, QPolygon
 from PyQt6.QtWidgets import (
-    QApplication, QMainWindow, QTabWidget, QWidget, QMessageBox
+    QApplication, QMainWindow, QTabWidget, QWidget, QMessageBox, QFileDialog
 )
 
 # Configuration must be imported before matplotlib for MPLCONFIGDIR
@@ -50,7 +50,7 @@ class UeberstundenApp(QMainWindow, MainTabMixin, GoalsTabMixin, CalendarTabMixin
         self.system_is_dark = bg_lightness < 128
 
         self.settings = self.load_settings()
-        self.db = DBManager(self.settings.get("db_path", DB_FILE))
+        self.db = DBManager(self._resolve_db_path())
 
         self.entries = []
         self.current_calculated_overtime = 0
@@ -80,6 +80,52 @@ class UeberstundenApp(QMainWindow, MainTabMixin, GoalsTabMixin, CalendarTabMixin
         self.setup_stats_tab()
 
         self.load_data()
+
+    def _resolve_db_path(self):
+        """
+        Gibt den konfigurierten DB-Pfad zurück. Wenn das Verzeichnis nicht existiert
+        oder die Datei nicht erreichbar ist, öffnet sich ein Dialog zur Auswahl.
+        """
+        db_path = self.settings.get("db_path", DB_FILE)
+        if os.path.exists(db_path):
+            return db_path
+        # Wenn es der Standard-Pfad ist, darf sqlite3 eine neue DB anlegen
+        if db_path == DB_FILE:
+            return db_path
+        # Benutzerdefinierter Pfad existiert nicht → nachfragen
+        msg = QMessageBox(self)
+        msg.setWindowTitle("Datenbank nicht gefunden")
+        msg.setText(
+            f"Die Datenbankdatei wurde nicht gefunden:\n{db_path}\n\n"
+            "Bitte wähle eine vorhandene Datenbankdatei oder einen neuen Speicherort."
+        )
+        btn_select = msg.addButton("Datei auswählen…", QMessageBox.ButtonRole.AcceptRole)
+        btn_new = msg.addButton("Neu erstellen", QMessageBox.ButtonRole.ActionRole)
+        msg.addButton("Abbrechen", QMessageBox.ButtonRole.RejectRole)
+        msg.exec()
+        clicked = msg.clickedButton()
+        if clicked == btn_select:
+            path, _ = QFileDialog.getOpenFileName(
+                self, "Datenbankdatei auswählen", DB_FILE,
+                "SQLite-Datenbank (*.db);;Alle Dateien (*)"
+            )
+            if path:
+                self.settings["db_path"] = path
+                self.save_settings()
+                return path
+        elif clicked == btn_new:
+            path, _ = QFileDialog.getSaveFileName(
+                self, "Neue Datenbankdatei anlegen", DB_FILE,
+                "SQLite-Datenbank (*.db);;Alle Dateien (*)"
+            )
+            if path:
+                self.settings["db_path"] = path
+                self.save_settings()
+                return path
+        # Fallback: Standard-Pfad verwenden
+        self.settings["db_path"] = DB_FILE
+        self.save_settings()
+        return DB_FILE
 
     def load_settings(self):
         """
