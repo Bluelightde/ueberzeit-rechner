@@ -1,14 +1,15 @@
 """
 Eigenständiges Widget für den Diagramm- und Statistik-Tab.
 """
-from PyQt6.QtWidgets import QVBoxLayout, QWidget
-from i18n import tr
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg
 from matplotlib.figure import Figure
+from PyQt6.QtWidgets import QVBoxLayout, QWidget
 
+from i18n import tr
 from logic import COLOR_POSITIVE, COLOR_NEGATIVE
 
 
+# pylint: disable=too-few-public-methods
 class StatsTab(QWidget):
     """Zeigt ein monatliches Balkendiagramm der Überstunden."""
 

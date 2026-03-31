@@ -7,10 +7,7 @@ import os
 import shutil
 from datetime import datetime
 
-logger = logging.getLogger(__name__)
-
 from PyQt6.QtCore import QDate, QLocale, Qt, QTime, pyqtSignal
-from i18n import get_locale, tr
 from PyQt6.QtGui import QColor, QFont
 from PyQt6.QtWidgets import (
     QCheckBox, QComboBox, QDateEdit,
@@ -21,15 +18,18 @@ from PyQt6.QtWidgets import (
 )
 
 from config import DB_FILE
-from models import WorkEntry
+from dialogs import EditDialog
+from i18n import get_locale, tr
 from logic import (
     calculate_timed_entries, get_login_time,
     format_time, fmt_date, fmt_time_hhmm,
     get_target_minutes, get_max_minutes, get_target_minutes_for_date,
     COLOR_POSITIVE, COLOR_NEGATIVE,
 )
-from dialogs import EditDialog
+from models import WorkEntry
 from ui_components import set_overtime_color
+
+logger = logging.getLogger(__name__)
 
 try:
     from openpyxl import Workbook
@@ -40,12 +40,13 @@ except ImportError:
 
 
 # pylint: disable=too-many-instance-attributes
-class MainTab(QWidget):
+class MainTab(QWidget):  # pylint: disable=too-many-public-methods
     """Haupt-Tab für Zeiterfassung, Eintrags-Liste und Export/Import."""
 
     data_changed = pyqtSignal()
     filter_changed = pyqtSignal(str)
 
+    # pylint: disable=too-many-arguments, too-many-positional-arguments
     def __init__(self, db, settings, save_settings_cb, open_settings_cb, parent=None):
         """
         Initialisiert das Haupt-Tab-Widget.
@@ -759,9 +760,12 @@ class MainTab(QWidget):
             </style></head><body>
             <h2>{tr('Überstunden-Nachweis')}</h2>
             <p class="sub">{self._get_export_title()} &nbsp;·&nbsp;
-               {tr('Erstellt am {d}').format(d=get_locale().toString(QDate.currentDate(), QLocale.FormatType.ShortFormat))}</p>
+               {tr('Erstellt am {d}').format(
+                   d=get_locale().toString(QDate.currentDate(), QLocale.FormatType.ShortFormat)
+               )}</p>
             <table>
-              <tr><th>{tr('Datum')}</th><th>{tr('Zeitraum')}</th><th>{tr('Überstunden')}</th><th>{tr('Anlass')}</th></tr>
+              <tr><th>{tr('Datum')}</th><th>{tr('Zeitraum')}</th>
+                  <th>{tr('Überstunden')}</th><th>{tr('Anlass')}</th></tr>
               {rows_html}
               <tr class="sum">
                 <td colspan="2">{tr('Gesamtsumme:')}</td>

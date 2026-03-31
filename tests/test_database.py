@@ -4,6 +4,7 @@ Unit-Tests für database.py (DBManager):
   - insert / load_all / update / delete
   - get_last_entry_before
 """
+# pylint: disable=missing-function-docstring, missing-class-docstring, redefined-outer-name
 import pytest
 from models import WorkEntry
 from database import DBManager
@@ -21,6 +22,7 @@ def db():
     manager.close()
 
 
+# pylint: disable=too-many-arguments, too-many-positional-arguments
 def make_entry(entry_id=None, date="2024-06-01", start="08:00", end="17:00",
                pause=30, minutes=510, reason="Test", target_minutes=-1):
     """Erstellt einen WorkEntry. entry_id=None simuliert einen noch nicht gespeicherten Eintrag."""

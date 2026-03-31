@@ -8,12 +8,14 @@ from PyQt6.QtWidgets import (
     QVBoxLayout, QHBoxLayout, QPushButton, QComboBox,
     QLabel, QTableWidget, QHeaderView, QTableWidgetItem, QWidget
 )
+
 from i18n import get_locale, tr
 
 from logic import get_holidays, format_time
 from ui_components import HeatmapDelegate, overtime_qcolor, set_overtime_color
 
 
+# pylint: disable=too-many-instance-attributes
 class CalendarTab(QWidget):
     """Zeigt eine Kalender-Heatmap des aktuellen Monats mit Überstunden-Farbkodierung."""
 
@@ -171,44 +173,47 @@ class CalendarTab(QWidget):
 
         for row, week in enumerate(cal):
             for col, day in enumerate(week):
-                if day == 0:
-                    item = QTableWidgetItem("")
-                    item.setData(Qt.ItemDataRole.UserRole + 1, False)
-                    item.setBackground(QColor("#222222" if is_dark else "#f3f4f6"))
-                else:
-                    date_str = f"{year}-{month:02d}-{day:02d}"
-                    mins = day_mins.get(date_str, 0)
-                    is_holiday = date_str in holidays
-                    is_workday = col in workdays_setting
-
-                    f_mins = f"\n({format_time(mins, show_plus=True)})" if mins != 0 else ""
-                    if is_holiday:
-                        text = f"{day}\n{holidays[date_str]}{f_mins}"
-                    else:
-                        text = f"{day}{f_mins}"
-
-                    item = QTableWidgetItem(text)
-                    item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
-
-                    if is_holiday:
-                        item.setToolTip(holidays[date_str])
-                        if mins == 0:
-                            item.setBackground(QColor("#1e3a8a" if is_dark else "#bfdbfe"))
-                            item.setForeground(QColor("#60a5fa" if is_dark else "#1d4ed8"))
-                        else:
-                            item.setBackground(overtime_qcolor(mins))
-                    else:
-                        if mins == 0:
-                            if not is_workday:
-                                item.setBackground(QColor("#2d3748" if is_dark else "#e5e7eb"))
-                            else:
-                                item.setBackground(QColor("#333333" if is_dark else "#ffffff"))
-                        else:
-                            item.setBackground(overtime_qcolor(mins))
-
-                    is_today = (
-                        year == today.year() and month == today.month() and day == today.day()
-                    )
-                    item.setData(Qt.ItemDataRole.UserRole + 1, is_today)
-
+                item = self._make_cell(
+                    day, col, year, month, today, day_mins, holidays, is_dark, workdays_setting
+                )
                 self.cal_table.setItem(row, col, item)
+
+    # pylint: disable=too-many-positional-arguments,too-many-arguments
+    def _make_cell(self, day, col, year, month, today,
+                   day_mins, holidays, is_dark, workdays_setting):
+        """Erstellt ein QTableWidgetItem für eine Kalender-Zelle."""
+        if day == 0:
+            item = QTableWidgetItem("")
+            item.setData(Qt.ItemDataRole.UserRole + 1, False)
+            item.setBackground(QColor("#222222" if is_dark else "#f3f4f6"))
+            return item
+
+        date_str = f"{year}-{month:02d}-{day:02d}"
+        mins = day_mins.get(date_str, 0)
+        is_holiday = date_str in holidays
+        is_workday = col in workdays_setting
+
+        f_mins = f"\n({format_time(mins, show_plus=True)})" if mins != 0 else ""
+        text = f"{day}\n{holidays[date_str]}{f_mins}" if is_holiday else f"{day}{f_mins}"
+
+        item = QTableWidgetItem(text)
+        item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+
+        if is_holiday:
+            item.setToolTip(holidays[date_str])
+            if mins == 0:
+                item.setBackground(QColor("#1e3a8a" if is_dark else "#bfdbfe"))
+                item.setForeground(QColor("#60a5fa" if is_dark else "#1d4ed8"))
+            else:
+                item.setBackground(overtime_qcolor(mins))
+        elif mins == 0:
+            if not is_workday:
+                item.setBackground(QColor("#2d3748" if is_dark else "#e5e7eb"))
+            else:
+                item.setBackground(QColor("#333333" if is_dark else "#ffffff"))
+        else:
+            item.setBackground(overtime_qcolor(mins))
+
+        is_today = year == today.year() and month == today.month() and day == today.day()
+        item.setData(Qt.ItemDataRole.UserRole + 1, is_today)
+        return item

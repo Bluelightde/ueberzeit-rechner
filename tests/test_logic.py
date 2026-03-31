@@ -3,7 +3,8 @@ Unit-Tests für logic.py:
   - get_holidays()        : Feiertags-Berechnung für alle 16 Bundesländer
   - calculate_timed_entries() : Pause und Überstunden-Berechnung
 """
-import pytest
+# pylint: disable=missing-function-docstring
+from PyQt6.QtCore import QDate
 from models import WorkEntry
 from logic import get_holidays, calculate_timed_entries
 
@@ -100,7 +101,9 @@ class TestGetHolidaysOstern:
 # get_holidays – bundeslandspezifische Feiertage
 # ---------------------------------------------------------------------------
 
+# pylint: disable=too-many-public-methods
 class TestGetHolidaysBundesland:
+    """Überprüft bundeslandspezifische Feiertage."""
 
     def test_heilige_drei_koenige_bw(self):
         holidays = get_holidays(2024, "DE", "BW")
@@ -183,7 +186,6 @@ class TestGetHolidaysBundesland:
 
     def test_buss_und_bettag_sn_ist_ein_mittwoch(self):
         # Buß- und Bettag ist immer ein Mittwoch (dayOfWeek == 3)
-        from PyQt6.QtCore import QDate
         holidays = get_holidays(2024, "DE", "SN")
         bub = next(d for d, n in holidays.items() if "Buß" in n)
         date = QDate.fromString(bub, "yyyy-MM-dd")
@@ -345,10 +347,10 @@ class TestCalculateTimedEntriesMehrereEintraege:
         # Einträge in umgekehrter Reihenfolge → gleiche Ergebnisse
         e1 = make_entry(1, "08:00", "12:00")
         e2 = make_entry(2, "13:00", "17:00")
-        results_normal, net_normal = calculate_timed_entries(
+        _, net_normal = calculate_timed_entries(
             [e1, e2], self.TARGET, self.MAX, is_auto=True
         )
-        results_rev, net_rev = calculate_timed_entries(
+        _, net_rev = calculate_timed_entries(
             [e2, e1], self.TARGET, self.MAX, is_auto=True
         )
         assert net_normal == net_rev

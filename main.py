@@ -759,9 +759,8 @@ if __name__ == "__main__":
     _early_settings = {}
     if os.path.exists(SETTINGS_FILE):
         try:
-            import json as _json
             with open(SETTINGS_FILE, "r", encoding="utf-8") as _f:
-                _early_settings = _json.load(_f)
+                _early_settings = json.load(_f)
         except Exception:  # pylint: disable=broad-except
             pass
     setup_i18n(_early_settings.get("language"))

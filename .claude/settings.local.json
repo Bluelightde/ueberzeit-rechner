@@ -38,7 +38,10 @@
       "Bash(python -m pytest tests/test_logic.py -q)",
       "Bash(python3:*)",
       "Bash(python -m pytest tests/ -x -q)",
-      "Bash(python -c \":*)"
+      "Bash(python -c \":*)",
+      "Bash(grep -n '\"\"Einstellungen\"\"' i18n.py)",
+      "Bash(pylint tabs/main_tab.py)",
+      "Bash(bash -c \"source venv/bin/activate && pylint tabs/main_tab.py 2>&1 | tail -5\")"
     ]
   }
 }

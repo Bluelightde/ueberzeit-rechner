@@ -143,6 +143,7 @@ class SettingsDialog(QDialog):
             self.add_break_rule_row(rule)
 
     def add_break_rule_row(self, data=None):
+        """Fügt eine Zeile für eine Pausenregel hinzu."""
         if not isinstance(data, dict):
             data = None
         row = self.break_rules_table.rowCount()
@@ -161,6 +162,7 @@ class SettingsDialog(QDialog):
         self.break_rules_table.setCellWidget(row, 1, break_spin)
 
     def remove_break_rule_row(self):
+        """Entfernt die aktuell ausgewählte Zeile der Pausenregeln."""
         curr = self.break_rules_table.currentRow()
         if curr >= 0:
             self.break_rules_table.removeRow(curr)

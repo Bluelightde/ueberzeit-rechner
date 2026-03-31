@@ -2,15 +2,19 @@
 Eigenständiges Widget für den Ziele- und Dashboard-Tab.
 """
 import math
+
 from PyQt6.QtCore import QDate, Qt
-from i18n import tr
 from PyQt6.QtGui import QFont
 from PyQt6.QtWidgets import (
     QVBoxLayout, QGroupBox, QHBoxLayout, QCheckBox,
     QLabel, QDateEdit, QSpinBox, QProgressBar, QGridLayout, QWidget
 )
 
-from logic import format_time, get_target_minutes_for_date, COLOR_POSITIVE, COLOR_NEGATIVE, COLOR_INFO
+from i18n import tr
+from logic import (
+    format_time, get_target_minutes_for_date,
+    COLOR_POSITIVE, COLOR_NEGATIVE, COLOR_INFO,
+)
 
 
 class GoalsTab(QWidget):

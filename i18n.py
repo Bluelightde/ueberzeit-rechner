@@ -9,7 +9,7 @@ setup_i18n() muss einmalig nach QApplication-Erstellung aufgerufen werden.
 """
 from PyQt6.QtCore import QLocale
 
-_lang = "de"
+_lang = "de"  # pylint: disable=invalid-name
 
 # Englische Übersetzungen (Schlüssel = deutscher Originaltext)
 _EN: dict[str, str] = {
@@ -78,7 +78,6 @@ _EN: dict[str, str] = {
     "CSV  (.csv)": "CSV  (.csv)",
     "Excel (.xlsx)": "Excel (.xlsx)",
     "PDF  (.pdf)": "PDF  (.pdf)",
-    "Einstellungen": "Settings",
     "Jetzt": "Now",
 
     # --- MainTab: Tabelle ---
