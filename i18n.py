@@ -7,6 +7,8 @@ Nutzung:
 
 setup_i18n() muss einmalig nach QApplication-Erstellung aufgerufen werden.
 """
+from __future__ import annotations
+
 from PyQt6.QtCore import QLocale
 
 _lang = "de"  # pylint: disable=invalid-name
