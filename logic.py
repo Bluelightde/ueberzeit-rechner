@@ -218,4 +218,3 @@ def get_login_time():
     if sys.platform == "win32":
         return _get_login_time_win32()
     return None
-
