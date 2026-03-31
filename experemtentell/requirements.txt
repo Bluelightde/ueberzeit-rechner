@@ -1,6 +1,0 @@
-PyQt6
-matplotlib
-openpyxl
-pyinstaller
-Pillow
-pyqtdarktheme
