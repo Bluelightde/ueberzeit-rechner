@@ -1,24 +1,27 @@
 """
-Modul für die Tabs der Anwendung.
+Eigenständiges Widget für den Haupt-Tab (Eingabe & Liste).
 """
 import csv
 import os
 import shutil
 from datetime import datetime
 
-from PyQt6.QtCore import QDate, Qt, QTime
+from PyQt6.QtCore import QDate, Qt, QTime, pyqtSignal
 from PyQt6.QtGui import QColor, QFont
 from PyQt6.QtWidgets import (
     QCheckBox, QComboBox, QDateEdit,
     QFileDialog, QFrame, QHBoxLayout, QHeaderView, QLabel,
     QLineEdit, QMenu, QMessageBox, QPushButton, QSpinBox,
     QTableWidget, QTableWidgetItem, QTimeEdit,
-    QVBoxLayout
+    QVBoxLayout, QWidget
 )
 
 from config import DB_FILE
 from models import WorkEntry
-from logic import calculate_timed_entries, get_login_time
+from logic import (
+    calculate_timed_entries, get_login_time,
+    format_time, get_target_minutes, get_max_minutes, get_target_minutes_for_date
+)
 from dialogs import EditDialog
 
 try:
@@ -30,15 +33,38 @@ except ImportError:
 
 
 # pylint: disable=too-many-instance-attributes
-class MainTabMixin:
-    """Mixin for the main input and list tab."""
+class MainTab(QWidget):
+    """Haupt-Tab für Zeiterfassung, Eintrags-Liste und Export/Import."""
 
-    # pylint: disable=too-many-locals, too-many-statements, too-many-branches, too-many-nested-blocks
-    def setup_main_tab(self):
+    data_changed = pyqtSignal()
+    filter_changed = pyqtSignal(str)
+
+    def __init__(self, db, settings, save_settings_cb, open_settings_cb, parent=None):
         """
-        Erstellt das Layout und die Steuerelemente für den Haupt-Tab (Eingabe & Liste).
+        Initialisiert das Haupt-Tab-Widget.
+
+        Args:
+            db:               DBManager-Instanz für Datenbankzugriffe.
+            settings:         Einstellungs-Dictionary (gemeinsame Referenz).
+            save_settings_cb: Callable zum Speichern der Einstellungen.
+            open_settings_cb: Callable zum Öffnen des Einstellungs-Dialogs.
+            parent:           Eltern-Widget.
         """
-        layout = QVBoxLayout(self.tab_main)
+        super().__init__(parent)
+        self.db = db
+        self.settings = settings
+        self._save_settings = save_settings_cb
+        self._open_settings_cb = open_settings_cb
+        self.entries = []
+        self.current_calculated_overtime = 0
+        self.current_calculated_pause = 0
+
+        self._build_ui()
+
+    # pylint: disable=too-many-locals, too-many-statements
+    def _build_ui(self):
+        """Erstellt das Layout des Haupt-Tabs."""
+        layout = QVBoxLayout(self)
 
         self.lbl_saldo = QLabel("0h 0m")
         self.lbl_saldo.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -81,7 +107,7 @@ class MainTabMixin:
         btn_now_end = QPushButton("Jetzt")
         btn_now_end.setFixedWidth(50)
         btn_now_end.setToolTip("Aktuelle Uhrzeit als Endzeit setzen")
-        btn_now_end.clicked.connect(self.set_now_as_end)
+        btn_now_end.clicked.connect(self._set_now_as_end)
         input_row1.addWidget(btn_now_end)
 
         self.pause_spin = QSpinBox()
@@ -132,7 +158,7 @@ class MainTabMixin:
         toolbar_layout = QHBoxLayout()
         self.month_filter = QComboBox()
         self.month_filter.addItem("Alle", "ALL")
-        self.month_filter.currentIndexChanged.connect(self.on_list_filter_changed)
+        self.month_filter.currentIndexChanged.connect(self._on_list_filter_changed)
         toolbar_layout.addWidget(QLabel("Filter:"))
         toolbar_layout.addWidget(self.month_filter)
         toolbar_layout.addStretch()
@@ -150,7 +176,7 @@ class MainTabMixin:
         toolbar_layout.addWidget(btn_export)
 
         btn_settings = QPushButton("Einstellungen")
-        btn_settings.clicked.connect(self.open_settings)
+        btn_settings.clicked.connect(self._open_settings_cb)
         toolbar_layout.addWidget(btn_settings)
         layout.addLayout(toolbar_layout)
 
@@ -161,23 +187,85 @@ class MainTabMixin:
         header = self.table.horizontalHeader()
         header.setSectionResizeMode(3, QHeaderView.ResizeMode.Stretch)
         self.table.setColumnWidth(1, 160)
-
         self.table.cellDoubleClicked.connect(self.edit_entry)
         layout.addWidget(self.table)
 
         self.on_start_time_changed(start_to_use)
 
-    def load_data(self):
-        """
-        Lädt alle Daten aus der Datenbank und aktualisiert die Benutzeroberfläche.
-        """
-        self.entries = self.db.load_all()
-        self.update_ui()
-        self.update_stats_chart()
-        self.on_goal_changed()
-        self.update_calendar_heatmap()
+    # --- Public interface ---
 
-    # pylint: disable=too-many-locals, too-many-statements, too-many-branches, too-many-nested-blocks
+    def refresh(self, entries):
+        """Aktualisiert die Einträge und die Tabellen-Anzeige.
+
+        Args:
+            entries: Aktuelle Liste aller WorkEntry-Objekte.
+        """
+        self.entries = entries
+        self.update_ui()
+
+    def set_filter(self, month_str):
+        """Setzt den Monatsfilter ohne das filter_changed-Signal auszulösen.
+
+        Args:
+            month_str: Monatsstring im Format 'yyyy-MM' oder 'ALL'.
+        """
+        idx = self.month_filter.findData(month_str)
+        if idx >= 0:
+            self.month_filter.blockSignals(True)
+            self.month_filter.setCurrentIndex(idx)
+            self.month_filter.blockSignals(False)
+            self.update_ui()
+
+    def set_db(self, db):
+        """Ersetzt die Datenbankverbindung (z.B. nach DB-Wechsel in Einstellungen).
+
+        Args:
+            db: Neue DBManager-Instanz.
+        """
+        self.db = db
+
+    def on_settings_changed(self):
+        """Aktualisiert UI-Elemente nach einer Einstellungsänderung."""
+        self.pause_spin.setEnabled(not self.settings.get("auto_break", True))
+        new_start = self._get_default_start_time()
+        self.time_start.blockSignals(True)
+        self.time_start.setTime(new_start)
+        self.time_start.blockSignals(False)
+        self.on_start_time_changed(new_start)
+
+    def recalculate_day(self, date_str):
+        """Verteilt Pausen und Überstunden für alle Zeiteinträge eines Tages neu.
+
+        Manuelle Einträge (ohne Start-/Endzeit) werden nicht angefasst.
+
+        Args:
+            date_str: Datum im Format 'yyyy-MM-dd'.
+        """
+        day_entries = [e for e in self.entries if e.date == date_str]
+        if not day_entries:
+            return
+        timed = [e for e in day_entries if e.start and e.end]
+        if not timed:
+            return
+
+        target_mins = get_target_minutes_for_date(date_str, self.entries, self.settings)
+        max_mins = get_max_minutes(self.settings)
+        is_auto = self.settings.get("auto_break", True)
+
+        results, _ = calculate_timed_entries(timed, target_mins, max_mins, is_auto)
+        for e in timed:
+            e.pause, e.minutes = results[e.id]
+            self.db.update(e)
+
+    def recalculate_all_days(self):
+        """Berechnet alle Tage in der Eintrags-Liste neu (z.B. nach Einstellungsänderung)."""
+        all_dates = sorted(set(e.date for e in self.entries))
+        for date_str in all_dates:
+            self.recalculate_day(date_str)
+
+    # --- UI update ---
+
+    # pylint: disable=too-many-locals, too-many-statements, too-many-branches
     def update_ui(self):
         """Aktualisiert die Eintrags-Tabelle und den Gesamtsaldo entsprechend dem aktiven Filter."""
         self.month_filter.blockSignals(True)
@@ -218,8 +306,10 @@ class MainTabMixin:
             item_zeit = QTableWidgetItem(z_str)
             item_zeit.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
 
-            item_min = QTableWidgetItem(self.format_time(e.minutes, show_plus=True))
-            item_min.setTextAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+            item_min = QTableWidgetItem(format_time(e.minutes, show_plus=True))
+            item_min.setTextAlignment(
+                Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter
+            )
             if e.minutes > 0:
                 item_min.setForeground(QColor("#10b981"))
             elif e.minutes < 0:
@@ -235,7 +325,7 @@ class MainTabMixin:
             self.table.setCellWidget(row, 4, btn_del)
             row += 1
 
-        self.lbl_saldo.setText(self.format_time(total_overall))
+        self.lbl_saldo.setText(format_time(total_overall))
         if total_overall > 0:
             self.lbl_saldo.setStyleSheet("color: #10b981;")
         elif total_overall < 0:
@@ -243,10 +333,10 @@ class MainTabMixin:
         else:
             self.lbl_saldo.setStyleSheet("")
 
+    # --- Input helpers ---
+
     def _get_default_start_time(self):
-        """Ermittelt die Startzeit für die Eingabemaske.
-        Wenn Login-Zeit aktiv: Login-Zeit → default_start (Fallback).
-        Sonst: last_start (heute) → default_start."""
+        """Ermittelt die Startzeit für die Eingabemaske."""
         if self.settings.get("use_login_time", False):
             t = get_login_time()
             if t and t.isValid():
@@ -257,19 +347,18 @@ class MainTabMixin:
             return QTime.fromString(self.settings["last_start"], "HH:mm")
         return QTime.fromString(self.settings.get("default_start", "07:00"), "HH:mm")
 
-    def _compute_target_end_time(self, new_start: "QTime") -> "QTime":
-        """Berechnet die Endzeit so dass das Tagessoll (Regelarbeitszeit) erreicht wird.
-        Berücksichtigt bereits gespeicherte Einträge (auch manuelle) für das Datum."""
+    def _compute_target_end_time(self, new_start):
+        """Berechnet die Endzeit so, dass das Tagessoll erreicht wird."""
         curr_date_str = self.date_edit.date().toString("yyyy-MM-dd")
         all_day = [e for e in self.entries if e.date == curr_date_str]
         timed_existing = [e for e in all_day if e.start and e.end]
         manual_sum = sum(e.minutes for e in all_day if not (e.start and e.end))
 
-        target_mins = self.get_target_minutes_for_date(curr_date_str)
-        max_mins = self.get_max_minutes()
+        target_mins = get_target_minutes_for_date(curr_date_str, self.entries, self.settings)
+        max_mins = get_max_minutes(self.settings)
         is_auto = self.settings.get("auto_break", True)
 
-        # Wir suchen die kleinste Dauer (in Minuten), die das Soll erfüllt.
+        duration_mins = 0
         for duration_mins in range(0, max_mins * 2 + 1):
             temp = WorkEntry(
                 id=-1,
@@ -280,19 +369,20 @@ class MainTabMixin:
                 minutes=0,
                 reason=""
             )
-            # calculate_timed_entries liefert uns das Netto der Zeiteinträge (timed_existing + temp)
             _, total_net_timed = calculate_timed_entries(
                 timed_existing + [temp], target_mins, max_mins, is_auto
             )
-
-            # Das gesamte Tagessaldo ist Netto-Zeit + manuelle Korrekturen
             if (total_net_timed + manual_sum) >= target_mins:
                 break
 
         return new_start.addSecs(duration_mins * 60)
 
+    def _set_now_as_end(self):
+        """Setzt die Endzeit auf die aktuelle Uhrzeit."""
+        self.time_end.setTime(QTime.currentTime())
+
     def on_start_time_changed(self, new_start_time):
-        """Wird aufgerufen, wenn die Startzeit geändert wird; aktualisiert die Endzeit-Vorschau."""
+        """Wird aufgerufen, wenn die Startzeit geändert wird."""
         today = QDate.currentDate().toString("yyyy-MM-dd")
         self.settings["last_date"] = today
         self.settings["last_start"] = new_start_time.toString("HH:mm")
@@ -302,12 +392,12 @@ class MainTabMixin:
         self.time_end.blockSignals(False)
         self.update_live_calc()
 
-    # pylint: disable=too-many-locals, too-many-statements, too-many-branches, too-many-nested-blocks
+    # pylint: disable=too-many-locals, too-many-statements, too-many-branches
     def update_live_calc(self):
         """Berechnet die Überstunden-Vorschau live und zeigt sie im Label an."""
         curr_date_str = self.date_edit.date().toString("yyyy-MM-dd")
-        target_mins = self.get_target_minutes_for_date(curr_date_str)
-        max_mins = self.get_max_minutes()
+        target_mins = get_target_minutes_for_date(curr_date_str, self.entries, self.settings)
+        max_mins = get_max_minutes(self.settings)
         is_auto = self.settings.get("auto_break", True)
 
         current_temp = WorkEntry(
@@ -336,21 +426,21 @@ class MainTabMixin:
         self.current_calculated_overtime = entry_overtime
 
         final_total_overtime = (total_net - target_mins) + manual_sum
-
         calc_text = (
-            f"Netto (Tag): {self.format_time(total_net)} ➔ "
-            f"<b>{self.format_time(final_total_overtime, show_plus=True)}"
+            f"Netto (Tag): {format_time(total_net)} ➔ "
+            f"<b>{format_time(final_total_overtime, show_plus=True)}"
             " Überstunden (Tag-Saldo)</b>"
         )
         warnings = []
         if total_net >= max_mins:
             warnings.append(f"⚠️ Max. {max_mins // 60}h erreicht!")
 
-        # Ruhezeit-Check (Lücke zum Vortag/letzten Eintrag davor)
         prev_entry = self.db.get_last_entry_before(curr_date_str)
         if prev_entry and prev_entry.end:
             try:
-                dt_prev = datetime.strptime(f"{prev_entry.date} {prev_entry.end}", "%Y-%m-%d %H:%M")
+                dt_prev = datetime.strptime(
+                    f"{prev_entry.date} {prev_entry.end}", "%Y-%m-%d %H:%M"
+                )
                 start_str_curr = self.time_start.time().toString('HH:mm')
                 dt_curr = datetime.strptime(
                     f"{curr_date_str} {start_str_curr}", "%Y-%m-%d %H:%M"
@@ -368,9 +458,7 @@ class MainTabMixin:
             self.lbl_live_calc.setStyleSheet("")
         self.lbl_live_calc.setText(calc_text)
 
-    def set_now_as_end(self):
-        """Setzt die Endzeit auf die aktuelle Uhrzeit."""
-        self.time_end.setTime(QTime.currentTime())
+    # --- Data modification ---
 
     def add_entry(self):
         """Liest die Eingabefelder aus, prüft auf Überlappung und fügt den Eintrag in die DB ein."""
@@ -378,7 +466,6 @@ class MainTabMixin:
         start_str = self.time_start.time().toString("HH:mm")
         end_str = self.time_end.time().toString("HH:mm")
 
-        # Überlappungs-Check
         overlap = self.check_overlap(date_str, start_str, end_str)
         if overlap:
             QMessageBox.warning(
@@ -406,12 +493,11 @@ class MainTabMixin:
         self.custom_target_cb.setChecked(False)
         self.date_edit.setDate(QDate.currentDate())
 
-        # Alle Einträge neu laden und den betroffenen Tag glattziehen
         self.entries = self.db.load_all()
         self.recalculate_day(date_str)
-        self.load_data()
+        self.data_changed.emit()
 
-    # pylint: disable=too-many-locals, too-many-statements, too-many-branches, too-many-nested-blocks
+    # pylint: disable=too-many-locals, too-many-statements, too-many-branches
     def edit_entry(self, row, _column):
         """Öffnet den Bearbeitungs-Dialog für den Eintrag in der angeklickten Zeile."""
         entry_idx = self.table.item(row, 0).data(Qt.ItemDataRole.UserRole)
@@ -419,12 +505,10 @@ class MainTabMixin:
         old_date = entry.date
 
         dialog = EditDialog(
-            entry, self.entries, self.get_target_minutes(),
-            self.get_max_minutes(), self.settings.get("auto_break", True), self
+            entry, self.entries, get_target_minutes(self.settings),
+            get_max_minutes(self.settings), self.settings.get("auto_break", True), self
         )
         if dialog.exec():
-            # Bevor wir anwenden: Überlappungs-Check (mit den neuen Werten aus dem Dialog)
-            # Wir holen uns die Werte temporär
             new_date = dialog.date_edit.date().toString("yyyy-MM-dd")
             new_start = (
                 dialog.time_start.time().toString("HH:mm")
@@ -447,48 +531,26 @@ class MainTabMixin:
             dialog.apply_to_entry()
             self.db.update(entry)
 
-            # Neu laden und beide betroffenen Tage (alt/neu) neu berechnen
             self.entries = self.db.load_all()
             self.recalculate_day(old_date)
             if entry.date != old_date:
                 self.recalculate_day(entry.date)
-            self.load_data()
+            self.data_changed.emit()
 
-    def delete_entry(self, entry: WorkEntry):
+    def delete_entry(self, entry):
         """Fragt den Benutzer nach Bestätigung und löscht dann den übergebenen Eintrag."""
         date_str = entry.date
         d = QDate.fromString(date_str, "yyyy-MM-dd").toString("dd.MM.yyyy")
-        reply = QMessageBox.question(self, "Löschen bestätigen",
+        reply = QMessageBox.question(
+            self, "Löschen bestätigen",
             f"Eintrag vom {d} wirklich löschen?",
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+        )
         if reply == QMessageBox.StandardButton.Yes:
             self.db.delete(entry.id)
-            # Nach Löschen: Tag neu berechnen
             self.entries = [e for e in self.entries if e.id != entry.id]
             self.recalculate_day(date_str)
-            self.load_data()
-
-    # pylint: disable=too-many-locals, too-many-statements, too-many-branches, too-many-nested-blocks
-    def recalculate_day(self, date_str):
-        """Verteilt Pausen und Überstunden für alle Zeiteinträge eines Tages neu.
-        Manuelle Einträge (ohne Start-/Endzeit) werden nicht angefasst."""
-        day_entries = [e for e in self.entries if e.date == date_str]
-        if not day_entries:
-            return
-
-        timed = [e for e in day_entries if e.start and e.end]
-        if not timed:
-            return
-
-        target_mins = self.get_target_minutes_for_date(date_str)
-        max_mins = self.get_max_minutes()
-        is_auto = self.settings.get("auto_break", True)
-
-        results, _ = calculate_timed_entries(timed, target_mins, max_mins, is_auto)
-
-        for e in timed:
-            e.pause, e.minutes = results[e.id]
-            self.db.update(e)
+            self.data_changed.emit()
 
     def check_overlap(self, date_str, start_str, end_str, exclude_id=None):
         """Prüft, ob sich der Zeitraum mit bestehenden Einträgen am selben Tag überschneidet."""
@@ -498,35 +560,32 @@ class MainTabMixin:
         s_new = QTime.fromString(start_str, "HH:mm")
         e_new = QTime.fromString(end_str, "HH:mm")
 
-        # Falls Mitternacht überschritten wird, ist die Logik komplexer,
-        # hier vereinfacht für den gleichen Tag:
         for e in self.entries:
             if e.date == date_str and e.start and e.end and e.id != exclude_id:
                 s_old = QTime.fromString(e.start, "HH:mm")
                 e_old = QTime.fromString(e.end, "HH:mm")
-
-                # Standard Überlappungs-Check: (StartA < EndeB) und (EndeA > StartB)
-                # Wir nutzen secsTo für den Vergleich
                 if s_new.secsTo(e_old) > 0 and s_old.secsTo(e_new) > 0:
                     return f"{e.start} - {e.end} ({e.reason or 'Ohne Anlass'})"
         return None
 
-    def on_list_filter_changed(self):
+    # --- Filter sync ---
+
+    def _on_list_filter_changed(self):
         """Wird aufgerufen, wenn der Monatsfilter in der Listenansicht geändert wird."""
         filter_val = self.month_filter.currentData()
         if filter_val and filter_val != "ALL":
-            idx = self.cal_month_filter.findData(filter_val)
-            if idx >= 0:
-                self.cal_month_filter.blockSignals(True)
-                self.cal_month_filter.setCurrentIndex(idx)
-                self.cal_month_filter.blockSignals(False)
+            self.filter_changed.emit(filter_val)
         self.update_ui()
 
+    # --- Export / Import ---
+
     def _get_export_entries(self):
+        """Gibt die Einträge gemäß aktivem Filter zurück."""
         filter_val = self.month_filter.currentData()
         return [e for e in self.entries if filter_val == "ALL" or e.date.startswith(filter_val)]
 
     def _get_export_title(self):
+        """Gibt den Titel für Export-Dokumente zurück."""
         filter_val = self.month_filter.currentData()
         return "Alle Einträge" if filter_val == "ALL" else f"Monat {filter_val}"
 
@@ -553,14 +612,16 @@ class MainTabMixin:
                 writer.writerow(["Datum", "Zeitraum", "Minuten", "Dauer", "Anlass"])
                 for e in export_entries:
                     d, zeitraum = self._export_row_data(e)
-                    writer.writerow([d, zeitraum, e.minutes, self.format_time(e.minutes), e.reason])
+                    writer.writerow(
+                        [d, zeitraum, e.minutes, format_time(e.minutes), e.reason]
+                    )
                 total = sum(e.minutes for e in export_entries)
-                writer.writerow(["Gesamt", "", "", self.format_time(total), ""])
+                writer.writerow(["Gesamt", "", "", format_time(total), ""])
             QMessageBox.information(self, "Erfolg", "CSV erfolgreich exportiert!")
         except Exception as ex:  # pylint: disable=broad-except
             QMessageBox.critical(self, "Fehler", f"Fehler beim CSV-Export:\n{str(ex)}")
 
-    # pylint: disable=too-many-locals, too-many-statements, too-many-branches, too-many-nested-blocks
+    # pylint: disable=too-many-locals, too-many-statements, too-many-branches
     def export_xlsx(self):
         """Exportiert die aktuell gefilterten Einträge als Excel-Datei (xlsx)."""
         if not _OPENPYXL:
@@ -580,13 +641,11 @@ class MainTabMixin:
             ws = wb.active
             ws.title = "Überstunden"
 
-            # Titel
             ws.merge_cells("A1:E1")
             ws["A1"] = f"Überstunden-Nachweis – {self._get_export_title()}"
             ws["A1"].font = Font(bold=True, size=13)
             ws["A1"].alignment = Alignment(horizontal="center")
 
-            # Kopfzeile
             hdr_fill = PatternFill("solid", fgColor="3b82f6")
             hdr_font = Font(bold=True, color="FFFFFF")
             hdr_align = Alignment(horizontal="center")
@@ -596,34 +655,31 @@ class MainTabMixin:
                 c.fill = hdr_fill
                 c.alignment = hdr_align
 
-            # Datenzeilen
             alt_fill = PatternFill("solid", fgColor="f3f4f6")
             for i, e in enumerate(export_entries):
-                row = i + 4
+                r = i + 4
                 d, zeitraum = self._export_row_data(e)
-                values = [d, zeitraum, e.minutes, self.format_time(e.minutes), e.reason]
+                values = [d, zeitraum, e.minutes, format_time(e.minutes), e.reason]
                 for col, val in enumerate(values, 1):
-                    c = ws.cell(row=row, column=col, value=val)
+                    c = ws.cell(row=r, column=col, value=val)
                     if i % 2 == 1:
                         c.fill = alt_fill
-                ovt_cell = ws.cell(row=row, column=3)
+                ovt_cell = ws.cell(row=r, column=3)
                 if e.minutes > 0:
                     ovt_cell.font = Font(color="059669")
                 elif e.minutes < 0:
                     ovt_cell.font = Font(color="dc2626")
 
-            # Summenzeile
             sum_row = len(export_entries) + 4
             sum_fill = PatternFill("solid", fgColor="dbeafe")
             ws.merge_cells(f"A{sum_row}:C{sum_row}")
             ws[f"A{sum_row}"] = "Gesamtsumme:"
-            ws[f"D{sum_row}"] = self.format_time(total_min)
+            ws[f"D{sum_row}"] = format_time(total_min)
             for col in range(1, 6):
                 c = ws.cell(row=sum_row, column=col)
                 c.font = Font(bold=True)
                 c.fill = sum_fill
 
-            # Spaltenbreiten
             for col, width in zip("ABCDE", [14, 24, 18, 12, 32]):
                 ws.column_dimensions[col].width = width
 
@@ -661,7 +717,7 @@ class MainTabMixin:
                     f"<tr style='background:{bg}'>"
                     f"<td>{d}</td><td>{zeitraum}</td>"
                     f"<td style='color:{color};text-align:right'>"
-                    f"{self.format_time(e.minutes, show_plus=True)}</td>"
+                    f"{format_time(e.minutes, show_plus=True)}</td>"
                     f"<td>{e.reason}</td></tr>"
                 )
 
@@ -684,7 +740,7 @@ class MainTabMixin:
               <tr class="sum">
                 <td colspan="2">Gesamtsumme:</td>
                 <td style='text-align:right'>
-                  {self.format_time(total_min, show_plus=True)}</td><td></td>
+                  {format_time(total_min, show_plus=True)}</td><td></td>
               </tr>
             </table>
             </body></html>"""
@@ -702,9 +758,12 @@ class MainTabMixin:
         except Exception as ex:  # pylint: disable=broad-except
             QMessageBox.critical(self, "Fehler", f"Fehler beim PDF-Export:\n{str(ex)}")
 
+    # pylint: disable=too-many-locals, too-many-statements, too-many-branches, too-many-nested-blocks
     def import_csv(self):
         """Importiert Einträge aus einer CSV-Datei und fügt sie zur Datenbank hinzu."""
-        file_name, _ = QFileDialog.getOpenFileName(self, "CSV Import", "", "CSV Dateien (*.csv)")
+        file_name, _ = QFileDialog.getOpenFileName(
+            self, "CSV Import", "", "CSV Dateien (*.csv)"
+        )
         if not file_name:
             return
         try:
@@ -723,13 +782,12 @@ class MainTabMixin:
                         date_str = row[0].strip()
                         if date_str.lower() in ["datum", "date"] or not date_str:
                             continue
-
-                        # Minuten optional behandeln
                         try:
-                            minutes = int(row[1].strip()) if len(row) > 1 and row[1].strip() else 0
+                            minutes = (
+                                int(row[1].strip()) if len(row) > 1 and row[1].strip() else 0
+                            )
                         except ValueError:
                             minutes = 0
-
                         reason = row[2].strip() if len(row) > 2 else ""
                         start_str = row[3].strip() if len(row) > 3 else ""
                         end_str = row[4].strip() if len(row) > 4 else ""
@@ -741,13 +799,14 @@ class MainTabMixin:
                         parsed_date = ""
                         for fmt in ("%d.%m.%y", "%d.%m.%Y", "%Y-%m-%d"):
                             try:
-                                parsed_date = datetime.strptime(date_str, fmt).strftime("%Y-%m-%d")
+                                parsed_date = datetime.strptime(
+                                    date_str, fmt
+                                ).strftime("%Y-%m-%d")
                                 break
                             except ValueError:
                                 pass
-
                         if not parsed_date:
-                            parsed_date = date_str # Fallback
+                            parsed_date = date_str
 
                         pending.append(WorkEntry(
                             id=None, date=parsed_date, start=start_str,
@@ -762,11 +821,11 @@ class MainTabMixin:
             preview_lines = [f"  {e.date}  {e.start}-{e.end}  {e.reason}" for e in pending[:5]]
             if len(pending) > 5:
                 preview_lines.append(f"  … und {len(pending) - 5} weitere")
-            preview = "\n".join(preview_lines)
 
             reply = QMessageBox.question(
                 self, "Import bestätigen",
-                f"{len(pending)} Einträge gefunden:\n\n{preview}\n\nJetzt importieren?\n"
+                f"{len(pending)} Einträge gefunden:\n\n{chr(10).join(preview_lines)}"
+                "\n\nJetzt importieren?\n"
                 "(Überstunden werden automatisch für jeden Tag berechnet/konsolidiert)",
                 QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
             )
@@ -780,12 +839,11 @@ class MainTabMixin:
             for entry in pending:
                 self.db.insert(entry)
 
-            # Alle Einträge neu laden und alle betroffenen Tage glattziehen
             self.entries = self.db.load_all()
             for d in sorted(list(affected_dates)):
                 self.recalculate_day(d)
 
-            self.load_data()
+            self.data_changed.emit()
             QMessageBox.information(
                 self, "Erfolg",
                 f"{len(pending)} Einträge importiert!\n"

@@ -1,6 +1,7 @@
 
 """
 Geschäftslogik zur Feiertagsberechnung, Zeitauswertung und Login-Ermittlung.
+Enthält außerdem gemeinsam genutzte Hilfsfunktionen für alle Tab-Widgets.
 """
 import getpass
 import re
@@ -207,6 +208,65 @@ def _get_login_time_win32():
     except (subprocess.SubprocessError, OSError):
         pass
     return None
+
+def format_time(total_minutes, show_plus=False):
+    """Formatiert Minuten in lesbare Zeitangabe.
+    Unter 60 Min → '45m', ab 60 Min → '1h 5m'.
+    """
+    sign = "+" if show_plus and total_minutes > 0 else ("-" if total_minutes < 0 else "")
+    abs_m = abs(total_minutes)
+    if abs_m < 60:
+        return f"{sign}{abs_m}m"
+    return f"{sign}{abs_m // 60}h {abs_m % 60}m"
+
+
+def get_target_minutes(settings):
+    """Gibt die Regelarbeitszeit aus den Einstellungen in Minuten zurück."""
+    t = QTime.fromString(settings.get("target_work_time", "08:00"), "HH:mm")
+    return t.hour() * 60 + t.minute()
+
+
+def get_max_minutes(settings):
+    """Gibt die maximal anrechenbare Arbeitszeit pro Tag in Minuten zurück."""
+    return settings.get("max_work_hours", 10) * 60
+
+
+def get_target_minutes_for_date(date_str, entries, settings):
+    """Ermittelt das Tagessoll für ein bestimmtes Datum.
+
+    Prüft in dieser Reihenfolge:
+    1. Individuelles Tagessoll eines vorhandenen Eintrags
+    2. Sonderarbeitstage aus den Einstellungen (z.B. 24.12.)
+    3. Feiertag → 0 Minuten
+    4. Kein Arbeitstag (Wochenende) → 0 Minuten
+    5. Reguläre Regelarbeitszeit
+    """
+    for e in entries:
+        if e.date == date_str and e.target_minutes != -1:
+            return e.target_minutes
+
+    qdate = QDate.fromString(date_str, "yyyy-MM-dd")
+
+    special_days = settings.get("special_days", [])
+    for sd in special_days:
+        if qdate.month() == sd["month"] and qdate.day() == sd["day"]:
+            t = QTime.fromString(sd["target"], "HH:mm")
+            return t.hour() * 60 + t.minute()
+
+    year = qdate.year()
+    state = settings.get("state", "TH")
+    holidays = get_holidays(year, state)
+
+    if date_str in holidays:
+        return 0
+
+    day_idx = qdate.dayOfWeek() - 1
+    workdays = settings.get("workdays", [0, 1, 2, 3, 4])
+    if day_idx not in workdays:
+        return 0
+
+    return get_target_minutes(settings)
+
 
 def get_login_time():
     """Ermittelt die letzte Anmeldezeit des aktuellen Benutzers als QTime.

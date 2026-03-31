@@ -1,23 +1,44 @@
 """
-Modul für die Tabs der Anwendung.
+Eigenständiges Widget für den Ziele- und Dashboard-Tab.
 """
 import math
 from PyQt6.QtCore import QDate, Qt
 from PyQt6.QtGui import QFont
 from PyQt6.QtWidgets import (
     QVBoxLayout, QGroupBox, QHBoxLayout, QCheckBox,
-    QLabel, QDateEdit, QSpinBox, QProgressBar, QGridLayout
+    QLabel, QDateEdit, QSpinBox, QProgressBar, QGridLayout, QWidget
 )
 
+from logic import format_time, get_target_minutes_for_date
 
-# pylint: disable=too-many-instance-attributes
-class GoalsTabMixin:
-    """Mixin for the goals and dashboard tab."""
 
-    # pylint: disable=too-many-locals, too-many-statements, too-many-branches, too-many-nested-blocks
-    def setup_goals_tab(self):
-        """Erstellt den Tab für Ziele und das Fortschritts-Dashboard."""
-        layout = QVBoxLayout(self.tab_goals)
+class GoalsTab(QWidget):
+    """Zeigt Gleitzeit-Ziele und ein Fortschritts-Dashboard."""
+
+    # pylint: disable=too-many-instance-attributes
+    def __init__(self, settings, save_settings_cb, parent=None):
+        """
+        Initialisiert das Ziele-Widget.
+
+        Args:
+            settings:         Einstellungs-Dictionary (gemeinsame Referenz).
+            save_settings_cb: Callable zum Speichern der Einstellungen.
+            parent:           Eltern-Widget.
+        """
+        super().__init__(parent)
+        self.settings = settings
+        self._save_settings = save_settings_cb
+        self.entries = []
+
+        self._build_ui()
+
+        if self.settings.get("goal_hours", 0) == 0:
+            self.auto_calculate_goal_hours()
+
+    # pylint: disable=too-many-locals, too-many-statements
+    def _build_ui(self):
+        """Erstellt das Layout des Ziele-Tabs."""
+        layout = QVBoxLayout(self)
         layout.setContentsMargins(30, 30, 30, 30)
         layout.setSpacing(20)
 
@@ -81,21 +102,18 @@ class GoalsTabMixin:
         grid = QGridLayout()
         grid.setSpacing(15)
 
-        # Kachel: Aktueller Stand
         self.lbl_goal_current = QLabel("0h 0m")
         self.lbl_goal_current.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.lbl_goal_current.setFont(QFont("Arial", 20, QFont.Weight.Bold))
         grid.addWidget(QLabel("Aktueller Stand", alignment=Qt.AlignmentFlag.AlignCenter), 0, 0)
         grid.addWidget(self.lbl_goal_current, 1, 0)
 
-        # Kachel: Es fehlen noch
         self.lbl_goal_missing = QLabel("0h 0m")
         self.lbl_goal_missing.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.lbl_goal_missing.setFont(QFont("Arial", 20, QFont.Weight.Bold))
         grid.addWidget(QLabel("Es fehlen noch", alignment=Qt.AlignmentFlag.AlignCenter), 0, 1)
         grid.addWidget(self.lbl_goal_missing, 1, 1)
 
-        # Kachel: Verbleibende Tage (bis zum Start des Zeitraums)
         self.lbl_goal_days = QLabel("0")
         self.lbl_goal_days.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.lbl_goal_days.setFont(QFont("Arial", 20, QFont.Weight.Bold))
@@ -106,7 +124,6 @@ class GoalsTabMixin:
 
         dashboard_layout.addLayout(grid)
 
-        # Fazit-Label unten
         self.lbl_goal_action = QLabel("-")
         self.lbl_goal_action.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.lbl_goal_action.setFont(QFont("Arial", 12))
@@ -116,8 +133,14 @@ class GoalsTabMixin:
         layout.addWidget(self.dashboard_group)
         layout.addStretch()
 
-        if self.settings.get("goal_hours", 0) == 0:
-            self.auto_calculate_goal_hours()
+    def refresh(self, entries):
+        """Aktualisiert die Einträge und das Dashboard.
+
+        Args:
+            entries: Aktuelle Liste aller WorkEntry-Objekte.
+        """
+        self.entries = entries
+        self.on_goal_changed()
 
     def auto_calculate_goal_hours(self):
         """Berechnet die benötigten Überstunden automatisch anhand des gewählten Zeitraums."""
@@ -128,15 +151,14 @@ class GoalsTabMixin:
 
         total_target_mins = 0
         curr = start_d
-
         while curr <= end_d:
-            total_target_mins += self.get_target_minutes_for_date(curr.toString("yyyy-MM-dd"))
+            total_target_mins += get_target_minutes_for_date(
+                curr.toString("yyyy-MM-dd"), self.entries, self.settings
+            )
             curr = curr.addDays(1)
 
-        total_hours_needed = total_target_mins / 60.0
-
         self.goal_hours_spin.blockSignals(True)
-        self.goal_hours_spin.setValue(math.ceil(total_hours_needed))
+        self.goal_hours_spin.setValue(math.ceil(total_target_mins / 60.0))
         self.goal_hours_spin.blockSignals(False)
 
         self.on_goal_changed()
@@ -147,7 +169,7 @@ class GoalsTabMixin:
         self.settings["goal_start_date"] = self.goal_start_edit.date().toString("yyyy-MM-dd")
         self.settings["goal_end_date"] = self.goal_end_edit.date().toString("yyyy-MM-dd")
         self.settings["goal_hours"] = self.goal_hours_spin.value()
-        self.save_settings()
+        self._save_settings()
 
         self.goal_start_edit.setEnabled(self.goal_active_cb.isChecked())
         self.goal_end_edit.setEnabled(self.goal_active_cb.isChecked())
@@ -155,18 +177,14 @@ class GoalsTabMixin:
         self.dashboard_group.setVisible(self.goal_active_cb.isChecked())
 
         if self.goal_active_cb.isChecked():
-            self.update_goal_status()
+            self._update_goal_status()
 
-    # pylint: disable=too-many-locals, too-many-statements, too-many-branches, too-many-nested-blocks
-    def update_goal_status(self):
+    # pylint: disable=too-many-branches
+    def _update_goal_status(self):
         """Aktualisiert die Anzeige des Fortschritts-Dashboards."""
-        if not self.goal_active_cb.isChecked():
-            return
-
         target_start_date = self.goal_start_edit.date()
         target_mins = self.goal_hours_spin.value() * 60
         current_saldo = sum(e.minutes for e in self.entries)
-
         progress_saldo = max(0, current_saldo)
 
         if target_mins == 0:
@@ -176,10 +194,9 @@ class GoalsTabMixin:
 
         self.goal_progress_bar.setValue(percentage)
         self.goal_progress_bar.setFormat(f"{percentage}% erreicht")
-        self.lbl_goal_current.setText(self.format_time(current_saldo))
+        self.lbl_goal_current.setText(format_time(current_saldo))
 
         missing_mins = target_mins - current_saldo
-
         if missing_mins <= 0:
             self.lbl_goal_missing.setText("0h 0m")
             self.lbl_goal_days.setText("-")
@@ -189,7 +206,7 @@ class GoalsTabMixin:
             self.lbl_goal_action.setStyleSheet("color: #10b981; font-weight: bold;")
             return
 
-        self.lbl_goal_missing.setText(self.format_time(missing_mins))
+        self.lbl_goal_missing.setText(format_time(missing_mins))
 
         today = QDate.currentDate()
         if target_start_date <= today:
@@ -202,14 +219,14 @@ class GoalsTabMixin:
 
         workdays = 0
         curr = today.addDays(1)
-
         while curr < target_start_date:
-            if self.get_target_minutes_for_date(curr.toString("yyyy-MM-dd")) > 0:
+            if get_target_minutes_for_date(
+                curr.toString("yyyy-MM-dd"), self.entries, self.settings
+            ) > 0:
                 workdays += 1
             curr = curr.addDays(1)
 
         self.lbl_goal_days.setText(str(workdays))
-
         if workdays == 0:
             self.lbl_goal_action.setText("Keine regulären Arbeitstage mehr zum Ansparen übrig!")
             self.lbl_goal_action.setStyleSheet("color: #ef4444;")

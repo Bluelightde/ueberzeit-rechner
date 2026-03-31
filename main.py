@@ -6,37 +6,37 @@ import os
 import shutil
 import sys
 
-from PyQt6.QtCore import QDate, Qt, QTime, QPoint
+from PyQt6.QtCore import QDate, Qt, QPoint
 from PyQt6.QtGui import QColor, QIcon, QPalette, QPainter, QPixmap, QPolygon
 from PyQt6.QtWidgets import (
-    QApplication, QMainWindow, QTabWidget, QWidget, QMessageBox, QFileDialog
+    QApplication, QMainWindow, QTabWidget, QMessageBox, QFileDialog
 )
 
 # Configuration must be imported before matplotlib for MPLCONFIGDIR
 # pylint: disable=wrong-import-position, wrong-import-order
 from config import BASE_DIR, DB_FILE, SETTINGS_FILE, ICON_PATH
 from database import DBManager
-from logic import get_holidays
 from dialogs import SettingsDialog
 
-from tabs.main_tab import MainTabMixin
-from tabs.goals_tab import GoalsTabMixin
-from tabs.calendar_tab import CalendarTabMixin
-from tabs.stats_tab import StatsTabMixin
+from tabs.main_tab import MainTab
+from tabs.goals_tab import GoalsTab
+from tabs.calendar_tab import CalendarTab
+from tabs.stats_tab import StatsTab
 # pylint: enable=wrong-import-position, wrong-import-order
 
 
 # --- HAUPTANWENDUNG ---
-# pylint: disable=too-many-instance-attributes, too-many-public-methods
-class UeberstundenApp(QMainWindow, MainTabMixin, GoalsTabMixin, CalendarTabMixin, StatsTabMixin):
+# pylint: disable=too-many-instance-attributes
+class UeberstundenApp(QMainWindow):
     """
-    Hauptklasse der Anwendung Überstunden-Rechner Pro.
-    Verwaltet das Hauptfenster, die Tabs und die Geschäftslogik.
+    Hauptfenster der Anwendung Überstunden-Rechner Pro.
+
+    Verwaltet die Datenbankverbindung, Einstellungen und das Tab-Layout.
+    Die eigentliche UI-Logik liegt in den eigenständigen Tab-Widgets.
     """
+
     def __init__(self):
-        """
-        Initialisiert die Anwendung, lädt Einstellungen und baut die UI auf.
-        """
+        """Initialisiert die Anwendung, lädt Einstellungen und baut die UI auf."""
         super().__init__()
         self.setWindowTitle("Überstunden-Rechner Pro")
         self.resize(1000, 750)
@@ -46,40 +46,45 @@ class UeberstundenApp(QMainWindow, MainTabMixin, GoalsTabMixin, CalendarTabMixin
 
         self.system_palette = QApplication.instance().palette()
         bg_color = self.system_palette.color(QPalette.ColorRole.Window)
-        bg_lightness = bg_color.lightness()
-        self.system_is_dark = bg_lightness < 128
+        self.system_is_dark = bg_color.lightness() < 128
 
         self.settings = self.load_settings()
         self.db = DBManager(self._resolve_db_path())
 
-        self.entries = []
-        self.current_calculated_overtime = 0
-        self.current_calculated_pause = 0
-
         self.apply_theme()
 
-        # Daten laden BEVOR die UI sie berechnet
-        self.entries = self.db.load_all()
+        # Tab-Widgets erstellen und mit gemeinsamen Ressourcen verknüpfen
+        self.tab_main = MainTab(
+            db=self.db,
+            settings=self.settings,
+            save_settings_cb=self.save_settings,
+            open_settings_cb=self.open_settings,
+        )
+        self.tab_goals = GoalsTab(
+            settings=self.settings,
+            save_settings_cb=self.save_settings,
+        )
+        self.tab_calendar = CalendarTab(settings=self.settings)
+        self.tab_stats = StatsTab(settings=self.settings)
 
-        self.tabs = QTabWidget()
-        self.setCentralWidget(self.tabs)
+        tabs = QTabWidget()
+        tabs.addTab(self.tab_main,     "Eingabe && Liste")
+        tabs.addTab(self.tab_goals,    "Ziele && Dashboard")
+        tabs.addTab(self.tab_calendar, "Kalender-Heatmap")
+        tabs.addTab(self.tab_stats,    "Diagramm && Statistik")
+        self.setCentralWidget(tabs)
 
-        self.tab_main = QWidget()
-        self.tab_goals = QWidget()
-        self.tab_calendar = QWidget()
-        self.tab_stats = QWidget()
+        # Signals verbinden: Datenänderungen im Haupt-Tab → alle Tabs aktualisieren
+        self.tab_main.data_changed.connect(self._on_data_changed)
 
-        self.tabs.addTab(self.tab_main, "Eingabe && Liste")
-        self.tabs.addTab(self.tab_goals, "Ziele && Dashboard")
-        self.tabs.addTab(self.tab_calendar, "Kalender-Heatmap")
-        self.tabs.addTab(self.tab_stats, "Diagramm && Statistik")
+        # Monatsfilter synchronisieren zwischen Haupt-Tab und Kalender-Tab
+        self.tab_main.filter_changed.connect(self.tab_calendar.set_filter)
+        self.tab_calendar.filter_changed.connect(self.tab_main.set_filter)
 
-        self.setup_main_tab()
-        self.setup_goals_tab()
-        self.setup_calendar_tab()
-        self.setup_stats_tab()
+        # Erstmalige Befüllung aller Tabs
+        self._on_data_changed()
 
-        self.load_data()
+    # --- Datenbankpfad ---
 
     def _resolve_db_path(self):
         """
@@ -89,10 +94,8 @@ class UeberstundenApp(QMainWindow, MainTabMixin, GoalsTabMixin, CalendarTabMixin
         db_path = self.settings.get("db_path", DB_FILE)
         if os.path.exists(db_path):
             return db_path
-        # Wenn es der Standard-Pfad ist, darf sqlite3 eine neue DB anlegen
         if db_path == DB_FILE:
             return db_path
-        # Benutzerdefinierter Pfad existiert nicht → nachfragen
         msg = QMessageBox(self)
         msg.setWindowTitle("Datenbank nicht gefunden")
         msg.setText(
@@ -122,15 +125,14 @@ class UeberstundenApp(QMainWindow, MainTabMixin, GoalsTabMixin, CalendarTabMixin
                 self.settings["db_path"] = path
                 self.save_settings()
                 return path
-        # Fallback: Standard-Pfad verwenden
         self.settings["db_path"] = DB_FILE
         self.save_settings()
         return DB_FILE
 
+    # --- Einstellungen ---
+
     def load_settings(self):
-        """
-        Lädt die Einstellungen aus der JSON-Datei oder gibt Standardwerte zurück.
-        """
+        """Lädt die Einstellungen aus der JSON-Datei oder gibt Standardwerte zurück."""
         defaults = {
             "default_start": "07:00",
             "target_work_time": "08:00",
@@ -158,19 +160,17 @@ class UeberstundenApp(QMainWindow, MainTabMixin, GoalsTabMixin, CalendarTabMixin
         return defaults
 
     def save_settings(self):
-        """
-        Speichert die aktuellen Einstellungen in die JSON-Datei.
-        """
+        """Speichert die aktuellen Einstellungen in die JSON-Datei."""
         try:
             with open(SETTINGS_FILE, "w", encoding="utf-8") as f:
                 json.dump(self.settings, f)
         except OSError:
             pass
 
+    # --- Theme ---
+
     def get_light_palette(self):
-        """
-        Erstellt und gibt die Farbpalette für den hellen Modus zurück (Breeze Light).
-        """
+        """Erstellt und gibt die Farbpalette für den hellen Modus zurück (Breeze Light)."""
         palette = QPalette()
         palette.setColor(QPalette.ColorRole.Window,          QColor("#eff0f1"))
         palette.setColor(QPalette.ColorRole.WindowText,      QColor("#31363b"))
@@ -188,9 +188,7 @@ class UeberstundenApp(QMainWindow, MainTabMixin, GoalsTabMixin, CalendarTabMixin
         return palette
 
     def get_dark_palette(self):
-        """
-        Erstellt und gibt die Farbpalette für den dunklen Modus zurück (Breeze Dark).
-        """
+        """Erstellt und gibt die Farbpalette für den dunklen Modus zurück (Breeze Dark)."""
         palette = QPalette()
         palette.setColor(QPalette.ColorRole.Window,          QColor("#31363b"))
         palette.setColor(QPalette.ColorRole.WindowText,      QColor("#eff0f1"))
@@ -208,9 +206,7 @@ class UeberstundenApp(QMainWindow, MainTabMixin, GoalsTabMixin, CalendarTabMixin
         return palette
 
     def get_dark_stylesheet(self, icon_dir=''):
-        """
-        Gibt das CSS-Stylesheet für den Breeze Dark Modus zurück.
-        """
+        """Gibt das CSS-Stylesheet für den Breeze Dark Modus zurück."""
         return """
             * { font-size: 13px; }
 
@@ -633,7 +629,6 @@ class UeberstundenApp(QMainWindow, MainTabMixin, GoalsTabMixin, CalendarTabMixin
             p.drawPolygon(QPolygon(pts))
             p.end()
             px.save(os.path.join(icon_dir, f'arrow_{name}.png'))
-        # Qt QSS benötigt Forward-Slashes, auch auf Windows
         return icon_dir.replace('\\', '/')
 
     def apply_theme(self):
@@ -641,13 +636,11 @@ class UeberstundenApp(QMainWindow, MainTabMixin, GoalsTabMixin, CalendarTabMixin
         qt_app = QApplication.instance()
         is_dark = self.settings.get("dark_mode", False)
 
-        # Auf Linux im Entwicklungsmodus: natives Breeze-Theme nutzen
         if not getattr(sys, 'frozen', False) and sys.platform.startswith('linux'):
             qt_app.setStyle("Breeze")
             qt_app.setPalette(self.get_dark_palette() if is_dark else self.get_light_palette())
             return
 
-        # Alle anderen Fälle (kompiliert oder Windows/macOS): Fusion + modernes Stylesheet
         qt_app.setStyle("Fusion")
         qt_app.setPalette(self.get_dark_palette() if is_dark else self.get_light_palette())
         icon_dir = self._create_arrow_icons()
@@ -656,62 +649,17 @@ class UeberstundenApp(QMainWindow, MainTabMixin, GoalsTabMixin, CalendarTabMixin
         )
         qt_app.setStyleSheet(sheet)
 
-    def closeEvent(self, event):  # pylint: disable=invalid-name
-        """
-        Wird beim Schließen der Anwendung aufgerufen. Speichert Einstellungen und schließt die DB.
-        """
-        self.save_settings()
-        self.db.close()
-        super().closeEvent(event)
+    # --- Daten-Orchestrierung ---
 
-    def get_target_minutes(self):
-        """
-        Gibt die in den Einstellungen festgelegte Regelarbeitszeit in Minuten zurück.
-        """
-        t = QTime.fromString(self.settings.get("target_work_time", "08:00"), "HH:mm")
-        return t.hour() * 60 + t.minute()
+    def _on_data_changed(self):
+        """Lädt alle Einträge aus der DB und verteilt sie an alle Tab-Widgets."""
+        entries = self.db.load_all()
+        self.tab_main.refresh(entries)
+        self.tab_goals.refresh(entries)
+        self.tab_calendar.refresh(entries)
+        self.tab_stats.refresh(entries)
 
-    def get_target_minutes_for_date(self, date_str):
-        """
-        Ermittelt das Tagessoll für ein bestimmtes Datum unter Berücksichtigung von
-        individuellen Einträgen, Sonderarbeitstagen, Feiertagen und Wochenenden.
-        """
-        # 1. Check if any entry for this day has a custom target_minutes
-        for e in self.entries:
-            if e.date == date_str and e.target_minutes != -1:
-                return e.target_minutes
-
-        qdate = QDate.fromString(date_str, "yyyy-MM-dd")
-
-        # 2. Check special days from settings (e.g. 24.12.)
-        special_days = self.settings.get("special_days", [])
-        for sd in special_days:
-            if qdate.month() == sd["month"] and qdate.day() == sd["day"]:
-                t = QTime.fromString(sd["target"], "HH:mm")
-                return t.hour() * 60 + t.minute()
-
-        year = qdate.year()
-        state = self.settings.get("state", "TH")
-        holidays = get_holidays(year, state)
-
-        # Check if holiday
-        if date_str in holidays:
-            return 0
-
-        # Check if workday (0=Mon, 6=Sun)
-        # QDate.dayOfWeek() returns 1 (Mon) to 7 (Sun)
-        day_idx = qdate.dayOfWeek() - 1
-        workdays = self.settings.get("workdays", [0, 1, 2, 3, 4])
-        if day_idx not in workdays:
-            return 0
-
-        return self.get_target_minutes()
-
-    def get_max_minutes(self):
-        """
-        Gibt die maximal anrechenbare Arbeitszeit pro Tag in Minuten zurück.
-        """
-        return self.settings.get("max_work_hours", 10) * 60
+    # --- Einstellungs-Dialog ---
 
     def open_settings(self):
         """Öffnet den Einstellungs-Dialog und übernimmt geänderte Einstellungen."""
@@ -742,36 +690,27 @@ class UeberstundenApp(QMainWindow, MainTabMixin, GoalsTabMixin, CalendarTabMixin
 
                 self.db.close()
                 self.db = DBManager(new_db_path)
-                self.entries = self.db.load_all()
+                self.tab_main.set_db(self.db)
 
             self.settings.update(new_settings)
             self.save_settings()
             self.apply_theme()
-            self.pause_spin.setEnabled(not self.settings.get("auto_break", True))
 
             # Alle Tage neu berechnen, da sich das Soll geändert haben könnte
-            all_dates = sorted(list(set(e.date for e in self.entries)))
-            for d_str in all_dates:
-                self.recalculate_day(d_str)
+            self.tab_main.entries = self.db.load_all()
+            self.tab_main.recalculate_all_days()
 
-            self.load_data() # Lädt alles neu (inkl. UI-Update)
+            # Tabs über Einstellungsänderung informieren und UI neu laden
+            self.tab_main.on_settings_changed()
+            self._on_data_changed()
 
-            new_start = self._get_default_start_time()
-            self.time_start.blockSignals(True)
-            self.time_start.setTime(new_start)
-            self.time_start.blockSignals(False)
-            self.on_start_time_changed(new_start)
+    # --- Lebenszyklus ---
 
-    def format_time(self, total_minutes, show_plus=False):
-        """Formatiert Minuten in Stunden und Minuten.
-        Unter 60 Min -> '45m'
-        Ab 60 Min    -> '1h 5m'
-        """
-        sign = "+" if show_plus and total_minutes > 0 else ("-" if total_minutes < 0 else "")
-        abs_m = abs(total_minutes)
-        if abs_m < 60:
-            return f"{sign}{abs_m}m"
-        return f"{sign}{abs_m // 60}h {abs_m % 60}m"
+    def closeEvent(self, event):  # pylint: disable=invalid-name
+        """Wird beim Schließen der Anwendung aufgerufen. Speichert Einstellungen und DB."""
+        self.save_settings()
+        self.db.close()
+        super().closeEvent(event)
 
 
 if __name__ == "__main__":

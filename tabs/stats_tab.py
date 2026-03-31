@@ -1,22 +1,41 @@
 """
-Modul für die Tabs der Anwendung.
+Eigenständiges Widget für den Diagramm- und Statistik-Tab.
 """
-from PyQt6.QtWidgets import QVBoxLayout
+from PyQt6.QtWidgets import QVBoxLayout, QWidget
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg
 from matplotlib.figure import Figure
 
 
-class StatsTabMixin:
-    """Mixin for the statistics and charts tab."""
+class StatsTab(QWidget):
+    """Zeigt ein monatliches Balkendiagramm der Überstunden."""
 
-    def setup_stats_tab(self):
-        """Erstellt den Tab für das Diagramm und die Statistik."""
-        self.stats_layout = QVBoxLayout(self.tab_stats)
+    def __init__(self, settings, parent=None):
+        """
+        Initialisiert das Statistik-Widget.
+
+        Args:
+            settings: Einstellungs-Dictionary (gemeinsame Referenz mit Hauptfenster).
+            parent:   Eltern-Widget.
+        """
+        super().__init__(parent)
+        self.settings = settings
+        self.entries = []
+
+        layout = QVBoxLayout(self)
         self.figure = Figure(figsize=(8, 4))
         self.canvas = FigureCanvasQTAgg(self.figure)
-        self.stats_layout.addWidget(self.canvas)
+        layout.addWidget(self.canvas)
 
-    def update_stats_chart(self):
+    def refresh(self, entries):
+        """Aktualisiert die Einträge und zeichnet das Diagramm neu.
+
+        Args:
+            entries: Aktuelle Liste aller WorkEntry-Objekte.
+        """
+        self.entries = entries
+        self._update_chart()
+
+    def _update_chart(self):
         """Zeichnet das monatliche Balkendiagramm der Überstunden neu."""
         monthly_totals = {}
         for e in reversed(self.entries):
@@ -37,11 +56,11 @@ class StatsTabMixin:
             spine.set_edgecolor(text_color)
 
         if not monthly_totals:
-            ax.text(0.5, 0.5, "Keine Daten vorhanden", color=text_color, ha='center', va='center')
+            ax.text(0.5, 0.5, "Keine Daten vorhanden",
+                    color=text_color, ha='center', va='center')
         else:
             months = list(monthly_totals.keys())
             values = [v / 60 for v in monthly_totals.values()]
-
             colors = ['#10b981' if v >= 0 else '#ef4444' for v in values]
             ax.bar(months, values, color=colors)
             ax.set_ylabel("Überstunden (in Stunden)", color=text_color)

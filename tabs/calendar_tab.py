@@ -1,41 +1,54 @@
 """
-Modul für die Tabs der Anwendung.
+Eigenständiges Widget für den Kalender-Heatmap-Tab.
 """
 import calendar
-from PyQt6.QtCore import QDate, Qt
+from PyQt6.QtCore import QDate, Qt, pyqtSignal
 from PyQt6.QtGui import QFont, QColor
 from PyQt6.QtWidgets import (
     QVBoxLayout, QHBoxLayout, QPushButton, QComboBox,
-    QLabel, QTableWidget, QHeaderView, QTableWidgetItem
+    QLabel, QTableWidget, QHeaderView, QTableWidgetItem, QWidget
 )
 
-from logic import get_holidays
+from logic import get_holidays, format_time
 from ui_components import HeatmapDelegate
 
 
-class CalendarTabMixin:
-    """Mixin for the calendar heatmap tab."""
+class CalendarTab(QWidget):
+    """Zeigt eine Kalender-Heatmap des aktuellen Monats mit Überstunden-Farbkodierung."""
 
-    # pylint: disable=too-many-locals, too-many-statements, too-many-branches, too-many-nested-blocks
-    def setup_calendar_tab(self):
-        """Erstellt den Tab für die Kalender-Heatmap."""
-        layout = QVBoxLayout(self.tab_calendar)
+    filter_changed = pyqtSignal(str)
+
+    def __init__(self, settings, parent=None):
+        """
+        Initialisiert das Kalender-Widget.
+
+        Args:
+            settings: Einstellungs-Dictionary (gemeinsame Referenz).
+            parent:   Eltern-Widget.
+        """
+        super().__init__(parent)
+        self.settings = settings
+        self.entries = []
+
+        self._build_ui()
+
+    def _build_ui(self):
+        """Erstellt das Layout des Kalender-Tabs."""
+        layout = QVBoxLayout(self)
 
         cal_toolbar = QHBoxLayout()
-
         self.btn_cal_prev = QPushButton("< Vorheriger")
-        self.btn_cal_prev.clicked.connect(self.cal_go_prev_month)
+        self.btn_cal_prev.clicked.connect(self._go_prev_month)
         self.btn_cal_next = QPushButton("Nächster >")
-        self.btn_cal_next.clicked.connect(self.cal_go_next_month)
+        self.btn_cal_next.clicked.connect(self._go_next_month)
 
         self.cal_month_filter = QComboBox()
-        self.cal_month_filter.currentIndexChanged.connect(self.on_cal_filter_changed)
+        self.cal_month_filter.currentIndexChanged.connect(self._on_filter_changed)
 
         cal_toolbar.addWidget(QLabel("Monat:"))
         cal_toolbar.addWidget(self.btn_cal_prev)
         cal_toolbar.addWidget(self.cal_month_filter)
         cal_toolbar.addWidget(self.btn_cal_next)
-
         cal_toolbar.addStretch()
 
         self.lbl_cal_month_sum = QLabel("Monats-Saldo: 0h 0m")
@@ -44,11 +57,9 @@ class CalendarTabMixin:
         font.setBold(True)
         self.lbl_cal_month_sum.setFont(font)
         cal_toolbar.addWidget(self.lbl_cal_month_sum)
-
         layout.addLayout(cal_toolbar)
 
         self.cal_table = QTableWidget(6, 7)
-
         self.cal_table.setHorizontalHeaderLabels(
             ["Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag", "Samstag", "Sonntag"]
         )
@@ -61,20 +72,49 @@ class CalendarTabMixin:
         self.cal_table.setItemDelegate(self.heatmap_delegate)
         layout.addWidget(self.cal_table)
 
-    def cal_go_prev_month(self):
-        """Navigiert im Kalender einen Monat zurück."""
+    def refresh(self, entries):
+        """Aktualisiert die Einträge und zeichnet die Heatmap neu.
+
+        Args:
+            entries: Aktuelle Liste aller WorkEntry-Objekte.
+        """
+        self.entries = entries
+        self._update_heatmap()
+
+    def set_filter(self, month_str):
+        """Setzt den Monatsfilter ohne das filter_changed-Signal auszulösen.
+
+        Args:
+            month_str: Monatsstring im Format 'yyyy-MM'.
+        """
+        idx = self.cal_month_filter.findData(month_str)
+        if idx >= 0:
+            self.cal_month_filter.blockSignals(True)
+            self.cal_month_filter.setCurrentIndex(idx)
+            self.cal_month_filter.blockSignals(False)
+            self._update_heatmap()
+
+    def _go_prev_month(self):
+        """Navigiert einen Monat zurück."""
         idx = self.cal_month_filter.currentIndex()
         if idx < self.cal_month_filter.count() - 1:
             self.cal_month_filter.setCurrentIndex(idx + 1)
 
-    def cal_go_next_month(self):
-        """Navigiert im Kalender einen Monat vor."""
+    def _go_next_month(self):
+        """Navigiert einen Monat vor."""
         idx = self.cal_month_filter.currentIndex()
         if idx > 0:
             self.cal_month_filter.setCurrentIndex(idx - 1)
 
-    # pylint: disable=too-many-locals, too-many-statements, too-many-branches, too-many-nested-blocks
-    def update_calendar_heatmap(self):
+    def _on_filter_changed(self):
+        """Wird aufgerufen, wenn der Benutzer den Monat im Dropdown ändert."""
+        cal_val = self.cal_month_filter.currentData()
+        if cal_val:
+            self.filter_changed.emit(cal_val)
+        self._update_heatmap()
+
+    # pylint: disable=too-many-locals, too-many-branches, too-many-statements
+    def _update_heatmap(self):
         """Aktualisiert die Kalender-Heatmap für den ausgewählten Monat."""
         self.cal_month_filter.blockSignals(True)
         current_cal_filter = self.cal_month_filter.currentData()
@@ -86,7 +126,6 @@ class CalendarTabMixin:
             months_set.add(today.addMonths(i).toString("yyyy-MM"))
 
         months = sorted(list(months_set), reverse=True)
-
         for m in months:
             self.cal_month_filter.addItem(f"{m[-2:]}/{m[:4]}", m)
 
@@ -100,7 +139,6 @@ class CalendarTabMixin:
             self.cal_month_filter.currentIndex() < self.cal_month_filter.count() - 1
         )
         self.btn_cal_next.setEnabled(self.cal_month_filter.currentIndex() > 0)
-
         self.cal_month_filter.blockSignals(False)
 
         sel_date_str = self.cal_month_filter.currentData()
@@ -115,15 +153,12 @@ class CalendarTabMixin:
 
         day_mins = {}
         monthly_sum = 0
-
         for e in self.entries:
             if e.date.startswith(sel_date_str):
                 day_mins[e.date] = day_mins.get(e.date, 0) + e.minutes
                 monthly_sum += e.minutes
 
-        self.lbl_cal_month_sum.setText(
-            f"Monats-Saldo: {self.format_time(monthly_sum, show_plus=True)}"
-        )
+        self.lbl_cal_month_sum.setText(f"Monats-Saldo: {format_time(monthly_sum, show_plus=True)}")
         if monthly_sum > 0:
             self.lbl_cal_month_sum.setStyleSheet("color: #10b981;")
         elif monthly_sum < 0:
@@ -147,10 +182,9 @@ class CalendarTabMixin:
                     is_holiday = date_str in holidays
                     is_workday = col in workdays_setting
 
-                    f_mins = f"\n({self.format_time(mins, show_plus=True)})" if mins != 0 else ""
+                    f_mins = f"\n({format_time(mins, show_plus=True)})" if mins != 0 else ""
                     if is_holiday:
-                        hol_name = holidays[date_str]
-                        text = f"{day}\n{hol_name}{f_mins}"
+                        text = f"{day}\n{holidays[date_str]}{f_mins}"
                     else:
                         text = f"{day}{f_mins}"
 
@@ -163,11 +197,9 @@ class CalendarTabMixin:
                             item.setBackground(QColor("#1e3a8a" if is_dark else "#bfdbfe"))
                             item.setForeground(QColor("#60a5fa" if is_dark else "#1d4ed8"))
                         elif mins > 0:
-                            alpha = min(255, 60 + (mins * 2))
-                            item.setBackground(QColor(16, 185, 129, alpha))
+                            item.setBackground(QColor(16, 185, 129, min(255, 60 + (mins * 2))))
                         else:
-                            alpha = min(255, 60 + (abs(mins) * 2))
-                            item.setBackground(QColor(239, 68, 68, alpha))
+                            item.setBackground(QColor(239, 68, 68, min(255, 60 + (abs(mins) * 2))))
                     else:
                         if mins == 0:
                             if not is_workday:
@@ -175,27 +207,13 @@ class CalendarTabMixin:
                             else:
                                 item.setBackground(QColor("#333333" if is_dark else "#ffffff"))
                         elif mins > 0:
-                            alpha = min(255, 60 + (mins * 2))
-                            item.setBackground(QColor(16, 185, 129, alpha))
+                            item.setBackground(QColor(16, 185, 129, min(255, 60 + (mins * 2))))
                         else:
-                            alpha = min(255, 60 + (abs(mins) * 2))
-                            item.setBackground(QColor(239, 68, 68, alpha))
+                            item.setBackground(QColor(239, 68, 68, min(255, 60 + (abs(mins) * 2))))
 
-                    # Den aktuellen Tag (Heute) prüfen und markieren
-                    if year == today.year() and month == today.month() and day == today.day():
-                        item.setData(Qt.ItemDataRole.UserRole + 1, True)
-                    else:
-                        item.setData(Qt.ItemDataRole.UserRole + 1, False)
+                    is_today = (
+                        year == today.year() and month == today.month() and day == today.day()
+                    )
+                    item.setData(Qt.ItemDataRole.UserRole + 1, is_today)
 
                 self.cal_table.setItem(row, col, item)
-
-    def on_cal_filter_changed(self):
-        """Wird aufgerufen, wenn der Monatsfilter im Kalender geändert wird."""
-        cal_val = self.cal_month_filter.currentData()
-        if cal_val:
-            idx = self.month_filter.findData(cal_val)
-            if idx >= 0:
-                self.month_filter.blockSignals(True)
-                self.month_filter.setCurrentIndex(idx)
-                self.month_filter.blockSignals(False)
-        self.update_calendar_heatmap()
