@@ -16,6 +16,7 @@ import platform
 import shutil
 import subprocess
 import sys
+import tarfile
 import zipfile
 from pathlib import Path
 
@@ -37,6 +38,7 @@ ARCH        = platform.machine()    # 'x86_64', 'arm64', …
 # ---------------------------------------------------------------------------
 
 def step(msg: str):
+    """Gibt einen formatierten Fortschrittsschritt aus."""
     print(f"\n{'='*60}")
     print(f"  {msg}")
     print('='*60)
@@ -46,6 +48,9 @@ def run(*args, **kwargs):
     """Führt einen Befehl aus und bricht bei Fehler ab."""
     cmd = [str(a) for a in args]
     print(f"  $ {' '.join(cmd)}")
+    # We handle the error manually below, so we set check=False if not provided.
+    if 'check' not in kwargs:
+        kwargs['check'] = False
     result = subprocess.run(cmd, **kwargs)
     if result.returncode != 0:
         print(f"\n[FEHLER] Befehl fehlgeschlagen (Exit {result.returncode})")
@@ -109,6 +114,7 @@ def find_pyinstaller(python: Path) -> list:
 # ---------------------------------------------------------------------------
 
 def install_deps(python: Path):
+    """Installiert die Abhängigkeiten aus der requirements.txt."""
     step("Abhängigkeiten installieren")
     req = SCRIPT_DIR / "requirements.txt"
     if req.exists():
@@ -129,6 +135,7 @@ def install_deps(python: Path):
 
 
 def clean_old_build():
+    """Löscht alte Build- und Dist-Verzeichnisse."""
     step("Altes Build-Verzeichnis bereinigen")
     for d in [DIST_DIR / APP_NAME, BUILD_DIR]:
         if d.exists():
@@ -137,6 +144,7 @@ def clean_old_build():
 
 
 def run_pyinstaller(python: Path):
+    """Führt PyInstaller aus, um die Anwendung zu bauen."""
     step("PyInstaller starten")
     pi_cmd = find_pyinstaller(python)
     run(*pi_cmd, str(SCRIPT_DIR / SPEC_FILE), cwd=str(SCRIPT_DIR))
@@ -147,6 +155,7 @@ def run_pyinstaller(python: Path):
 # ---------------------------------------------------------------------------
 
 def package_linux():
+    """Erstellt ein tar.gz-Paket für Linux."""
     step("Linux: tar.gz erstellen")
     src = DIST_DIR / APP_NAME
     if not src.exists():
@@ -154,13 +163,13 @@ def package_linux():
         return
     out_name = f"{APP_NAME}-linux-{ARCH}.tar.gz"
     out_path = DIST_DIR / out_name
-    import tarfile
     with tarfile.open(out_path, "w:gz") as tar:
         tar.add(src, arcname=APP_NAME)
     print(f"  Paket erstellt: {out_path}  ({out_path.stat().st_size // 1024} KB)")
 
 
 def package_windows():
+    """Erstellt ein ZIP-Paket für Windows."""
     step("Windows: ZIP erstellen")
     src = DIST_DIR / APP_NAME
     if not src.exists():
@@ -175,7 +184,7 @@ def package_windows():
 
 
 def package_macos():
-    step("macOS: DMG erstellen")
+    """Erstellt ein DMG- oder ZIP-Paket für macOS."""
     app_path = DIST_DIR / f"{APP_NAME}.app"
     if not app_path.exists():
         print(f"  [WARNUNG] {app_path} nicht gefunden – übersprungen.")
@@ -208,6 +217,7 @@ def package_macos():
 # ---------------------------------------------------------------------------
 
 def summary():
+    """Gibt eine Zusammenfassung der erstellten Dateien aus."""
     step("Build abgeschlossen")
     print(f"  Plattform : {PLAT} / {ARCH}")
     print(f"  Ausgabe   : {(SCRIPT_DIR / DIST_DIR).resolve()}")
@@ -223,6 +233,7 @@ def summary():
 # ---------------------------------------------------------------------------
 
 def main():
+    """Haupteinstiegspunkt für das Build-Skript."""
     parser = argparse.ArgumentParser(
         description="Baut den Überstundenrechner für die aktuelle Plattform.")
     parser.add_argument("--no-package", action="store_true",

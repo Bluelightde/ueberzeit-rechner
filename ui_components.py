@@ -6,6 +6,7 @@ from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QColor, QPainter, QPen
 from PyQt6.QtWidgets import QStyledItemDelegate
 
+# pylint: disable=too-few-public-methods
 class HeatmapDelegate(QStyledItemDelegate):
     """
     Delegate zum Zeichnen eines blauen Rahmens um den heutigen Tag in der Heatmap.

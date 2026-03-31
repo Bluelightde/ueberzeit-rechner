@@ -16,6 +16,7 @@ from ui_components import HeatmapDelegate
 class CalendarTabMixin:
     """Mixin for the calendar heatmap tab."""
 
+    # pylint: disable=too-many-local-variables, too-many-statements, too-many-branches, too-many-nested-blocks
     def setup_calendar_tab(self):
         """Erstellt den Tab für die Kalender-Heatmap."""
         layout = QVBoxLayout(self.tab_calendar)
@@ -72,6 +73,7 @@ class CalendarTabMixin:
         if idx > 0:
             self.cal_month_filter.setCurrentIndex(idx - 1)
 
+    # pylint: disable=too-many-local-variables, too-many-statements, too-many-branches, too-many-nested-blocks
     def update_calendar_heatmap(self):
         """Aktualisiert die Kalender-Heatmap für den ausgewählten Monat."""
         self.cal_month_filter.blockSignals(True)

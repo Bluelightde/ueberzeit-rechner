@@ -27,6 +27,7 @@ from tabs.stats_tab import StatsTabMixin
 
 
 # --- HAUPTANWENDUNG ---
+# pylint: disable=too-many-instance-attributes, too-many-public-methods
 class UeberstundenApp(QMainWindow, MainTabMixin, GoalsTabMixin, CalendarTabMixin, StatsTabMixin):
     """
     Hauptklasse der Anwendung Überstunden-Rechner Pro.

@@ -4,6 +4,7 @@ Datenklassen-Modelle für die Anwendung.
 """
 from dataclasses import dataclass
 
+# pylint: disable=too-many-instance-attributes
 @dataclass
 class WorkEntry:
     """

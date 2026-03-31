@@ -13,6 +13,7 @@ from config import BUNDESLAENDER, DB_FILE
 from models import WorkEntry
 from logic import calculate_timed_entries
 
+# pylint: disable=too-many-instance-attributes, too-many-arguments
 class SettingsDialog(QDialog):
     """
     Dialog zum Verwalten der Benutzereinstellungen wie Standardarbeitszeiten,
@@ -238,6 +239,7 @@ class SettingsDialog(QDialog):
         }
 
 
+# pylint: disable=too-many-instance-attributes, too-many-arguments
 class EditDialog(QDialog):
     """
     Dialog zum Bearbeiten oder Hinzufügen eines Arbeitseintrags.
