@@ -239,7 +239,7 @@ class SettingsDialog(QDialog):
         }
 
 
-# pylint: disable=too-many-instance-attributes, too-many-arguments
+# pylint: disable=too-many-instance-attributes, too-many-arguments, too-many-positional-arguments
 class EditDialog(QDialog):
     """
     Dialog zum Bearbeiten oder Hinzufügen eines Arbeitseintrags.

@@ -8,6 +8,7 @@ import subprocess
 import sys
 from PyQt6.QtCore import QDate, QTime
 
+# pylint: disable=too-many-locals
 def get_holidays(year, state):
     """
     Berechnet die gesetzlichen Feiertage für ein gegebenes Jahr und Bundesland.
@@ -62,7 +63,7 @@ def get_holidays(year, state):
 
     return holidays
 
-# pylint: disable=too-many-local-variables, too-many-branches
+# pylint: disable=too-many-locals, too-many-branches
 def calculate_timed_entries(timed_entries, target_mins, max_mins, is_auto):
     """Berechnet Pause und Überstunden für die Zeiteinträge eines Tages.
 
@@ -125,7 +126,7 @@ def calculate_timed_entries(timed_entries, target_mins, max_mins, is_auto):
     total_net = min(max_mins, total_accumulated_gross - recorded_pause_distributed)
     return results, total_net
 
-# pylint: disable=too-many-local-variables, too-many-branches
+# pylint: disable=too-many-locals, too-many-branches
 def _get_login_time_linux():
     """Linux-spezifische Ermittlung der Login-Zeit."""
     # Primär: journalctl mit --output=short-iso für zuverlässiges Parsing
@@ -158,7 +159,7 @@ def _get_login_time_linux():
         pass
     return None
 
-# pylint: disable=too-many-local-variables, too-many-branches
+# pylint: disable=too-many-locals, too-many-branches
 def _get_login_time_darwin():
     """macOS-spezifische Ermittlung der Login-Zeit."""
     try:
@@ -186,7 +187,7 @@ def _get_login_time_darwin():
         pass
     return None
 
-# pylint: disable=too-many-local-variables, too-many-branches
+# pylint: disable=too-many-locals, too-many-branches
 def _get_login_time_win32():
     """Windows-spezifische Ermittlung der Login-Zeit."""
     _no_win = {"creationflags": subprocess.CREATE_NO_WINDOW}

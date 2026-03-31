@@ -12,7 +12,9 @@
       "Bash(cp \"/home/miw/Nextcloud_Combase/Programme/Überstundenrechner_experimentell/create_icon.py\" /home/miw/Dokumente/Github/ueberstundenrechnerpro/create_icon.py)",
       "Bash(cp \"/home/miw/Nextcloud_Combase/Programme/Überstundenrechner_experimentell/icon.png\" /home/miw/Dokumente/Github/ueberstundenrechnerpro/icon.png)",
       "Bash(cp \"/home/miw/Nextcloud_Combase/Programme/Überstundenrechner_experimentell/icon.ico\" /home/miw/Dokumente/Github/ueberstundenrechnerpro/icon.ico)",
-      "Bash(cp \"/home/miw/Nextcloud_Combase/Programme/Überstundenrechner_experimentell/icon.icns\" /home/miw/Dokumente/Github/ueberstundenrechnerpro/icon.icns)"
+      "Bash(cp \"/home/miw/Nextcloud_Combase/Programme/Überstundenrechner_experimentell/icon.icns\" /home/miw/Dokumente/Github/ueberstundenrechnerpro/icon.icns)",
+      "Bash(~/.local/bin/pylint build.py config.py create_icon.py database.py dialogs.py logic.py main.py models.py ui_components.py tabs/__init__.py tabs/calendar_tab.py tabs/goals_tab.py tabs/main_tab.py tabs/stats_tab.py 2>&1)",
+      "Bash(/home/miw/Dokumente/Github/fortitoken-mobile-registration/venv/bin/pylint build.py config.py create_icon.py database.py dialogs.py logic.py main.py models.py ui_components.py tabs/__init__.py tabs/calendar_tab.py tabs/goals_tab.py tabs/main_tab.py tabs/stats_tab.py 2>&1)"
     ]
   }
 }

@@ -29,10 +29,11 @@ except ImportError:
     _OPENPYXL = False
 
 
+# pylint: disable=too-many-instance-attributes
 class MainTabMixin:
     """Mixin for the main input and list tab."""
 
-    # pylint: disable=too-many-local-variables, too-many-statements, too-many-branches, too-many-nested-blocks
+    # pylint: disable=too-many-locals, too-many-statements, too-many-branches, too-many-nested-blocks
     def setup_main_tab(self):
         """
         Erstellt das Layout und die Steuerelemente für den Haupt-Tab (Eingabe & Liste).
@@ -176,7 +177,7 @@ class MainTabMixin:
         self.on_goal_changed()
         self.update_calendar_heatmap()
 
-    # pylint: disable=too-many-local-variables, too-many-statements, too-many-branches, too-many-nested-blocks
+    # pylint: disable=too-many-locals, too-many-statements, too-many-branches, too-many-nested-blocks
     def update_ui(self):
         """Aktualisiert die Eintrags-Tabelle und den Gesamtsaldo entsprechend dem aktiven Filter."""
         self.month_filter.blockSignals(True)
@@ -301,7 +302,7 @@ class MainTabMixin:
         self.time_end.blockSignals(False)
         self.update_live_calc()
 
-    # pylint: disable=too-many-local-variables, too-many-statements, too-many-branches, too-many-nested-blocks
+    # pylint: disable=too-many-locals, too-many-statements, too-many-branches, too-many-nested-blocks
     def update_live_calc(self):
         """Berechnet die Überstunden-Vorschau live und zeigt sie im Label an."""
         curr_date_str = self.date_edit.date().toString("yyyy-MM-dd")
@@ -410,7 +411,7 @@ class MainTabMixin:
         self.recalculate_day(date_str)
         self.load_data()
 
-    # pylint: disable=too-many-local-variables, too-many-statements, too-many-branches, too-many-nested-blocks
+    # pylint: disable=too-many-locals, too-many-statements, too-many-branches, too-many-nested-blocks
     def edit_entry(self, row, _column):
         """Öffnet den Bearbeitungs-Dialog für den Eintrag in der angeklickten Zeile."""
         entry_idx = self.table.item(row, 0).data(Qt.ItemDataRole.UserRole)
@@ -467,7 +468,7 @@ class MainTabMixin:
             self.recalculate_day(date_str)
             self.load_data()
 
-    # pylint: disable=too-many-local-variables, too-many-statements, too-many-branches, too-many-nested-blocks
+    # pylint: disable=too-many-locals, too-many-statements, too-many-branches, too-many-nested-blocks
     def recalculate_day(self, date_str):
         """Verteilt Pausen und Überstunden für alle Zeiteinträge eines Tages neu.
         Manuelle Einträge (ohne Start-/Endzeit) werden nicht angefasst."""
@@ -559,7 +560,7 @@ class MainTabMixin:
         except Exception as ex:  # pylint: disable=broad-except
             QMessageBox.critical(self, "Fehler", f"Fehler beim CSV-Export:\n{str(ex)}")
 
-    # pylint: disable=too-many-local-variables, too-many-statements, too-many-branches, too-many-nested-blocks
+    # pylint: disable=too-many-locals, too-many-statements, too-many-branches, too-many-nested-blocks
     def export_xlsx(self):
         """Exportiert die aktuell gefilterten Einträge als Excel-Datei (xlsx)."""
         if not _OPENPYXL:

@@ -10,10 +10,11 @@ from PyQt6.QtWidgets import (
 )
 
 
+# pylint: disable=too-many-instance-attributes
 class GoalsTabMixin:
     """Mixin for the goals and dashboard tab."""
 
-    # pylint: disable=too-many-local-variables, too-many-statements, too-many-branches, too-many-nested-blocks
+    # pylint: disable=too-many-locals, too-many-statements, too-many-branches, too-many-nested-blocks
     def setup_goals_tab(self):
         """Erstellt den Tab für Ziele und das Fortschritts-Dashboard."""
         layout = QVBoxLayout(self.tab_goals)
@@ -156,7 +157,7 @@ class GoalsTabMixin:
         if self.goal_active_cb.isChecked():
             self.update_goal_status()
 
-    # pylint: disable=too-many-local-variables, too-many-statements, too-many-branches, too-many-nested-blocks
+    # pylint: disable=too-many-locals, too-many-statements, too-many-branches, too-many-nested-blocks
     def update_goal_status(self):
         """Aktualisiert die Anzeige des Fortschritts-Dashboards."""
         if not self.goal_active_cb.isChecked():

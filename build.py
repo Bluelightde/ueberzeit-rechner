@@ -51,7 +51,7 @@ def run(*args, **kwargs):
     # We handle the error manually below, so we set check=False if not provided.
     if 'check' not in kwargs:
         kwargs['check'] = False
-    result = subprocess.run(cmd, **kwargs)
+    result = subprocess.run(cmd, **kwargs)  # pylint: disable=subprocess-run-check
     if result.returncode != 0:
         print(f"\n[FEHLER] Befehl fehlgeschlagen (Exit {result.returncode})")
         sys.exit(result.returncode)

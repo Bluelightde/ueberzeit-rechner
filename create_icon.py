@@ -27,14 +27,14 @@ def rounded_rect(draw, xy, radius, fill):
     draw.ellipse([x1 - 2 * radius, y1 - 2 * radius, x1, y1], fill=fill)
 
 
-# pylint: disable=too-many-arguments
+# pylint: disable=too-many-arguments, too-many-positional-arguments
 def circle(draw, cx, cy, r, fill=None, outline=None, width=1):
     """Zeichnet einen Kreis."""
     draw.ellipse([cx - r, cy - r, cx + r, cy + r],
                  fill=fill, outline=outline, width=width)
 
 
-# pylint: disable=too-many-arguments
+# pylint: disable=too-many-arguments, too-many-positional-arguments
 def line_at_angle(draw, cx, cy, angle_deg, r_inner, r_outer, fill, width):
     """Zeichnet eine Linie in einem bestimmten Winkel."""
     a = math.radians(angle_deg - 90)
