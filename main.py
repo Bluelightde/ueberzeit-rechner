@@ -416,7 +416,7 @@ class SettingsDialog(QDialog):
         """
         super().__init__(parent)
         self.setWindowTitle("Einstellungen")
-        self.resize(380, 450)
+        self.resize(380, 480)
         layout = QVBoxLayout(self)
 
         layout.addWidget(QLabel("<b>Tages-Standardwerte:</b>"))
@@ -430,6 +430,34 @@ class SettingsDialog(QDialog):
         self.login_time_cb.setChecked(current_settings.get("use_login_time", False))
         layout.addWidget(self.login_time_cb)
 
+        self._setup_workdays_ui(layout, current_settings)
+        self._setup_time_settings_ui(layout, current_settings)
+
+        layout.addSpacing(10)
+        layout.addWidget(QLabel("<b>Pausen-Regelung:</b>"))
+        self.auto_break_cb = QCheckBox("Automatische Pausen-Berechnung")
+        self.auto_break_cb.setToolTip("6-9h: 30 Min, >9h: 45 Min")
+        self.auto_break_cb.setChecked(current_settings.get("auto_break", True))
+        layout.addWidget(self.auto_break_cb)
+
+        self._setup_regional_ui(layout, current_settings)
+        self._setup_special_days_ui(layout, current_settings)
+
+        layout.addSpacing(10)
+        layout.addWidget(QLabel("<b>Darstellung:</b>"))
+        self.dark_mode_cb = QCheckBox("Dark Mode aktivieren")
+        self.dark_mode_cb.setChecked(current_settings.get("dark_mode", False))
+        layout.addWidget(self.dark_mode_cb)
+
+        self.btn_save = QPushButton("Speichern")
+        self.btn_save.clicked.connect(self.accept)
+
+        self._setup_db_path_ui(layout, current_settings)
+
+        layout.addSpacing(15)
+        layout.addWidget(self.btn_save)
+
+    def _setup_workdays_ui(self, layout, current_settings):
         layout.addSpacing(10)
         layout.addWidget(QLabel("<b>Arbeitstage (Soll-Tage):</b>"))
         self.workday_checkboxes = []
@@ -443,6 +471,7 @@ class SettingsDialog(QDialog):
             self.workday_checkboxes.append(cb)
         layout.addLayout(workdays_layout)
 
+    def _setup_time_settings_ui(self, layout, current_settings):
         layout.addSpacing(10)
         time_layout = QHBoxLayout()
         self.time_start = QTimeEdit()
@@ -450,9 +479,7 @@ class SettingsDialog(QDialog):
         default_start = current_settings.get("default_start", "07:00")
         self.time_start.setTime(QTime.fromString(default_start, "HH:mm"))
         self.time_start.setEnabled(not current_settings.get("use_login_time", False))
-        self.login_time_cb.stateChanged.connect(
-            self._on_login_time_state_changed
-        )
+        self.login_time_cb.stateChanged.connect(self._on_login_time_state_changed)
         time_layout.addWidget(QLabel("Fallback Startzeit:"))
         time_layout.addWidget(self.time_start)
         layout.addLayout(time_layout)
@@ -475,30 +502,22 @@ class SettingsDialog(QDialog):
         max_layout.addWidget(self.max_hours_spin)
         layout.addLayout(max_layout)
 
-        layout.addSpacing(10)
-        layout.addWidget(QLabel("<b>Pausen-Regelung:</b>"))
-        self.auto_break_cb = QCheckBox("Automatische Pausen-Berechnung")
-        self.auto_break_cb.setToolTip("6-9h: 30 Min, >9h: 45 Min")
-        self.auto_break_cb.setChecked(current_settings.get("auto_break", True))
-        layout.addWidget(self.auto_break_cb)
-
+    def _setup_regional_ui(self, layout, current_settings):
         layout.addSpacing(10)
         layout.addWidget(QLabel("<b>Regionales:</b>"))
-
         state_layout = QHBoxLayout()
         self.state_combo = QComboBox()
         for code, name in BUNDESLAENDER.items():
             self.state_combo.addItem(name, code)
-
         curr_state = current_settings.get("state", "TH")
         idx = self.state_combo.findData(curr_state)
         if idx >= 0:
             self.state_combo.setCurrentIndex(idx)
-
         state_layout.addWidget(QLabel("Bundesland (für Feiertage):"))
         state_layout.addWidget(self.state_combo)
         layout.addLayout(state_layout)
 
+    def _setup_special_days_ui(self, layout, current_settings):
         layout.addSpacing(10)
         layout.addWidget(QLabel("<b>Sonder-Arbeitstage (z.B. 24.12.):</b>"))
         self.special_days_table = QTableWidget(0, 3)
@@ -518,21 +537,22 @@ class SettingsDialog(QDialog):
         special_btn_layout.addWidget(btn_remove_special)
         layout.addLayout(special_btn_layout)
 
-        # Load special days
         special_days = current_settings.get("special_days", [])
         for sd in special_days:
             self.add_special_day_row(sd)
 
+    def _setup_db_path_ui(self, layout, current_settings):
         layout.addSpacing(10)
-        layout.addWidget(QLabel("<b>Darstellung:</b>"))
-        self.dark_mode_cb = QCheckBox("Dark Mode aktivieren")
-        self.dark_mode_cb.setChecked(current_settings.get("dark_mode", False))
-        layout.addWidget(self.dark_mode_cb)
-
-        self.btn_save = QPushButton("Speichern")
-        self.btn_save.clicked.connect(self.accept)
-        layout.addSpacing(15)
-        layout.addWidget(self.btn_save)
+        layout.addWidget(QLabel("<b>Speicherort der Datenbank:</b>"))
+        db_path_layout = QHBoxLayout()
+        self.db_path_edit = QLineEdit()
+        self.db_path_edit.setText(current_settings.get("db_path", DB_FILE))
+        self.db_path_edit.setReadOnly(True)
+        btn_browse_db = QPushButton("Durchsuchen…")
+        btn_browse_db.clicked.connect(self.browse_db_path)
+        db_path_layout.addWidget(self.db_path_edit)
+        db_path_layout.addWidget(btn_browse_db)
+        layout.addLayout(db_path_layout)
 
     def _on_login_time_state_changed(self):
         """
@@ -572,6 +592,18 @@ class SettingsDialog(QDialog):
         if curr >= 0:
             self.special_days_table.removeRow(curr)
 
+    def browse_db_path(self):
+        """
+        Öffnet einen Dateidialog zur Auswahl des Speicherorts der Datenbank.
+        """
+        path, _ = QFileDialog.getSaveFileName(
+            self, "Datenbank speichern unter",
+            self.db_path_edit.text(),
+            "SQLite Datenbank (*.db);;Alle Dateien (*)"
+        )
+        if path:
+            self.db_path_edit.setText(path)
+
     def get_settings(self):
         """
         Gibt die im Dialog eingestellten Werte als Dictionary zurück.
@@ -594,6 +626,7 @@ class SettingsDialog(QDialog):
             "use_login_time": self.login_time_cb.isChecked(),
             "workdays": workdays,
             "special_days": special_days,
+            "db_path": self.db_path_edit.text()
         }
 
 
@@ -797,14 +830,13 @@ class UeberstundenApp(QMainWindow):
         if os.path.exists(ICON_PATH):
             self.setWindowIcon(QIcon(ICON_PATH))
 
-        self.db = DBManager(DB_FILE)
-
         self.system_palette = QApplication.instance().palette()
         bg_color = self.system_palette.color(QPalette.ColorRole.Window)
         bg_lightness = bg_color.lightness()
         self.system_is_dark = bg_lightness < 128
 
         self.settings = self.load_settings()
+        self.db = DBManager(self.settings.get("db_path", DB_FILE))
 
         self.entries = []
         self.current_calculated_overtime = 0
@@ -854,7 +886,8 @@ class UeberstundenApp(QMainWindow):
             "goal_active": False,
             "goal_start_date": QDate.currentDate().addDays(30).toString("yyyy-MM-dd"),
             "goal_end_date": QDate.currentDate().addDays(35).toString("yyyy-MM-dd"),
-            "goal_hours": 0
+            "goal_hours": 0,
+            "db_path": DB_FILE
         }
         if os.path.exists(SETTINGS_FILE):
             try:
@@ -1997,9 +2030,36 @@ class UeberstundenApp(QMainWindow):
 
     def open_settings(self):
         """Öffnet den Einstellungs-Dialog und übernimmt geänderte Einstellungen."""
+        old_db_path = self.settings.get("db_path", DB_FILE)
         dialog = SettingsDialog(self.settings, self)
         if dialog.exec():
-            self.settings.update(dialog.get_settings())
+            new_settings = dialog.get_settings()
+            new_db_path = new_settings.get("db_path", DB_FILE)
+
+            if new_db_path != old_db_path:
+                if os.path.exists(old_db_path) and not os.path.exists(new_db_path):
+                    reply = QMessageBox.question(
+                        self, "Datenbank verschieben?",
+                        "Soll die bestehende Datenbank an den neuen Ort verschoben werden?\n"
+                        "(Bei 'Nein' wird am neuen Ort eine neue, leere Datenbank erstellt.)",
+                        QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No |
+                        QMessageBox.StandardButton.Cancel
+                    )
+                    if reply == QMessageBox.StandardButton.Cancel:
+                        return
+                    if reply == QMessageBox.StandardButton.Yes:
+                        try:
+                            shutil.move(old_db_path, new_db_path)
+                        except OSError as e:
+                            QMessageBox.critical(self, "Fehler",
+                                               f"Datenbank konnte nicht verschoben werden:\n{e}")
+                            return
+
+                self.db.close()
+                self.db = DBManager(new_db_path)
+                self.entries = self.db.load_all()
+
+            self.settings.update(new_settings)
             self.save_settings()
             self.apply_theme()
             self.pause_spin.setEnabled(not self.settings.get("auto_break", True))
@@ -2634,8 +2694,9 @@ class UeberstundenApp(QMainWindow):
             if reply != QMessageBox.StandardButton.Yes:
                 return
 
-            if os.path.exists(DB_FILE):
-                shutil.copy2(DB_FILE, DB_FILE + ".backup")
+            current_db = self.settings.get("db_path", DB_FILE)
+            if os.path.exists(current_db):
+                shutil.copy2(current_db, current_db + ".backup")
 
             for entry in pending:
                 self.db.insert(entry)
