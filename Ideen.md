@@ -1,0 +1,2 @@
+- Erste Login Zeit des Tages
+- Live Anzeige überarbeiten und immer aktualiseiren auch wenn inviduelle Arbeitszeit.
