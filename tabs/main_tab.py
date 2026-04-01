@@ -2,6 +2,7 @@
 Eigenständiges Widget für den Haupt-Tab (Eingabe & Liste).
 """
 import csv
+import io
 import logging
 import os
 import shutil
@@ -37,6 +38,8 @@ try:
     _OPENPYXL = True
 except ImportError:
     _OPENPYXL = False
+
+from io import StringIO
 
 
 # pylint: disable=too-many-instance-attributes
@@ -579,6 +582,9 @@ class MainTab(QWidget):  # pylint: disable=too-many-public-methods
         s_new = QTime.fromString(start_str, "HH:mm")
         e_new = QTime.fromString(end_str, "HH:mm")
 
+        if s_new >= e_new:
+            return tr("Startzeit muss vor Endzeit liegen")
+
         for e in self.entries:
             if e.date == date_str and e.start and e.end and e.id != exclude_id:
                 s_old = QTime.fromString(e.start, "HH:mm")
@@ -803,8 +809,7 @@ class MainTab(QWidget):  # pylint: disable=too-many-public-methods
                 if not content:
                     return
                 delimiter = ";" if ";" in content.split("\n")[0] else ","
-                csvfile.seek(0)
-                reader = csv.reader(csvfile, delimiter=delimiter)
+                reader = csv.reader(StringIO(content), delimiter=delimiter)
 
                 pending = []
                 affected_dates = set()
