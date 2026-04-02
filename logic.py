@@ -108,9 +108,26 @@ def calculate_timed_entries(timed_entries, target_mins, max_mins, is_auto, break
 # pylint: disable=too-many-locals, too-many-branches
 def _get_login_time_linux():
     """Linux-spezifische Ermittlung der Login-Zeit."""
-    # Primär: journalctl mit --output=short-iso für zuverlässiges Parsing
+    user = getpass.getuser()
+    # 1. Versuch: Frühester Login von HEUTE
     try:
-        user = getpass.getuser()
+        r = subprocess.run(
+            ["journalctl", "-u", "systemd-logind",
+             "--grep", f"New session.*{user}",
+             "--since", "today", "--output=short-iso", "--no-pager"],
+            capture_output=True, text=True, timeout=5, check=False
+        )
+        if r.returncode == 0 and r.stdout.strip():
+            for line in r.stdout.strip().splitlines():
+                if "New session" in line and user in line:
+                    m = re.search(r"T(\d{2}):(\d{2}):", line)
+                    if m:
+                        return QTime(int(m.group(1)), int(m.group(2)))
+    except (subprocess.SubprocessError, OSError) as exc:
+        logger.debug("journalctl (today) fehlgeschlagen: %s", exc)
+
+    # 2. Versuch: Letzter Login überhaupt (Fallback wie bisher)
+    try:
         r = subprocess.run(
             ["journalctl", "-u", "systemd-logind",
              "--grep", f"New session.*{user}",
@@ -122,18 +139,20 @@ def _get_login_time_linux():
             if m:
                 return QTime(int(m.group(1)), int(m.group(2)))
     except (subprocess.SubprocessError, OSError) as exc:
-        logger.debug("journalctl-Abfrage fehlgeschlagen, versuche 'who': %s", exc)
+        logger.debug("journalctl (last) fehlgeschlagen, versuche 'who': %s", exc)
 
     # Fallback: who
     try:
-        user = getpass.getuser()
         r = subprocess.run(["who"], capture_output=True, text=True, timeout=3, check=False)
         if r.returncode == 0:
+            logins = []
             for line in r.stdout.strip().splitlines():
                 if line.startswith(user + " ") or line.startswith(user + "\t"):
                     m = re.search(r"(\d{2}:\d{2})", line)
                     if m:
-                        return QTime.fromString(m.group(1), "HH:mm")
+                        logins.append(QTime.fromString(m.group(1), "HH:mm"))
+            if logins:
+                return min(logins)
     except (subprocess.SubprocessError, OSError) as exc:
         logger.debug("'who'-Abfrage (Linux) fehlgeschlagen: %s", exc)
     return None
@@ -141,27 +160,46 @@ def _get_login_time_linux():
 # pylint: disable=too-many-locals, too-many-branches
 def _get_login_time_darwin():
     """macOS-spezifische Ermittlung der Login-Zeit."""
+    user = getpass.getuser()
     try:
-        user = getpass.getuser()
-        r = subprocess.run(["last", "-1", user],
+        # last -y zeigt das Jahr, LC_ALL=C für stabiles Datumsformat
+        r = subprocess.run(["last", "-y", user], env={"LC_ALL": "C"},
                            capture_output=True, text=True, timeout=5, check=False)
         if r.returncode == 0 and r.stdout:
-            m = re.search(r"\s(\d{1,2}:\d{2})\s", r.stdout.split("\n")[0])
-            if m:
-                return QTime.fromString(m.group(1).zfill(5), "HH:mm")
+            # "ddd MMM d" in English locale (e.g. "Thu Apr 2")
+            en_locale = QLocale(QLocale.Language.English, QLocale.Country.UnitedStates)
+            today_prefix = en_locale.toString(QDate.currentDate(), "ddd MMM d")
+            logins_today = []
+            all_logins = []
+            for line in r.stdout.splitlines():
+                if not line.strip() or "wtmp begins" in line:
+                    continue
+                m = re.search(r"\s(\d{1,2}:\d{2})\s", line)
+                if m:
+                    t = QTime.fromString(m.group(1).zfill(5), "HH:mm")
+                    all_logins.append(t)
+                    if today_prefix in line:
+                        logins_today.append(t)
+            
+            if logins_today:
+                return min(logins_today)
+            if all_logins:
+                return all_logins[0] # 'last' ist absteigend sortiert, also neuester
     except (subprocess.SubprocessError, OSError) as exc:
         logger.debug("'last'-Abfrage (macOS) fehlgeschlagen, versuche 'who': %s", exc)
 
     # Fallback: who
     try:
-        user = getpass.getuser()
         r = subprocess.run(["who"], capture_output=True, text=True, timeout=3, check=False)
         if r.returncode == 0:
+            logins = []
             for line in r.stdout.strip().splitlines():
                 if line.startswith(user):
                     m = re.search(r"(\d{1,2}:\d{2})", line)
                     if m:
-                        return QTime.fromString(m.group(1).zfill(5), "HH:mm")
+                        logins.append(QTime.fromString(m.group(1).zfill(5), "HH:mm"))
+            if logins:
+                return min(logins)
     except (subprocess.SubprocessError, OSError) as exc:
         logger.debug("'who'-Abfrage (macOS) fehlgeschlagen: %s", exc)
     return None
@@ -171,11 +209,15 @@ def _get_login_time_win32():
     """Windows-spezifische Ermittlung der Login-Zeit."""
     _no_win = {"creationflags": subprocess.CREATE_NO_WINDOW}
     try:
+        # PowerShell-Script: Sucht alle Logins (LogonType 2=Interactive, 10=RemoteInteractive),
+        # filtert auf HEUTE und nimmt den ersten (frühesten). 
+        # Falls heute keiner, nimm den allerletzten verfügbaren.
         ps_cmd = (
-            "(Get-CimInstance Win32_LogonSession | "
-            "Where-Object {$_.LogonType -in 2,10} | "
-            "Sort-Object StartTime -Descending | "
-            "Select-Object -First 1).StartTime.ToString('HH:mm')"
+            "$today = (Get-Date).Date; "
+            "$logons = Get-CimInstance Win32_LogonSession | Where-Object {$_.LogonType -in 2,10} | Sort-Object StartTime; "
+            "$today_logons = $logons | Where-Object {$_.StartTime -ge $today}; "
+            "if ($today_logons) { $today_logons[0].StartTime.ToString('HH:mm') } "
+            "else { ($logons | Select-Object -Last 1).StartTime.ToString('HH:mm') }"
         )
         r = subprocess.run(
             ["powershell", "-NoProfile", "-NonInteractive", "-Command", ps_cmd],

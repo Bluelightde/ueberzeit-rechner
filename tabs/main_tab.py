@@ -217,6 +217,7 @@ class MainTab(QWidget):  # pylint: disable=too-many-public-methods
         """
         self.entries = entries
         self.update_ui()
+        self.update_live_calc()
 
     def set_filter(self, month_str):
         """Setzt den Monatsfilter ohne das filter_changed-Signal auszulösen.
@@ -364,7 +365,12 @@ class MainTab(QWidget):  # pylint: disable=too-many-public-methods
         timed_existing = [e for e in all_day if e.start and e.end]
         manual_sum = sum(e.minutes for e in all_day if not (e.start and e.end))
 
-        target_mins = get_target_minutes_for_date(curr_date_str, self.entries, self.settings)
+        if self.custom_target_cb.isChecked():
+            t_target = self.custom_target_time.time()
+            target_mins = t_target.hour() * 60 + t_target.minute()
+        else:
+            target_mins = get_target_minutes_for_date(curr_date_str, self.entries, self.settings)
+
         max_mins = get_max_minutes(self.settings)
         is_auto = self.settings.get("auto_break", True)
 
@@ -407,7 +413,13 @@ class MainTab(QWidget):  # pylint: disable=too-many-public-methods
     def update_live_calc(self):
         """Berechnet die Überstunden-Vorschau live und zeigt sie im Label an."""
         curr_date_str = self.date_edit.date().toString("yyyy-MM-dd")
-        target_mins = get_target_minutes_for_date(curr_date_str, self.entries, self.settings)
+
+        if self.custom_target_cb.isChecked():
+            t_target = self.custom_target_time.time()
+            target_mins = t_target.hour() * 60 + t_target.minute()
+        else:
+            target_mins = get_target_minutes_for_date(curr_date_str, self.entries, self.settings)
+
         max_mins = get_max_minutes(self.settings)
         is_auto = self.settings.get("auto_break", True)
 
@@ -422,21 +434,45 @@ class MainTab(QWidget):  # pylint: disable=too-many-public-methods
         )
 
         all_day = [e for e in self.entries if e.date == curr_date_str]
-        timed = [e for e in all_day if e.start and e.end] + [current_temp]
+        
+        # Intelligenz: Wenn die aktuellen Formular-Zeiten exakt dem entsprechen,
+        # was wir gerade gespeichert haben, zählen wir sie in der Vorschau nicht doppelt.
+        is_duplicate = (
+            hasattr(self, "_last_added_params") and
+            self._last_added_params == (
+                curr_date_str, 
+                current_temp.start, 
+                current_temp.end
+            )
+        )
+
+        timed = [e for e in all_day if e.start and e.end]
+        if not is_duplicate:
+            timed.append(current_temp)
+
         manual_sum = sum(e.minutes for e in all_day if not (e.start and e.end))
 
         results, total_net = calculate_timed_entries(
             timed, target_mins, max_mins, is_auto, self.settings.get("break_rules")
         )
-        entry_pause, entry_overtime = results[-1]
+        
+        # Wenn wir den temp-Eintrag übersprungen haben, nehmen wir die Werte 
+        # vom letzten echten Eintrag für die Anzeige/Speicherung
+        if not is_duplicate:
+            entry_pause, entry_overtime = results[-1]
+        else:
+            # Dummy-Werte oder wir lassen sie wie sie sind
+            entry_pause = self.current_calculated_pause
+            entry_overtime = self.current_calculated_overtime
 
-        if is_auto:
+        if is_auto and not is_duplicate:
             self.pause_spin.blockSignals(True)
             self.pause_spin.setValue(entry_pause)
             self.pause_spin.blockSignals(False)
 
-        self.current_calculated_pause = entry_pause
-        self.current_calculated_overtime = entry_overtime
+        if not is_duplicate:
+            self.current_calculated_pause = entry_pause
+            self.current_calculated_overtime = entry_overtime
 
         final_total_overtime = (total_net - target_mins) + manual_sum
         calc_text = tr(
@@ -513,6 +549,12 @@ class MainTab(QWidget):  # pylint: disable=too-many-public-methods
         self.date_edit.setDate(QDate.currentDate())
 
         self.entries = self.db.load_all()
+        
+        # Wir speichern die Parameter des gerade hinzugefügten Eintrags.
+        # update_live_calc nutzt dies, um eine Doppelzählung in der Vorschau zu vermeiden,
+        # auch wenn Start- und Endzeit im Formular unverändert bleiben.
+        self._last_added_params = (date_str, start_str, end_str)
+
         self.recalculate_day(date_str)
         self.data_changed.emit()
 
