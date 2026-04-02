@@ -2,11 +2,11 @@
 Eigenständiges Widget für den Haupt-Tab (Eingabe & Liste).
 """
 import csv
-import io
 import logging
 import os
 import shutil
 from datetime import datetime
+from io import StringIO
 
 from PyQt6.QtCore import QDate, QLocale, Qt, QTime, pyqtSignal
 from PyQt6.QtGui import QColor, QFont
@@ -39,8 +39,6 @@ try:
 except ImportError:
     _OPENPYXL = False
 
-from io import StringIO
-
 
 # pylint: disable=too-many-instance-attributes
 class MainTab(QWidget):  # pylint: disable=too-many-public-methods
@@ -69,6 +67,7 @@ class MainTab(QWidget):  # pylint: disable=too-many-public-methods
         self.entries = []
         self.current_calculated_overtime = 0
         self.current_calculated_pause = 0
+        self._last_added_params = None
 
         self._build_ui()
 
@@ -434,14 +433,14 @@ class MainTab(QWidget):  # pylint: disable=too-many-public-methods
         )
 
         all_day = [e for e in self.entries if e.date == curr_date_str]
-        
+
         # Intelligenz: Wenn die aktuellen Formular-Zeiten exakt dem entsprechen,
         # was wir gerade gespeichert haben, zählen wir sie in der Vorschau nicht doppelt.
         is_duplicate = (
             hasattr(self, "_last_added_params") and
             self._last_added_params == (
-                curr_date_str, 
-                current_temp.start, 
+                curr_date_str,
+                current_temp.start,
                 current_temp.end
             )
         )
@@ -455,8 +454,8 @@ class MainTab(QWidget):  # pylint: disable=too-many-public-methods
         results, total_net = calculate_timed_entries(
             timed, target_mins, max_mins, is_auto, self.settings.get("break_rules")
         )
-        
-        # Wenn wir den temp-Eintrag übersprungen haben, nehmen wir die Werte 
+
+        # Wenn wir den temp-Eintrag übersprungen haben, nehmen wir die Werte
         # vom letzten echten Eintrag für die Anzeige/Speicherung
         if not is_duplicate:
             entry_pause, entry_overtime = results[-1]
@@ -549,7 +548,7 @@ class MainTab(QWidget):  # pylint: disable=too-many-public-methods
         self.date_edit.setDate(QDate.currentDate())
 
         self.entries = self.db.load_all()
-        
+
         # Wir speichern die Parameter des gerade hinzugefügten Eintrags.
         # update_live_calc nutzt dies, um eine Doppelzählung in der Vorschau zu vermeiden,
         # auch wenn Start- und Endzeit im Formular unverändert bleiben.

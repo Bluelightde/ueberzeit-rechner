@@ -8,6 +8,11 @@ import os
 import struct
 from PIL import Image, ImageDraw
 
+try:
+    LANCZOS = Image.Resampling.LANCZOS
+except AttributeError:
+    LANCZOS = Image.LANCZOS  # pylint: disable=no-member
+
 SIZE = 1024
 OUT_DIR = os.path.dirname(os.path.abspath(__file__))
 
@@ -121,7 +126,7 @@ def save_ico(img, path):
     sizes = [256, 128, 64, 48, 32, 16]
     images = []
     for sz in sizes:
-        images.append(img.resize((sz, sz), Image.LANCZOS))
+        images.append(img.resize((sz, sz), LANCZOS))
     images[0].save(path, format="ICO",
                    sizes=[(im.size[0], im.size[1]) for im in images],
                    append_images=images[1:])
@@ -134,7 +139,7 @@ def save_ico(img, path):
 
 def _png_bytes(img, size):
     """Hilfsfunktion zur Erzeugung von PNG-Bytes für ICNS."""
-    resized = img.resize((size, size), Image.LANCZOS)
+    resized = img.resize((size, size), LANCZOS)
     buf = io.BytesIO()
     resized.save(buf, format="PNG")
     return buf.getvalue()

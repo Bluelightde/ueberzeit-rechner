@@ -180,7 +180,7 @@ def _get_login_time_darwin():
                     all_logins.append(t)
                     if today_prefix in line:
                         logins_today.append(t)
-            
+
             if logins_today:
                 return min(logins_today)
             if all_logins:
@@ -210,11 +210,12 @@ def _get_login_time_win32():
     _no_win = {"creationflags": subprocess.CREATE_NO_WINDOW}
     try:
         # PowerShell-Script: Sucht alle Logins (LogonType 2=Interactive, 10=RemoteInteractive),
-        # filtert auf HEUTE und nimmt den ersten (frühesten). 
+        # filtert auf HEUTE und nimmt den ersten (frühesten).
         # Falls heute keiner, nimm den allerletzten verfügbaren.
         ps_cmd = (
             "$today = (Get-Date).Date; "
-            "$logons = Get-CimInstance Win32_LogonSession | Where-Object {$_.LogonType -in 2,10} | Sort-Object StartTime; "
+            "$logons = Get-CimInstance Win32_LogonSession | "
+            "Where-Object {$_.LogonType -in 2,10} | Sort-Object StartTime; "
             "$today_logons = $logons | Where-Object {$_.StartTime -ge $today}; "
             "if ($today_logons) { $today_logons[0].StartTime.ToString('HH:mm') } "
             "else { ($logons | Select-Object -Last 1).StartTime.ToString('HH:mm') }"
