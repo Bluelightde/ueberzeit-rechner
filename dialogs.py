@@ -513,9 +513,10 @@ class EditDialog(QDialog):
 
         s_str = self.time_start.time().toString("HH:mm")
         e_str = self.time_end.time().toString("HH:mm")
-        
+
         if is_midnight_shift(s_str, e_str):
-            self.lbl_warning.setText(tr("⚠️ Mitternachtsschicht: Wird beim Speichern in zwei Tage aufgeteilt."))
+            msg = tr("⚠️ Mitternachtsschicht: Wird beim Speichern in zwei Tage aufgeteilt.")
+            self.lbl_warning.setText(msg)
         else:
             self.lbl_warning.setText("")
 

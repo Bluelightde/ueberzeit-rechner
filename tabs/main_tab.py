@@ -25,7 +25,7 @@ from logic import (
     calculate_timed_entries, get_login_time,
     format_time, fmt_date, fmt_time_hhmm,
     get_target_minutes, get_max_minutes, get_target_minutes_for_date,
-    COLOR_POSITIVE, COLOR_NEGATIVE,
+    COLOR_POSITIVE, COLOR_NEGATIVE, COLOR_INFO,
     is_midnight_shift, split_midnight_shift,
 )
 from models import WorkEntry
@@ -455,28 +455,30 @@ class MainTab(QWidget):  # pylint: disable=too-many-public-methods
         # Dauerberechnung
         if is_midnight_shift(current_temp.start, current_temp.end):
             p1, p2 = split_midnight_shift(curr_date_str, current_temp.start, current_temp.end)
-            
+
             def get_mins(s, e):
                 ts = QTime.fromString(s, "HH:mm")
                 te = QTime.fromString(e, "HH:mm")
                 diff = ts.secsTo(te) // 60
-                if diff < 0: diff += 24*60
+                if diff < 0:
+                    diff += 24 * 60
                 return diff
-            
+
             m1 = get_mins(p1[1], p1[2])
             m2 = get_mins(p2[1], p2[2])
             total_net = m1 + m2 # Vereinfachte Netto-Anzeige für Vorschau
-            
+
             # Für die Vorschau am aktuellen Tag nehmen wir nur den ersten Teil
             # Aber wir zeigen dem Nutzer, dass es gesplittet wird.
             calc_text = tr(
                 "Mitternachtsschicht: {m1}m heute, {m2}m morgen. "
                 "Gesamt: {tot}"
             ).format(m1=m1, m2=m2, tot=format_time(total_net))
-            
+
             # Warnung hinzufügen
-            calc_text = f"<span style='color: {COLOR_INFO};'>{calc_text} (Wird beim Eintragen gesplittet)</span>"
-            
+            span_style = f"style='color: {COLOR_INFO};'"
+            calc_text = f"<span {span_style}>{calc_text} (Wird beim Eintragen gesplittet)</span>"
+
             self.current_calculated_pause = 0
             self.current_calculated_overtime = 0 # Wird beim recalculate_day nach Split berechnet
         else:
@@ -509,7 +511,7 @@ class MainTab(QWidget):  # pylint: disable=too-many-public-methods
                 net=format_time(total_net),
                 ot=format_time(final_total_overtime, show_plus=True),
             )
-        
+
         warnings = []
         if total_net >= max_mins:
             warnings.append(tr("⚠️ Max. {h}h erreicht!").format(h=max_mins // 60))
@@ -517,7 +519,7 @@ class MainTab(QWidget):  # pylint: disable=too-many-public-methods
         # Ruhezeit-Prüfung (11 Stunden)
         # 1. Letzter Eintrag von GESTERN oder davor
         prev_entry = self.db.get_last_entry_before(curr_date_str)
-        
+
         # 2. Letzter Eintrag von HEUTE (vor der aktuellen Startzeit)
         curr_day_entries = [e for e in all_day if e.start and e.end and e.id != -1]
         if curr_day_entries:
@@ -525,7 +527,10 @@ class MainTab(QWidget):  # pylint: disable=too-many-public-methods
             last_today = sorted(curr_day_entries, key=lambda x: x.end)[-1]
             # Nur wenn die Endzeit vor der aktuellen Startzeit liegt
             if QTime.fromString(last_today.end, "HH:mm") <= self.time_start.time():
-                if not prev_entry or QDate.fromString(prev_entry.date, "yyyy-MM-dd") < QDate.fromString(last_today.date, "yyyy-MM-dd") or (prev_entry.date == last_today.date and prev_entry.end < last_today.end):
+                d_prev_q = QDate.fromString(prev_entry.date, "yyyy-MM-dd")
+                d_last_q = QDate.fromString(last_today.date, "yyyy-MM-dd")
+                if not prev_entry or d_prev_q < d_last_q or \
+                   (prev_entry.date == last_today.date and prev_entry.end < last_today.end):
                     prev_entry = last_today
 
         if prev_entry and prev_entry.end:
@@ -576,7 +581,7 @@ class MainTab(QWidget):  # pylint: disable=too-many-public-methods
         # Mitternachts-Splitting
         if is_midnight_shift(start_str, end_str):
             p1, p2 = split_midnight_shift(date_str, start_str, end_str)
-            
+
             # Eintrag 1 (bis 00:00)
             e1 = WorkEntry(
                 id=None, date=p1[0], start=p1[1], end=p1[2],
@@ -593,7 +598,7 @@ class MainTab(QWidget):  # pylint: disable=too-many-public-methods
             )
             self.db.insert(e1)
             self.db.insert(e2)
-            
+
             QMessageBox.information(
                 self, tr("Mitternachtsschicht"),
                 tr("Der Eintrag wurde auf zwei Tage aufgeteilt:\n"
@@ -630,7 +635,7 @@ class MainTab(QWidget):  # pylint: disable=too-many-public-methods
 
         for d in affected_dates:
             self.recalculate_day(d)
-        
+
         self.data_changed.emit()
 
     # pylint: disable=too-many-locals, too-many-statements, too-many-branches
@@ -670,10 +675,10 @@ class MainTab(QWidget):  # pylint: disable=too-many-public-methods
             # Mitternachts-Splitting beim Bearbeiten
             if dialog.has_times_cb.isChecked() and is_midnight_shift(new_start, new_end):
                 p1, p2 = split_midnight_shift(new_date, new_start, new_end)
-                
+
                 # Alten Eintrag löschen
                 self.db.delete(entry.id)
-                
+
                 # Zwei neue hinzufügen
                 e1 = WorkEntry(
                     id=None, date=p1[0], start=p1[1], end=p1[2],
@@ -689,7 +694,7 @@ class MainTab(QWidget):  # pylint: disable=too-many-public-methods
                 )
                 self.db.insert(e1)
                 self.db.insert(e2)
-                
+
                 affected_dates = [old_date, p1[0], p2[0]]
                 QMessageBox.information(
                     self, tr("Mitternachtsschicht"),
@@ -751,21 +756,8 @@ class MainTab(QWidget):  # pylint: disable=too-many-public-methods
 
     def _check_segment_overlap(self, date_str, start_str, end_str, exclude_id=None):
         """Hilfsfunktion zur Prüfung eines einzelnen Zeitsegments gegen die DB."""
-        s_new = QTime.fromString(start_str, "HH:mm")
-        # 00:00 am Ende eines Segments bedeutet "Ende des Tages"
-        e_new = QTime.fromString(end_str, "HH:mm")
-        if end_str == "00:00" and s_new != QTime(0, 0):
-             # Interner Vergleich: 00:00 ist zeitlich vor 22:00,
-             # aber als Ende-Marker für ein Segment meinen wir 24:00.
-             # Wir nutzen secsTo, was bei QTime über Mitternacht negativ wäre,
-             # außer wir behandeln es speziell.
-             pass
-
         for e in self.entries:
             if e.date == date_str and e.start and e.end and e.id != exclude_id:
-                s_old = QTime.fromString(e.start, "HH:mm")
-                e_old = QTime.fromString(e.end, "HH:mm")
-
                 # Dauerberechnung mit Mitternachtskorrektur für den Vergleich
                 def to_mins(t_str):
                     t = QTime.fromString(t_str, "HH:mm")
