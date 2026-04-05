@@ -7,7 +7,7 @@ from PyQt6.QtWidgets import (
     QCheckBox, QComboBox, QDateEdit, QDialog,
     QFileDialog, QHBoxLayout, QHeaderView, QLabel,
     QLineEdit, QPushButton, QSpinBox,
-    QTableWidget, QTimeEdit, QVBoxLayout
+    QTableWidget, QTabWidget, QTimeEdit, QVBoxLayout, QWidget
 )
 from config import DB_FILE, get_country_list, get_subdivisions
 from i18n import available_languages, get_locale, tr
@@ -26,46 +26,49 @@ class SettingsDialog(QDialog):
         """
         super().__init__(parent)
         self.setWindowTitle(tr("Einstellungen"))
-        self.resize(400, 540)
-        layout = QVBoxLayout(self)
+        self.resize(500, 480)
+        main_layout = QVBoxLayout(self)
 
-        layout.addWidget(QLabel(f"<b>{tr('Tages-Standardwerte:')}</b>"))
+        self.tabs = QTabWidget()
+        main_layout.addWidget(self.tabs)
 
-        self.login_time_cb = QCheckBox(tr("Login-Zeit als Startzeit verwenden"))
-        self.login_time_cb.setToolTip(tr(
-            "Liest beim Programmstart die letzte Anmeldezeit des Benutzers aus.\n"
-            "Die Standard-Startzeit dient als Fallback, falls die Anmeldezeit\n"
-            "nicht ermittelt werden kann."
-        ))
-        self.login_time_cb.setChecked(current_settings.get("use_login_time", False))
-        layout.addWidget(self.login_time_cb)
-
-        self._setup_workdays_ui(layout, current_settings)
-        self._setup_time_settings_ui(layout, current_settings)
-
-        layout.addSpacing(10)
-        layout.addWidget(QLabel(f"<b>{tr('Pausen-Regelung:')}</b>"))
+        # Tab 1: Arbeitszeit & Pausen
+        tab_work = QWidget()
+        layout_work = QVBoxLayout(tab_work)
+        self._setup_time_settings_ui(layout_work, current_settings)
+        self._setup_workdays_ui(layout_work, current_settings)
+        layout_work.addSpacing(10)
+        layout_work.addWidget(QLabel(f"<b>{tr('Pausen-Regelung:')}</b>"))
         self.auto_break_cb = QCheckBox(tr("Automatische Pausen-Berechnung"))
         self.auto_break_cb.setChecked(current_settings.get("auto_break", True))
-        layout.addWidget(self.auto_break_cb)
-        self._setup_break_rules_ui(layout, current_settings)
+        layout_work.addWidget(self.auto_break_cb)
+        self._setup_break_rules_ui(layout_work, current_settings)
+        layout_work.addStretch()
+        self.tabs.addTab(tab_work, tr("Arbeitszeit && Pause"))
 
-        self._setup_regional_ui(layout, current_settings)
-        self._setup_special_days_ui(layout, current_settings)
+        # Tab 2: Region & Feiertage
+        tab_region = QWidget()
+        layout_region = QVBoxLayout(tab_region)
+        self._setup_regional_ui(layout_region, current_settings)
+        self._setup_special_days_ui(layout_region, current_settings)
+        layout_region.addStretch()
+        self.tabs.addTab(tab_region, tr("Region && Feiertage"))
 
-        layout.addSpacing(10)
-        layout.addWidget(QLabel(f"<b>{tr('Darstellung:')}</b>"))
+        # Tab 3: System & Darstellung
+        tab_system = QWidget()
+        layout_system = QVBoxLayout(tab_system)
+        layout_system.addWidget(QLabel(f"<b>{tr('Darstellung:')}</b>"))
         self.dark_mode_cb = QCheckBox(tr("Dark Mode aktivieren"))
         self.dark_mode_cb.setChecked(current_settings.get("dark_mode", False))
-        layout.addWidget(self.dark_mode_cb)
+        layout_system.addWidget(self.dark_mode_cb)
+        layout_system.addSpacing(10)
+        self._setup_db_path_ui(layout_system, current_settings)
+        layout_system.addStretch()
+        self.tabs.addTab(tab_system, tr("System && Design"))
 
         self.btn_save = QPushButton(tr("Speichern"))
         self.btn_save.clicked.connect(self.accept)
-
-        self._setup_db_path_ui(layout, current_settings)
-
-        layout.addSpacing(15)
-        layout.addWidget(self.btn_save)
+        main_layout.addWidget(self.btn_save)
 
     def _setup_workdays_ui(self, layout, current_settings):
         layout.addSpacing(10)
@@ -83,7 +86,17 @@ class SettingsDialog(QDialog):
         layout.addLayout(workdays_layout)
 
     def _setup_time_settings_ui(self, layout, current_settings):
-        layout.addSpacing(10)
+        layout.addWidget(QLabel(f"<b>{tr('Tages-Standardwerte:')}</b>"))
+
+        self.login_time_cb = QCheckBox(tr("Login-Zeit als Startzeit verwenden"))
+        self.login_time_cb.setToolTip(tr(
+            "Liest beim Programmstart die letzte Anmeldezeit des Benutzers aus.\n"
+            "Die Standard-Startzeit dient als Fallback, falls die Anmeldezeit\n"
+            "nicht ermittelt werden kann."
+        ))
+        self.login_time_cb.setChecked(current_settings.get("use_login_time", False))
+        layout.addWidget(self.login_time_cb)
+
         time_layout = QHBoxLayout()
         self.time_start = QTimeEdit()
         self.time_start.setDisplayFormat(
