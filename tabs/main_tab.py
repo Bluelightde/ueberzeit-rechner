@@ -179,8 +179,7 @@ class MainTab(QWidget):  # pylint: disable=too-many-public-methods
         btn_export = QPushButton(tr("Export"))
         export_menu = QMenu(self)
         export_menu.addAction(tr("CSV  (.csv)"),
-                              lambda: export_csv(self, self._get_export_entries(),
-                                               self._get_export_title()))
+                              lambda: export_csv(self, self._get_export_entries()))
         export_menu.addAction(tr("Excel (.xlsx)"),
                               lambda: export_xlsx(self, self._get_export_entries(),
                                                 self._get_export_title()))
