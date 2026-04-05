@@ -327,3 +327,32 @@ def get_login_time():
     if sys.platform == "win32":
         return _get_login_time_win32()
     return None
+
+
+def is_midnight_shift(start_str: str, end_str: str) -> bool:
+    """Prüft, ob eine Zeitspanne über Mitternacht geht (Endzeit vor Startzeit)."""
+    if not start_str or not end_str:
+        return False
+    s = QTime.fromString(start_str, "HH:mm")
+    e = QTime.fromString(end_str, "HH:mm")
+    if not s.isValid() or not e.isValid():
+        return False
+    return e < s
+
+
+def split_midnight_shift(date_str: str, start_str: str, end_str: str):
+    """Teilt eine Mitternachtsschicht in zwei Teile auf.
+
+    Gibt ein Tupel ((date1, start1, end1), (date2, start2, end2)) zurück.
+    Wenn keine Mitternachtsschicht vorliegt, wird (None, None) zurückgegeben.
+    """
+    if not is_midnight_shift(start_str, end_str):
+        return None, None
+
+    d1 = QDate.fromString(date_str, "yyyy-MM-dd")
+    d2 = d1.addDays(1)
+
+    part1 = (d1.toString("yyyy-MM-dd"), start_str, "00:00")
+    part2 = (d2.toString("yyyy-MM-dd"), "00:00", end_str)
+
+    return part1, part2

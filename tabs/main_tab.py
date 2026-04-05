@@ -26,6 +26,7 @@ from logic import (
     format_time, fmt_date, fmt_time_hhmm,
     get_target_minutes, get_max_minutes, get_target_minutes_for_date,
     COLOR_POSITIVE, COLOR_NEGATIVE,
+    is_midnight_shift, split_midnight_shift,
 )
 from models import WorkEntry
 from ui_components import set_overtime_color
@@ -451,46 +452,89 @@ class MainTab(QWidget):  # pylint: disable=too-many-public-methods
 
         manual_sum = sum(e.minutes for e in all_day if not (e.start and e.end))
 
-        results, total_net = calculate_timed_entries(
-            timed, target_mins, max_mins, is_auto, self.settings.get("break_rules")
-        )
-
-        # Wenn wir den temp-Eintrag übersprungen haben, nehmen wir die Werte
-        # vom letzten echten Eintrag für die Anzeige/Speicherung
-        if not is_duplicate:
-            entry_pause, entry_overtime = results[-1]
+        # Dauerberechnung
+        if is_midnight_shift(current_temp.start, current_temp.end):
+            p1, p2 = split_midnight_shift(curr_date_str, current_temp.start, current_temp.end)
+            
+            def get_mins(s, e):
+                ts = QTime.fromString(s, "HH:mm")
+                te = QTime.fromString(e, "HH:mm")
+                diff = ts.secsTo(te) // 60
+                if diff < 0: diff += 24*60
+                return diff
+            
+            m1 = get_mins(p1[1], p1[2])
+            m2 = get_mins(p2[1], p2[2])
+            total_net = m1 + m2 # Vereinfachte Netto-Anzeige für Vorschau
+            
+            # Für die Vorschau am aktuellen Tag nehmen wir nur den ersten Teil
+            # Aber wir zeigen dem Nutzer, dass es gesplittet wird.
+            calc_text = tr(
+                "Mitternachtsschicht: {m1}m heute, {m2}m morgen. "
+                "Gesamt: {tot}"
+            ).format(m1=m1, m2=m2, tot=format_time(total_net))
+            
+            # Warnung hinzufügen
+            calc_text = f"<span style='color: {COLOR_INFO};'>{calc_text} (Wird beim Eintragen gesplittet)</span>"
+            
+            self.current_calculated_pause = 0
+            self.current_calculated_overtime = 0 # Wird beim recalculate_day nach Split berechnet
         else:
-            # Dummy-Werte oder wir lassen sie wie sie sind
-            entry_pause = self.current_calculated_pause
-            entry_overtime = self.current_calculated_overtime
+            results, total_net = calculate_timed_entries(
+                timed, target_mins, max_mins, is_auto, self.settings.get("break_rules")
+            )
 
-        if is_auto and not is_duplicate:
-            self.pause_spin.blockSignals(True)
-            self.pause_spin.setValue(entry_pause)
-            self.pause_spin.blockSignals(False)
+            # Wenn wir den temp-Eintrag übersprungen haben, nehmen wir die Werte
+            # vom letzten echten Eintrag für die Anzeige/Speicherung
+            if not is_duplicate:
+                entry_pause, entry_overtime = results[-1]
+            else:
+                # Dummy-Werte oder wir lassen sie wie sie sind
+                entry_pause = self.current_calculated_pause
+                entry_overtime = self.current_calculated_overtime
 
-        if not is_duplicate:
-            self.current_calculated_pause = entry_pause
-            self.current_calculated_overtime = entry_overtime
+            if is_auto and not is_duplicate:
+                self.pause_spin.blockSignals(True)
+                self.pause_spin.setValue(entry_pause)
+                self.pause_spin.blockSignals(False)
 
-        final_total_overtime = (total_net - target_mins) + manual_sum
-        calc_text = tr(
-            "Netto (Tag): {net} ➔ <b>{ot} Überstunden (Tag-Saldo)</b>"
-        ).format(
-            net=format_time(total_net),
-            ot=format_time(final_total_overtime, show_plus=True),
-        )
+            if not is_duplicate:
+                self.current_calculated_pause = entry_pause
+                self.current_calculated_overtime = entry_overtime
+
+            final_total_overtime = (total_net - target_mins) + manual_sum
+            calc_text = tr(
+                "Netto (Tag): {net} ➔ <b>{ot} Überstunden (Tag-Saldo)</b>"
+            ).format(
+                net=format_time(total_net),
+                ot=format_time(final_total_overtime, show_plus=True),
+            )
+        
         warnings = []
         if total_net >= max_mins:
             warnings.append(tr("⚠️ Max. {h}h erreicht!").format(h=max_mins // 60))
 
+        # Ruhezeit-Prüfung (11 Stunden)
+        # 1. Letzter Eintrag von GESTERN oder davor
         prev_entry = self.db.get_last_entry_before(curr_date_str)
+        
+        # 2. Letzter Eintrag von HEUTE (vor der aktuellen Startzeit)
+        curr_day_entries = [e for e in all_day if e.start and e.end and e.id != -1]
+        if curr_day_entries:
+            # Sortieren nach Endzeit
+            last_today = sorted(curr_day_entries, key=lambda x: x.end)[-1]
+            # Nur wenn die Endzeit vor der aktuellen Startzeit liegt
+            if QTime.fromString(last_today.end, "HH:mm") <= self.time_start.time():
+                if not prev_entry or QDate.fromString(prev_entry.date, "yyyy-MM-dd") < QDate.fromString(last_today.date, "yyyy-MM-dd") or (prev_entry.date == last_today.date and prev_entry.end < last_today.end):
+                    prev_entry = last_today
+
         if prev_entry and prev_entry.end:
             try:
                 dt_prev = datetime.strptime(
                     f"{prev_entry.date} {prev_entry.end}", "%Y-%m-%d %H:%M"
                 )
                 start_str_curr = self.time_start.time().toString('HH:mm')
+                # Wenn Mitternachtsschicht, prüfen wir nur den Start des ersten Teils
                 dt_curr = datetime.strptime(
                     f"{curr_date_str} {start_str_curr}", "%Y-%m-%d %H:%M"
                 )
@@ -529,32 +573,64 @@ class MainTab(QWidget):  # pylint: disable=too-many-public-methods
             )
             return
 
-        entry = WorkEntry(
-            id=None,
-            date=date_str,
-            start=start_str,
-            end=end_str,
-            pause=self.current_calculated_pause,
-            minutes=self.current_calculated_overtime,
-            reason=self.reason_edit.text().strip(),
-            target_minutes=(
-                self.custom_target_time.time().hour() * 60
-                + self.custom_target_time.time().minute()
-            ) if self.custom_target_cb.isChecked() else -1
-        )
-        self.db.insert(entry)
+        # Mitternachts-Splitting
+        if is_midnight_shift(start_str, end_str):
+            p1, p2 = split_midnight_shift(date_str, start_str, end_str)
+            
+            # Eintrag 1 (bis 00:00)
+            e1 = WorkEntry(
+                id=None, date=p1[0], start=p1[1], end=p1[2],
+                pause=0, minutes=0, # Wird durch recalculate_day gesetzt
+                reason=self.reason_edit.text().strip(),
+                target_minutes=-1 # Bei Split nutzen wir Standard
+            )
+            # Eintrag 2 (ab 00:00)
+            e2 = WorkEntry(
+                id=None, date=p2[0], start=p2[1], end=p2[2],
+                pause=0, minutes=0,
+                reason=self.reason_edit.text().strip(),
+                target_minutes=-1
+            )
+            self.db.insert(e1)
+            self.db.insert(e2)
+            
+            QMessageBox.information(
+                self, tr("Mitternachtsschicht"),
+                tr("Der Eintrag wurde auf zwei Tage aufgeteilt:\n"
+                   "- {d1}: {s1} - 00:00\n"
+                   "- {d2}: 00:00 - {e2}").format(
+                       d1=fmt_date(p1[0]), s1=p1[1],
+                       d2=fmt_date(p2[0]), e2=p2[2]
+                   )
+            )
+            affected_dates = [p1[0], p2[0]]
+        else:
+            entry = WorkEntry(
+                id=None,
+                date=date_str,
+                start=start_str,
+                end=end_str,
+                pause=self.current_calculated_pause,
+                minutes=self.current_calculated_overtime,
+                reason=self.reason_edit.text().strip(),
+                target_minutes=(
+                    self.custom_target_time.time().hour() * 60
+                    + self.custom_target_time.time().minute()
+                ) if self.custom_target_cb.isChecked() else -1
+            )
+            self.db.insert(entry)
+            affected_dates = [date_str]
+
         self.reason_edit.clear()
         self.custom_target_cb.setChecked(False)
         self.date_edit.setDate(QDate.currentDate())
 
         self.entries = self.db.load_all()
-
-        # Wir speichern die Parameter des gerade hinzugefügten Eintrags.
-        # update_live_calc nutzt dies, um eine Doppelzählung in der Vorschau zu vermeiden,
-        # auch wenn Start- und Endzeit im Formular unverändert bleiben.
         self._last_added_params = (date_str, start_str, end_str)
 
-        self.recalculate_day(date_str)
+        for d in affected_dates:
+            self.recalculate_day(d)
+        
         self.data_changed.emit()
 
     # pylint: disable=too-many-locals, too-many-statements, too-many-branches
@@ -591,13 +667,47 @@ class MainTab(QWidget):  # pylint: disable=too-many-public-methods
                 )
                 return
 
-            dialog.apply_to_entry()
-            self.db.update(entry)
+            # Mitternachts-Splitting beim Bearbeiten
+            if dialog.has_times_cb.isChecked() and is_midnight_shift(new_start, new_end):
+                p1, p2 = split_midnight_shift(new_date, new_start, new_end)
+                
+                # Alten Eintrag löschen
+                self.db.delete(entry.id)
+                
+                # Zwei neue hinzufügen
+                e1 = WorkEntry(
+                    id=None, date=p1[0], start=p1[1], end=p1[2],
+                    pause=0, minutes=0,
+                    reason=dialog.reason_edit.text().strip(),
+                    target_minutes=-1
+                )
+                e2 = WorkEntry(
+                    id=None, date=p2[0], start=p2[1], end=p2[2],
+                    pause=0, minutes=0,
+                    reason=dialog.reason_edit.text().strip(),
+                    target_minutes=-1
+                )
+                self.db.insert(e1)
+                self.db.insert(e2)
+                
+                affected_dates = [old_date, p1[0], p2[0]]
+                QMessageBox.information(
+                    self, tr("Mitternachtsschicht"),
+                    tr("Der Eintrag wurde auf zwei Tage aufgeteilt:\n"
+                       "- {d1}: {s1} - 00:00\n"
+                       "- {d2}: 00:00 - {e2}").format(
+                           d1=fmt_date(p1[0]), s1=p1[1],
+                           d2=fmt_date(p2[0]), e2=p2[2]
+                       )
+                )
+            else:
+                dialog.apply_to_entry()
+                self.db.update(entry)
+                affected_dates = [old_date, entry.date]
 
             self.entries = self.db.load_all()
-            self.recalculate_day(old_date)
-            if entry.date != old_date:
-                self.recalculate_day(entry.date)
+            for d in sorted(list(set(affected_dates))):
+                self.recalculate_day(d)
             self.data_changed.emit()
 
     def delete_entry(self, entry):
@@ -616,22 +726,67 @@ class MainTab(QWidget):  # pylint: disable=too-many-public-methods
             self.data_changed.emit()
 
     def check_overlap(self, date_str, start_str, end_str, exclude_id=None):
-        """Prüft, ob sich der Zeitraum mit bestehenden Einträgen am selben Tag überschneidet."""
+        """Prüft, ob sich der Zeitraum mit bestehenden Einträgen überschneidet.
+
+        Berücksichtigt Mitternachtsschichten durch Splitting in zwei Segmente.
+        """
         if not start_str or not end_str:
             return None
 
-        s_new = QTime.fromString(start_str, "HH:mm")
-        e_new = QTime.fromString(end_str, "HH:mm")
+        # Falls Mitternachtsschicht: In zwei Segmente teilen und beide einzeln prüfen
+        if is_midnight_shift(start_str, end_str):
+            p1, p2 = split_midnight_shift(date_str, start_str, end_str)
+            # Segment 1: Start bis 00:00 am Wahltag
+            err1 = self._check_segment_overlap(*p1, exclude_id=exclude_id)
+            if err1:
+                return err1
+            # Segment 2: 00:00 bis Ende am Folgetag
+            err2 = self._check_segment_overlap(*p2, exclude_id=exclude_id)
+            if err2:
+                return err2
+            return None
 
-        if s_new >= e_new:
-            return tr("Startzeit muss vor Endzeit liegen")
+        # Regulärer Fall (keine Mitternachtsschicht)
+        return self._check_segment_overlap(date_str, start_str, end_str, exclude_id=exclude_id)
+
+    def _check_segment_overlap(self, date_str, start_str, end_str, exclude_id=None):
+        """Hilfsfunktion zur Prüfung eines einzelnen Zeitsegments gegen die DB."""
+        s_new = QTime.fromString(start_str, "HH:mm")
+        # 00:00 am Ende eines Segments bedeutet "Ende des Tages"
+        e_new = QTime.fromString(end_str, "HH:mm")
+        if end_str == "00:00" and s_new != QTime(0, 0):
+             # Interner Vergleich: 00:00 ist zeitlich vor 22:00,
+             # aber als Ende-Marker für ein Segment meinen wir 24:00.
+             # Wir nutzen secsTo, was bei QTime über Mitternacht negativ wäre,
+             # außer wir behandeln es speziell.
+             pass
 
         for e in self.entries:
             if e.date == date_str and e.start and e.end and e.id != exclude_id:
                 s_old = QTime.fromString(e.start, "HH:mm")
                 e_old = QTime.fromString(e.end, "HH:mm")
-                if s_new.secsTo(e_old) > 0 and s_old.secsTo(e_new) > 0:
-                    return f"{e.start} - {e.end} ({e.reason or tr('Ohne Anlass')})"
+
+                # Dauerberechnung mit Mitternachtskorrektur für den Vergleich
+                def to_mins(t_str):
+                    t = QTime.fromString(t_str, "HH:mm")
+                    return t.hour() * 60 + t.minute()
+
+                m_s_new = to_mins(start_str)
+                m_e_new = to_mins(end_str)
+                if m_e_new <= m_s_new and end_str == "00:00":
+                    m_e_new = 24 * 60
+
+                m_s_old = to_mins(e.start)
+                m_e_old = to_mins(e.end)
+                if m_e_old <= m_s_old: # Bestehender Eintrag ist Mitternachtsschicht
+                    # Das sollte nach dem neuen System nicht mehr vorkommen (da gesplittet),
+                    # aber für Altdaten oder während der Umstellung:
+                    m_e_old = 24 * 60
+
+                # Standard Überlappungs-Check für Intervalle: [s1, e1] und [s2, e2]
+                # überlappen, wenn s1 < e2 UND s2 < e1
+                if m_s_new < m_e_old and m_s_old < m_e_new:
+                    return f"{e.date}: {e.start} - {e.end} ({e.reason or tr('Ohne Anlass')})"
         return None
 
     # --- Filter sync ---

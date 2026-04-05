@@ -12,7 +12,7 @@ from PyQt6.QtWidgets import (
 from config import DB_FILE, get_country_list, get_subdivisions
 from i18n import available_languages, get_locale, tr
 from models import WorkEntry
-from logic import calculate_timed_entries
+from logic import calculate_timed_entries, is_midnight_shift
 
 # pylint: disable=too-many-instance-attributes, too-many-arguments
 class SettingsDialog(QDialog):
@@ -373,6 +373,11 @@ class EditDialog(QDialog):
         self._setup_minutes_and_reason_ui(layout)
         self._setup_custom_target_ui(layout)
 
+        self.lbl_warning = QLabel("")
+        self.lbl_warning.setStyleSheet("color: #ef4444;")
+        self.lbl_warning.setWordWrap(True)
+        layout.addWidget(self.lbl_warning)
+
         btn_save = QPushButton(tr("Speichern"))
         btn_save.clicked.connect(self.accept)
         layout.addWidget(btn_save)
@@ -490,7 +495,16 @@ class EditDialog(QDialog):
         Berechnet die Überstunden automatisch basierend auf Start-, Endzeit und Pause.
         """
         if not self.has_times_cb.isChecked():
+            self.lbl_warning.setText("")
             return
+
+        s_str = self.time_start.time().toString("HH:mm")
+        e_str = self.time_end.time().toString("HH:mm")
+        
+        if is_midnight_shift(s_str, e_str):
+            self.lbl_warning.setText(tr("⚠️ Mitternachtsschicht: Wird beim Speichern in zwei Tage aufgeteilt."))
+        else:
+            self.lbl_warning.setText("")
 
         curr_date_str = self.date_edit.date().toString("yyyy-MM-dd")
         target_mins = self.parent().get_target_minutes_for_date(curr_date_str)
@@ -498,8 +512,8 @@ class EditDialog(QDialog):
         current_temp = WorkEntry(
             id=self.entry.id,
             date=curr_date_str,
-            start=self.time_start.time().toString("HH:mm"),
-            end=self.time_end.time().toString("HH:mm"),
+            start=s_str,
+            end=e_str,
             pause=self.pause_spin.value() if not self.auto_break else 0,
             minutes=0,
             reason=""
