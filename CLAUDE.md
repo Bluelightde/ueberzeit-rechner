@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-**Überstunden-Rechner** is a German overtime tracking desktop application built with Python, PyQt6, and SQLite. It runs as a single-file application (`ueberstunden.py`).
+**Überstunden-Rechner** is a German overtime tracking desktop application built with Python, PyQt6, and SQLite. It is structured as a modular application with `main.py` as the entry point.
 
 ## Running the Application
 
@@ -14,17 +14,21 @@ source venv/bin/activate  # bash/zsh
 source venv/bin/activate.fish  # fish
 
 # Run the application
-python ueberstunden.py
+python main.py
 ```
 
 ## Building a Distributable (PyInstaller)
 
 ```bash
+python build.py
+```
+Or manually:
+```bash
 source venv/bin/activate
-pyinstaller --onefile --windowed --add-data "icon.png:." ueberstunden.py
+pyinstaller ueberstunden.spec
 ```
 
-The output binary will be in `dist/`. On macOS, `BASE_DIR` is resolved 4 levels up from `sys.executable` inside the `.app` bundle so that `ueberstunden_daten.db` and `ueberstunden_settings.json` are stored next to the app, not inside it.
+The output binary will be in `dist/`.
 
 ## Installing / Updating Dependencies
 
@@ -33,24 +37,26 @@ source venv/bin/activate
 pip install -r requirements.txt
 ```
 
-Dependencies: `PyQt6`, `matplotlib`, `pyinstaller`.
+Dependencies: `PyQt6`, `matplotlib`, `pyinstaller`, `openpyxl`, `Pillow`, `holidays`, `pycountry`.
 
 ## Architecture
 
-The entire application lives in `ueberstunden.py` (~1240 lines). It is structured in clearly marked sections (`# --- ... ---`):
+The application is modularized into several components:
 
-1. **Configuration & Paths** — PyInstaller-compatible `BASE_DIR`/`BUNDLE_DIR` detection; paths for `DB_FILE`, `SETTINGS_FILE`, `ICON_PATH`.
-2. **Data class** — `WorkEntry` dataclass (id, date, start, end, pause, minutes, reason).
-3. **Holiday calculator** — `get_holidays(year, state)` computes all German public holidays for a given federal state using the Gaussian Easter algorithm plus state-specific rules.
-4. **`DBManager`** — Thin SQLite wrapper (one table: `entries`). Methods: `load_all`, `insert`, `update`, `delete`, `get_last_entry_before`.
-5. **Business logic** — `calculate_work_details(start, end, target_minutes)` computes gross time, auto-pause (0/30/45 min per German law), net time (capped at 600 min/10 h), and overtime delta.
-6. **`HeatmapDelegate`** — `QStyledItemDelegate` that draws a blue border on the calendar cell for today.
-7. **Dialogs** — `SettingsDialog` (default start time, target work time, federal state, dark mode) and `EditDialog` (edit/create a `WorkEntry` with live recalculation).
-8. **`UeberstundenApp`** — `QMainWindow` with four tabs:
-   - *Eingabe & Liste*: time entry form + filterable table with edit/delete.
-   - *Ziele & Dashboard*: overtime goal tracker with progress bar and estimated daily required overtime.
-   - *Kalender-Heatmap*: monthly calendar grid coloured by overtime intensity; highlights holidays and today.
-   - *Diagramm & Statistik*: matplotlib bar chart (weekly overtime) + aggregate stats.
+- `main.py` — Entry point, initializes the application and main window (`UeberstundenApp`).
+- `logic.py` — Core business logic for work time calculations (net time, pauses, overtime).
+- `database.py` — SQLite database management (`DBManager`).
+- `models.py` — Data structures (e.g., `WorkEntry`).
+- `config.py` — Global configuration, paths, and constants.
+- `i18n.py` — Internationalization support.
+- `ui_components.py` — Custom UI widgets and delegates.
+- `dialogs.py` — Settings and entry edit dialogs.
+- `exports.py` — CSV, Excel, and PDF export functionality.
+- `tabs/` — Contains individual tab implementations:
+  - `main_tab.py` — Data entry and list view.
+  - `goals_tab.py` — Overtime goals and dashboard.
+  - `calendar_tab.py` — Calendar heatmap visualization.
+  - `stats_tab.py` — Statistics and charts.
 
 ## Persistent Storage
 

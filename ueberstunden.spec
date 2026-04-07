@@ -21,9 +21,9 @@ if os.path.exists(ICON_FILE):
     datas.append((ICON_FILE, '.'))
 
 a = Analysis(
-    ['ueberstunden.py'],
+    ['main.py'],
     datas=datas,
-    hiddenimports=[],
+    hiddenimports=['holidays', 'holidays.countries'],
     hookspath=[],
     excludes=[
         # Ungenutzte PyQt6-Module

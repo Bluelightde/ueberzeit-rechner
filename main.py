@@ -250,7 +250,7 @@ class UeberstundenApp(QMainWindow):
                 color: #eff0f1;
                 border: 1px solid #4a5056;
                 border-radius: 3px;
-                padding: 4px 16px;
+                padding: 6px 16px;
                 min-height: 24px;
             }
             QPushButton:hover  { background-color: #4d5560; border-color: #3daee9; }
@@ -354,15 +354,6 @@ class UeberstundenApp(QMainWindow):
                 color: #3daee9;
                 font-weight: bold;
             }
-
-            QCheckBox::indicator {
-                width: 16px; height: 16px;
-                border: 1px solid #4a5056;
-                border-radius: 2px;
-                background-color: #232629;
-            }
-            QCheckBox::indicator:checked  { background-color: #3daee9; border-color: #3daee9; }
-            QCheckBox::indicator:hover    { border-color: #3daee9; }
 
             QScrollBar:vertical { background: #2e3338; width: 8px; border-radius: 4px; margin: 0; }
             QScrollBar::handle:vertical { background: #4a5056; border-radius: 4px; min-height: 24px; }
@@ -556,15 +547,6 @@ class UeberstundenApp(QMainWindow):
                 color: #3daee9;
                 font-weight: bold;
             }
-
-            QCheckBox::indicator {
-                width: 16px; height: 16px;
-                border: 1px solid #bdc3c7;
-                border-radius: 2px;
-                background-color: #fcfcfc;
-            }
-            QCheckBox::indicator:checked { background-color: #3daee9; border-color: #3daee9; }
-            QCheckBox::indicator:hover   { border-color: #3daee9; }
 
             QScrollBar:vertical { background: #dde1e3; width: 8px; border-radius: 4px; margin: 0; }
             QScrollBar::handle:vertical { background: #bdc3c7; border-radius: 4px; min-height: 24px; }

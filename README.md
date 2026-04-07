@@ -50,7 +50,7 @@ Ein leistungsstarker, lokal laufender Überstunden-Rechner mit grafischer Benutz
 
 Starte die Anwendung mit:
 ```bash
-python ueberstunden.py
+python main.py
 ```
 
 ### Erste Schritte
