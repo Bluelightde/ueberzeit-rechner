@@ -41,6 +41,7 @@ _EN: dict[str, str] = {
     "Pause (min)": "Break (min)",
     "Hinzufügen": "Add",
     "Löschen": "Delete",
+    "Bearbeiten": "Edit",
     "Regionales:": "Regional:",
     "Land:": "Country:",
     "Region (für Feiertage):": "Region (for holidays):",

@@ -199,6 +199,7 @@ class MainTab(QWidget):  # pylint: disable=too-many-public-methods
         header = self.table.horizontalHeader()
         header.setSectionResizeMode(3, QHeaderView.ResizeMode.Stretch)
         self.table.setColumnWidth(1, 160)
+        self.table.setColumnWidth(4, 200) # Platz für Edit & Löschen
         self.table.cellDoubleClicked.connect(self.edit_entry)
         layout.addWidget(self.table)
 
@@ -236,6 +237,10 @@ class MainTab(QWidget):  # pylint: disable=too-many-public-methods
             db: Neue DBManager-Instanz.
         """
         self.db = db
+
+    def get_target_minutes_for_date(self, date_str):
+        """Hilfsmethode für den EditDialog: Ermittelt die Soll-Minuten für ein Datum."""
+        return get_target_minutes_for_date(date_str, self.entries, self.settings)
 
     def on_settings_changed(self):
         """Aktualisiert UI-Elemente nach einer Einstellungsänderung."""
@@ -328,14 +333,28 @@ class MainTab(QWidget):  # pylint: disable=too-many-public-methods
             elif e.minutes < 0:
                 item_min.setForeground(QColor(COLOR_NEGATIVE))
 
+            # Aktion-Spalte mit Buttons für Bearbeiten und Löschen
+            btn_style = "padding: 2px 8px; min-height: 24px;"
+            btn_edit = QPushButton(tr("Bearbeiten"))
+            btn_edit.setStyleSheet(btn_style)
+            btn_edit.clicked.connect(lambda _, ent=e: self._open_edit_dialog(ent))
+
             btn_del = QPushButton(tr("Löschen"))
-            btn_del.clicked.connect(lambda checked, ent=e: self.delete_entry(ent))
+            btn_del.setStyleSheet(btn_style)
+            btn_del.clicked.connect(lambda _, ent=e: self.delete_entry(ent))
+
+            actions_widget = QWidget()
+            actions_layout = QHBoxLayout(actions_widget)
+            actions_layout.setContentsMargins(4, 1, 4, 1)
+            actions_layout.setSpacing(4)
+            actions_layout.addWidget(btn_edit)
+            actions_layout.addWidget(btn_del)
 
             self.table.setItem(row, 0, item_date)
             self.table.setItem(row, 1, item_zeit)
             self.table.setItem(row, 2, item_min)
             self.table.setItem(row, 3, QTableWidgetItem(e.reason))
-            self.table.setCellWidget(row, 4, btn_del)
+            self.table.setCellWidget(row, 4, actions_widget)
             row += 1
 
         self.lbl_saldo.setText(format_time(total_overall))
@@ -637,9 +656,13 @@ class MainTab(QWidget):  # pylint: disable=too-many-public-methods
 
     # pylint: disable=too-many-locals, too-many-statements, too-many-branches
     def edit_entry(self, row, _column):
-        """Öffnet den Bearbeitungs-Dialog für den Eintrag in der angeklickten Zeile."""
+        """Öffnet den Bearbeitungs-Dialog für den Eintrag in der angeklickten Zeile (Doppelklick)."""
         entry_idx = self.table.item(row, 0).data(Qt.ItemDataRole.UserRole)
         entry = self.entries[entry_idx]
+        self._open_edit_dialog(entry)
+
+    def _open_edit_dialog(self, entry):
+        """Öffnet den Bearbeitungs-Dialog für den übergebenen Arbeitseintrag."""
         old_date = entry.date
 
         dialog = EditDialog(
