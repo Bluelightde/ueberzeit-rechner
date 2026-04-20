@@ -533,21 +533,8 @@ class MainTab(QWidget):  # pylint: disable=too-many-public-methods
             warnings.append(tr("⚠️ Max. {h}h erreicht!").format(h=max_mins // 60))
 
         # Ruhezeit-Prüfung (11 Stunden)
-        # 1. Letzter Eintrag von GESTERN oder davor
+        # Nur zwischen verschiedenen Tagen prüfen (Letzter Eintrag vor heute)
         prev_entry = self.db.get_last_entry_before(curr_date_str)
-
-        # 2. Letzter Eintrag von HEUTE (vor der aktuellen Startzeit)
-        curr_day_entries = [e for e in all_day if e.start and e.end and e.id != -1]
-        if curr_day_entries:
-            # Sortieren nach Endzeit
-            last_today = sorted(curr_day_entries, key=lambda x: x.end)[-1]
-            # Nur wenn die Endzeit vor der aktuellen Startzeit liegt
-            if QTime.fromString(last_today.end, "HH:mm") <= self.time_start.time():
-                d_prev_q = QDate.fromString(prev_entry.date, "yyyy-MM-dd")
-                d_last_q = QDate.fromString(last_today.date, "yyyy-MM-dd")
-                if not prev_entry or d_prev_q < d_last_q or \
-                   (prev_entry.date == last_today.date and prev_entry.end < last_today.end):
-                    prev_entry = last_today
 
         if prev_entry and prev_entry.end:
             try:
