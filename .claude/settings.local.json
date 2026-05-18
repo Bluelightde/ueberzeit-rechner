@@ -46,7 +46,14 @@
       "Bash(gh run *)",
       "Bash(gh --version)",
       "Bash(grep -v \"^\\\\\"$\")",
-      "Bash(bash *)"
+      "Bash(bash *)",
+      "Bash(gh repo *)",
+      "Bash(sudo pacman *)",
+      "Bash(gh auth *)",
+      "Bash(git remote *)",
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)",
+      "Bash(git push *)"
     ]
   }
 }
