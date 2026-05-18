@@ -71,8 +71,8 @@ Extract the `.zip` file and run `Überstundenrechner.exe`.
 
 1. Clone the repository:
    ```bash
-   git clone https://github.com/Bluelightde/ueberstundenrechnerpro.git
-   cd ueberstundenrechnerpro
+   git clone https://github.com/Bluelightde/ueberzeit-rechner.git
+   cd ueberzeit-rechner
    ```
 
 2. Create a virtual environment:
