@@ -755,7 +755,7 @@ if __name__ == "__main__":
             window.settings.update(dlg.get_settings())
             window.tab_main.on_settings_changed()
             window.tab_main.recalculate_all_days()
-            window._on_data_changed()
+            window._on_data_changed()  # pylint: disable=protected-access
         window.settings["first_run"] = False
         window.save_settings()
 

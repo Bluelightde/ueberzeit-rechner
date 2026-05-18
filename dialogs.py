@@ -594,6 +594,7 @@ class EditDialog(QDialog):
             self.entry.pause = 0
 
 
+# pylint: disable=too-few-public-methods
 class WelcomeDialog(QDialog):
     """Erster-Start-Dialog für grundlegende Konfiguration."""
 
@@ -607,7 +608,13 @@ class WelcomeDialog(QDialog):
         layout.setSpacing(14)
         layout.setContentsMargins(28, 28, 28, 24)
 
-        # Titel
+        self._setup_header(layout)
+        self._setup_location(layout, settings)
+        self._setup_schedule(layout, settings)
+        layout.addStretch()
+        self._setup_buttons(layout)
+
+    def _setup_header(self, layout):
         lbl_title = QLabel(tr("Willkommen bei Überzeit Rechner"))
         font_title = QFont()
         font_title.setPointSize(14)
@@ -628,7 +635,7 @@ class WelcomeDialog(QDialog):
         line.setFrameShadow(QFrame.Shadow.Sunken)
         layout.addWidget(line)
 
-        # Land
+    def _setup_location(self, layout, settings):
         country_row = QHBoxLayout()
         country_row.addWidget(QLabel(tr("Land:")))
         self.country_combo = QComboBox()
@@ -640,7 +647,6 @@ class WelcomeDialog(QDialog):
         country_row.addWidget(self.country_combo)
         layout.addLayout(country_row)
 
-        # Region
         region_row = QHBoxLayout()
         region_row.addWidget(QLabel(tr("Region (für Feiertage):")))
         self.region_combo = QComboBox()
@@ -652,7 +658,7 @@ class WelcomeDialog(QDialog):
         if idx >= 0:
             self.region_combo.setCurrentIndex(idx)
 
-        # Tagessoll
+    def _setup_schedule(self, layout, settings):
         target_row = QHBoxLayout()
         target_row.addWidget(QLabel(tr("Regelarbeitszeit (Soll):")))
         self.time_target = QTimeEdit()
@@ -664,7 +670,6 @@ class WelcomeDialog(QDialog):
         target_row.addStretch()
         layout.addLayout(target_row)
 
-        # Arbeitstage
         layout.addWidget(QLabel(f"<b>{tr('Arbeitstage (Soll-Tage):')}</b>"))
         self.workday_checkboxes = []
         workdays_layout = QHBoxLayout()
@@ -677,9 +682,7 @@ class WelcomeDialog(QDialog):
             self.workday_checkboxes.append(cb)
         layout.addLayout(workdays_layout)
 
-        layout.addStretch()
-
-        # Buttons
+    def _setup_buttons(self, layout):
         btn_row = QHBoxLayout()
         btn_skip = QPushButton(tr("Überspringen"))
         btn_skip.clicked.connect(self.reject)

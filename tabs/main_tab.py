@@ -655,7 +655,7 @@ class MainTab(QWidget):  # pylint: disable=too-many-public-methods
 
     # pylint: disable=too-many-locals, too-many-statements, too-many-branches
     def edit_entry(self, row, _column):
-        """Öffnet den Bearbeitungs-Dialog für den Eintrag in der angeklickten Zeile (Doppelklick)."""
+        """Öffnet den Bearbeitungs-Dialog für den Eintrag in der angeklickten Zeile."""
         entry_idx = self.table.item(row, 0).data(Qt.ItemDataRole.UserRole)
         entry = self.entries[entry_idx]
         self._open_edit_dialog(entry)

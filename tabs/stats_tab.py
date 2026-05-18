@@ -22,8 +22,8 @@ def _path_deepcopy_fixed(self, memo):
 
 _mpath.Path.__deepcopy__ = _path_deepcopy_fixed
 
-from i18n import tr
-from logic import COLOR_POSITIVE, COLOR_NEGATIVE
+from i18n import tr  # pylint: disable=wrong-import-position
+from logic import COLOR_POSITIVE, COLOR_NEGATIVE  # pylint: disable=wrong-import-position
 
 
 # pylint: disable=too-few-public-methods
