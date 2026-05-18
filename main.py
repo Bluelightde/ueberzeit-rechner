@@ -221,14 +221,14 @@ class UeberstundenApp(QMainWindow):
     def get_dark_palette(self):
         """Erstellt und gibt die Farbpalette für den dunklen Modus zurück (Breeze Dark)."""
         palette = QPalette()
-        palette.setColor(QPalette.ColorRole.Window,          QColor("#31363b"))
+        palette.setColor(QPalette.ColorRole.Window,          QColor("#232629"))
         palette.setColor(QPalette.ColorRole.WindowText,      QColor("#eff0f1"))
-        palette.setColor(QPalette.ColorRole.Base,            QColor("#232629"))
-        palette.setColor(QPalette.ColorRole.AlternateBase,   QColor("#31363b"))
+        palette.setColor(QPalette.ColorRole.Base,            QColor("#1b1e20"))
+        palette.setColor(QPalette.ColorRole.AlternateBase,   QColor("#232629"))
         palette.setColor(QPalette.ColorRole.ToolTipBase,     QColor("#31363b"))
         palette.setColor(QPalette.ColorRole.ToolTipText,     QColor("#eff0f1"))
         palette.setColor(QPalette.ColorRole.Text,            QColor("#eff0f1"))
-        palette.setColor(QPalette.ColorRole.Button,          QColor("#31363b"))
+        palette.setColor(QPalette.ColorRole.Button,          QColor("#232629"))
         palette.setColor(QPalette.ColorRole.ButtonText,      QColor("#eff0f1"))
         palette.setColor(QPalette.ColorRole.BrightText,      QColor("#ff5555"))
         palette.setColor(QPalette.ColorRole.Highlight,       QColor("#3daee9"))
@@ -241,9 +241,9 @@ class UeberstundenApp(QMainWindow):
         return """
             * { font-size: 13px; }
 
-            QMainWindow, QDialog { background-color: #31363b; }
+            QMainWindow, QDialog { background-color: #232629; }
 
-            QWidget { background-color: #31363b; color: #eff0f1; }
+            QWidget { background-color: #232629; color: #eff0f1; }
 
             QPushButton {
                 background-color: #3b4045;
@@ -258,7 +258,7 @@ class UeberstundenApp(QMainWindow):
             QPushButton:disabled { color: #6c7176; border-color: #3a3f44; }
 
             QLineEdit, QComboBox {
-                background-color: #232629;
+                background-color: #1b1e20;
                 color: #eff0f1;
                 border: 1px solid #4a5056;
                 border-radius: 3px;
@@ -269,7 +269,7 @@ class UeberstundenApp(QMainWindow):
             QLineEdit:focus, QComboBox:focus { border-color: #3daee9; }
 
             QAbstractSpinBox {
-                background-color: #232629;
+                background-color: #1b1e20;
                 color: #eff0f1;
                 border: 1px solid #4a5056;
                 border-radius: 3px;
@@ -300,7 +300,7 @@ class UeberstundenApp(QMainWindow):
             QComboBox::drop-down { border: none; width: 22px; }
             QComboBox::down-arrow { width: 10px; height: 10px; }
             QComboBox QAbstractItemView {
-                background-color: #232629;
+                background-color: #1b1e20;
                 color: #eff0f1;
                 border: 1px solid #4a5056;
                 selection-background-color: #3daee9;
@@ -310,7 +310,7 @@ class UeberstundenApp(QMainWindow):
 
             QTabWidget::pane { border: 1px solid #4a5056; top: -1px; }
             QTabBar::tab {
-                background-color: #2e3338;
+                background-color: #252a2e;
                 color: #7f8c8d;
                 border: 1px solid #4a5056;
                 border-bottom: none;
@@ -319,19 +319,19 @@ class UeberstundenApp(QMainWindow):
                 padding: 5px 14px;
                 margin-right: 2px;
             }
-            QTabBar::tab:selected    { background-color: #31363b; color: #eff0f1; border-bottom: 2px solid #3daee9; }
+            QTabBar::tab:selected    { background-color: #232629; color: #eff0f1; border-bottom: 2px solid #3daee9; }
             QTabBar::tab:hover:!selected { background-color: #3b4045; color: #eff0f1; }
 
             QTableWidget {
-                background-color: #232629;
-                alternate-background-color: #2a2f34;
+                background-color: #1b1e20;
+                alternate-background-color: #1f2326;
                 color: #eff0f1;
                 gridline-color: #3a3f44;
                 border: 1px solid #4a5056;
             }
             QTableWidget::item:selected { background-color: #3daee9; color: #fff; }
             QHeaderView::section {
-                background-color: #31363b;
+                background-color: #232629;
                 color: #eff0f1;
                 border: none;
                 border-right: 1px solid #4a5056;
@@ -355,11 +355,11 @@ class UeberstundenApp(QMainWindow):
                 font-weight: bold;
             }
 
-            QScrollBar:vertical { background: #2e3338; width: 8px; border-radius: 4px; margin: 0; }
+            QScrollBar:vertical { background: #252a2e; width: 8px; border-radius: 4px; margin: 0; }
             QScrollBar::handle:vertical { background: #4a5056; border-radius: 4px; min-height: 24px; }
             QScrollBar::handle:vertical:hover { background: #3daee9; }
             QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical { height: 0; }
-            QScrollBar:horizontal { background: #2e3338; height: 8px; border-radius: 4px; margin: 0; }
+            QScrollBar:horizontal { background: #252a2e; height: 8px; border-radius: 4px; margin: 0; }
             QScrollBar::handle:horizontal { background: #4a5056; border-radius: 4px; min-width: 24px; }
             QScrollBar::handle:horizontal:hover { background: #3daee9; }
             QScrollBar::add-line:horizontal, QScrollBar::sub-line:horizontal { width: 0; }
@@ -367,7 +367,7 @@ class UeberstundenApp(QMainWindow):
             QProgressBar {
                 border: 1px solid #4a5056;
                 border-radius: 3px;
-                background-color: #232629;
+                background-color: #1b1e20;
                 text-align: center;
                 color: #eff0f1;
                 min-height: 16px;
@@ -376,16 +376,16 @@ class UeberstundenApp(QMainWindow):
 
             QLabel { background: transparent; }
             QFrame { background: transparent; }
-            QToolTip { background-color: #31363b; color: #eff0f1; border: 1px solid #4a5056; }
-            QMessageBox { background-color: #31363b; }
+            QToolTip { background-color: #232629; color: #eff0f1; border: 1px solid #4a5056; }
+            QMessageBox { background-color: #232629; }
 
             /* Aufklappbarer Kalender (QDateEdit-Popup) */
             QCalendarWidget {
-                background-color: #31363b;
+                background-color: #232629;
                 color: #eff0f1;
             }
             QCalendarWidget QWidget#qt_calendar_navigationbar {
-                background-color: #232629;
+                background-color: #1b1e20;
                 padding: 2px;
             }
             QCalendarWidget QToolButton {
@@ -400,7 +400,7 @@ class UeberstundenApp(QMainWindow):
             QCalendarWidget QToolButton:pressed { background-color: #2980b9; }
             QCalendarWidget QToolButton::menu-indicator { image: none; }
             QCalendarWidget QSpinBox {
-                background-color: #232629;
+                background-color: #1b1e20;
                 color: #eff0f1;
                 border: 1px solid #4a5056;
                 border-radius: 3px;
@@ -408,7 +408,7 @@ class UeberstundenApp(QMainWindow):
                 selection-background-color: #3daee9;
             }
             QCalendarWidget QAbstractItemView:enabled {
-                background-color: #232629;
+                background-color: #1b1e20;
                 color: #eff0f1;
                 selection-background-color: #3daee9;
                 selection-color: #ffffff;
@@ -416,7 +416,7 @@ class UeberstundenApp(QMainWindow):
             }
             QCalendarWidget QAbstractItemView:disabled { color: #4a5056; }
             QCalendarWidget QMenu {
-                background-color: #232629;
+                background-color: #1b1e20;
                 color: #eff0f1;
                 border: 1px solid #4a5056;
             }

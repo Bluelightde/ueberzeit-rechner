@@ -200,6 +200,7 @@ class MainTab(QWidget):  # pylint: disable=too-many-public-methods
         header.setSectionResizeMode(3, QHeaderView.ResizeMode.Stretch)
         self.table.setColumnWidth(1, 160)
         self.table.setColumnWidth(4, 200) # Platz für Edit & Löschen
+        self.table.verticalHeader().setDefaultSectionSize(36)
         self.table.cellDoubleClicked.connect(self.edit_entry)
         layout.addWidget(self.table)
 
@@ -345,7 +346,7 @@ class MainTab(QWidget):  # pylint: disable=too-many-public-methods
 
             actions_widget = QWidget()
             actions_layout = QHBoxLayout(actions_widget)
-            actions_layout.setContentsMargins(4, 1, 4, 1)
+            actions_layout.setContentsMargins(4, 3, 4, 3)
             actions_layout.setSpacing(4)
             actions_layout.addWidget(btn_edit)
             actions_layout.addWidget(btn_del)
