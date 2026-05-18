@@ -5,7 +5,7 @@ import sqlite3
 from datetime import date, timedelta
 
 
-def main():
+def main():  # pylint: disable=too-many-locals
     """Erstellt demo_daten.db mit realistischen Arbeitszeitdaten."""
     random.seed(42)
 
