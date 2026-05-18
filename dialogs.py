@@ -3,9 +3,10 @@
 Dialog-Fenster für Einstellungen und zum Bearbeiten von Einträgen.
 """
 from PyQt6.QtCore import QDate, QLocale, QTime
+from PyQt6.QtGui import QFont
 from PyQt6.QtWidgets import (
     QCheckBox, QComboBox, QDateEdit, QDialog,
-    QFileDialog, QHBoxLayout, QHeaderView, QLabel,
+    QFileDialog, QFrame, QHBoxLayout, QHeaderView, QLabel,
     QLineEdit, QPushButton, QSpinBox,
     QTableWidget, QTabWidget, QTimeEdit, QVBoxLayout, QWidget
 )
@@ -63,6 +64,10 @@ class SettingsDialog(QDialog):
         layout_system.addWidget(self.dark_mode_cb)
         layout_system.addSpacing(10)
         self._setup_db_path_ui(layout_system, current_settings)
+        layout_system.addSpacing(10)
+        btn_wizard = QPushButton(tr("Einrichtungsassistenten erneut aufrufen"))
+        btn_wizard.clicked.connect(self._open_welcome_wizard)
+        layout_system.addWidget(btn_wizard)
         layout_system.addStretch()
         self.tabs.addTab(tab_system, tr("System && Design"))
 
@@ -324,6 +329,24 @@ class SettingsDialog(QDialog):
         if path:
             self.db_path_edit.setText(path)
 
+    def _open_welcome_wizard(self):
+        current = {
+            "country": self.country_combo.currentData(),
+            "state": self.state_combo.currentData() if self.state_combo.isEnabled() else None,
+            "target_work_time": self.time_target.time().toString("HH:mm"),
+            "workdays": [i for i, cb in enumerate(self.workday_checkboxes) if cb.isChecked()],
+        }
+        dlg = WelcomeDialog(current, self)
+        if dlg.exec():
+            result = dlg.get_settings()
+            idx = self.country_combo.findData(result["country"])
+            if idx >= 0:
+                self.country_combo.setCurrentIndex(idx)
+            self._update_subdiv_combo(result["country"], result.get("state"))
+            self.time_target.setTime(QTime.fromString(result["target_work_time"], "HH:mm"))
+            for i, cb in enumerate(self.workday_checkboxes):
+                cb.setChecked(i in result["workdays"])
+
     def get_settings(self):
         """
         Gibt die im Dialog eingestellten Werte als Dictionary zurück.
@@ -569,3 +592,118 @@ class EditDialog(QDialog):
             self.entry.start = ""
             self.entry.end = ""
             self.entry.pause = 0
+
+
+class WelcomeDialog(QDialog):
+    """Erster-Start-Dialog für grundlegende Konfiguration."""
+
+    def __init__(self, settings, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle(tr("Willkommen"))
+        self.setMinimumWidth(460)
+        self.setModal(True)
+
+        layout = QVBoxLayout(self)
+        layout.setSpacing(14)
+        layout.setContentsMargins(28, 28, 28, 24)
+
+        # Titel
+        lbl_title = QLabel(tr("Willkommen bei Überzeit Rechner"))
+        font_title = QFont()
+        font_title.setPointSize(14)
+        font_title.setBold(True)
+        lbl_title.setFont(font_title)
+        lbl_title.setWordWrap(True)
+        layout.addWidget(lbl_title)
+
+        lbl_sub = QLabel(tr(
+            "Bitte triff ein paar grundlegende Einstellungen, "
+            "damit die App von Anfang an korrekt rechnet."
+        ))
+        lbl_sub.setWordWrap(True)
+        layout.addWidget(lbl_sub)
+
+        line = QFrame()
+        line.setFrameShape(QFrame.Shape.HLine)
+        line.setFrameShadow(QFrame.Shadow.Sunken)
+        layout.addWidget(line)
+
+        # Land
+        country_row = QHBoxLayout()
+        country_row.addWidget(QLabel(tr("Land:")))
+        self.country_combo = QComboBox()
+        for code, name in get_country_list():
+            self.country_combo.addItem(name, code)
+        idx = self.country_combo.findData(settings.get("country", "DE"))
+        if idx >= 0:
+            self.country_combo.setCurrentIndex(idx)
+        country_row.addWidget(self.country_combo)
+        layout.addLayout(country_row)
+
+        # Region
+        region_row = QHBoxLayout()
+        region_row.addWidget(QLabel(tr("Region (für Feiertage):")))
+        self.region_combo = QComboBox()
+        region_row.addWidget(self.region_combo)
+        layout.addLayout(region_row)
+        self.country_combo.currentIndexChanged.connect(self._update_regions)
+        self._update_regions()
+        idx = self.region_combo.findData(settings.get("state", ""))
+        if idx >= 0:
+            self.region_combo.setCurrentIndex(idx)
+
+        # Tagessoll
+        target_row = QHBoxLayout()
+        target_row.addWidget(QLabel(tr("Regelarbeitszeit (Soll):")))
+        self.time_target = QTimeEdit()
+        self.time_target.setDisplayFormat("HH:mm")
+        self.time_target.setTime(
+            QTime.fromString(settings.get("target_work_time", "08:00"), "HH:mm")
+        )
+        target_row.addWidget(self.time_target)
+        target_row.addStretch()
+        layout.addLayout(target_row)
+
+        # Arbeitstage
+        layout.addWidget(QLabel(f"<b>{tr('Arbeitstage (Soll-Tage):')}</b>"))
+        self.workday_checkboxes = []
+        workdays_layout = QHBoxLayout()
+        days = [get_locale().dayName(i + 1, QLocale.FormatType.ShortFormat) for i in range(7)]
+        selected = settings.get("workdays", [0, 1, 2, 3, 4])
+        for i, day_name in enumerate(days):
+            cb = QCheckBox(day_name)
+            cb.setChecked(i in selected)
+            workdays_layout.addWidget(cb)
+            self.workday_checkboxes.append(cb)
+        layout.addLayout(workdays_layout)
+
+        layout.addStretch()
+
+        # Buttons
+        btn_row = QHBoxLayout()
+        btn_skip = QPushButton(tr("Überspringen"))
+        btn_skip.clicked.connect(self.reject)
+        btn_start = QPushButton(tr("Los geht's →"))
+        btn_start.setDefault(True)
+        btn_start.clicked.connect(self.accept)
+        btn_row.addWidget(btn_skip)
+        btn_row.addStretch()
+        btn_row.addWidget(btn_start)
+        layout.addLayout(btn_row)
+
+    def _update_regions(self):
+        """Aktualisiert die Regions-Auswahl basierend auf dem gewählten Land."""
+        self.region_combo.clear()
+        subdivs = get_subdivisions(self.country_combo.currentData() or "DE")
+        for code, name in subdivs:
+            self.region_combo.addItem(name, code)
+        self.region_combo.setEnabled(bool(subdivs))
+
+    def get_settings(self):
+        """Gibt die gewählten Einstellungen als Dict zurück."""
+        return {
+            "country": self.country_combo.currentData() or "DE",
+            "state": self.region_combo.currentData() or "",
+            "target_work_time": self.time_target.time().toString("HH:mm"),
+            "workdays": [i for i, cb in enumerate(self.workday_checkboxes) if cb.isChecked()],
+        }

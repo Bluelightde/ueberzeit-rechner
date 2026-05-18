@@ -18,7 +18,7 @@ from PyQt6.QtWidgets import (
 # pylint: disable=wrong-import-position, wrong-import-order
 from config import BASE_DIR, DB_FILE, SETTINGS_FILE, ICON_PATH, LOG_FILE
 from database import DBManager
-from dialogs import SettingsDialog
+from dialogs import SettingsDialog, WelcomeDialog
 
 from i18n import setup_i18n, tr
 from tabs.main_tab import MainTab
@@ -62,7 +62,7 @@ class UeberstundenApp(QMainWindow):
     def __init__(self):
         """Initialisiert die Anwendung, lädt Einstellungen und baut die UI auf."""
         super().__init__()
-        self.setWindowTitle(tr("Überstunden-Rechner Pro"))
+        self.setWindowTitle("Überzeit Rechner")
         self.resize(1000, 750)
 
         if os.path.exists(ICON_PATH):
@@ -179,7 +179,8 @@ class UeberstundenApp(QMainWindow):
             "goal_start_date": QDate.currentDate().addDays(30).toString("yyyy-MM-dd"),
             "goal_end_date": QDate.currentDate().addDays(35).toString("yyyy-MM-dd"),
             "goal_hours": 0,
-            "db_path": DB_FILE
+            "db_path": DB_FILE,
+            "first_run": True
         }
         if os.path.exists(SETTINGS_FILE):
             try:
@@ -747,4 +748,15 @@ if __name__ == "__main__":
     setup_i18n(_early_settings.get("language"))
     window = UeberstundenApp()
     window.show()
+
+    if window.settings.get("first_run", True):
+        dlg = WelcomeDialog(window.settings, window)
+        if dlg.exec():
+            window.settings.update(dlg.get_settings())
+            window.tab_main.on_settings_changed()
+            window.tab_main.recalculate_all_days()
+            window._on_data_changed()
+        window.settings["first_run"] = False
+        window.save_settings()
+
     sys.exit(app.exec())

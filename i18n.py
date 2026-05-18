@@ -36,7 +36,7 @@ _EN: dict[str, str] = {
     "Arbeitstage (Soll-Tage):": "Work days (target days):",
     "Fallback Startzeit:": "Fallback start time:",
     "Regelarbeitszeit (Soll):": "Target work time:",
-    "Max. anrechenbare Arbeitszeit:": "Max. billable work time:",
+    "Max. anrechenbare Arbeitszeit:": "Max. countable work time:",
     "Ab Arbeitszeit (h:mm)": "After work time (h:mm)",
     "Pause (min)": "Break (min)",
     "Hinzufügen": "Add",
@@ -96,8 +96,22 @@ _EN: dict[str, str] = {
     ),
     "⚠️ Max. {h}h erreicht!": "⚠️ Max. {h}h reached!",
     "⚠️ Ruhezeit verletzt ({r}h < 11h)": "⚠️ Rest period violated ({r}h < 11h)",
+    "Überschneidung mit bestehendem Eintrag:": "Overlap with existing entry:",
+    "Mitternachtsschicht: {m1}m heute, {m2}m morgen. Gesamt: {tot}": (
+        "Midnight shift: {m1}m today, {m2}m tomorrow. Total: {tot}"
+    ),
 
     # --- MainTab: Dialoge / Meldungen ---
+    "Mitternachtsschicht": "Midnight shift",
+    (
+        "Der Eintrag wurde auf zwei Tage aufgeteilt:\n"
+        "- {d1}: {s1} - 00:00\n"
+        "- {d2}: 00:00 - {e2}"
+    ): (
+        "The entry has been split into two days:\n"
+        "- {d1}: {s1} - 00:00\n"
+        "- {d2}: 00:00 - {e2}"
+    ),
     "Löschen bestätigen": "Confirm deletion",
     "Eintrag vom {d} wirklich löschen?": "Really delete entry from {d}?",
     "Überschneidung": "Overlap",
@@ -203,6 +217,28 @@ _EN: dict[str, str] = {
         "you will reach your goal exactly."
     ),
 
+    # --- Welcome dialog ---
+    "Willkommen": "Welcome",
+    "Willkommen bei Überzeit Rechner": "Welcome to Überzeit Rechner",
+    (
+        "Bitte triff ein paar grundlegende Einstellungen, "
+        "damit die App von Anfang an korrekt rechnet."
+    ): (
+        "Please configure a few basics so the app "
+        "calculates correctly from the start."
+    ),
+    "Überspringen": "Skip",
+    "Los geht's →": "Get Started →",
+    "Einrichtungsassistenten erneut aufrufen": "Run Setup Wizard Again",
+
+    # --- Settings section headers ---
+    "Arbeitszeit && Pause": "Working time && Break",
+    "Region && Feiertage": "Region && Holidays",
+    "System && Design": "System && Appearance",
+    "⚠️ Mitternachtsschicht: Wird beim Speichern in zwei Tage aufgeteilt.": (
+        "⚠️ Midnight shift: Will be split into two days when saved."
+    ),
+
     # --- Sprache ---
     "Sprache:": "Language:",
     "(Neustart erforderlich)": "(restart required)",
@@ -219,7 +255,6 @@ _EN: dict[str, str] = {
     "Monatlicher Überstunden-Verlauf": "Monthly overtime trend",
 
     # --- Main window ---
-    "Überstunden-Rechner Pro": "Overtime Tracker Pro",
     "Eingabe && Liste": "Input && List",
     "Ziele && Dashboard": "Goals && Dashboard",
     "Kalender-Heatmap": "Calendar Heatmap",

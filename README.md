@@ -1,73 +1,167 @@
-# Überstunden-Rechner Pro
+# Überzeit Rechner – Overtime Tracker
 
-Ein leistungsstarker, lokal laufender Überstunden-Rechner mit grafischer Benutzeroberfläche (PyQt6), der dir hilft, deine Arbeitszeiten, Pausen und Überstunden präzise zu erfassen und zu visualisieren.
+A powerful, privacy-first overtime tracking desktop application with a graphical interface (PyQt6). Track your working hours, breaks, and overtime precisely — with visualizations, export options, and flexible target configuration.
 
-## ✨ Funktionen
+All data is stored **locally** in a SQLite database. No cloud, no telemetry.
 
-- **Präzise Zeiterfassung**: Erfasse Start- und Endzeiten sowie Pausen. Manuelle Korrekturbuchungen sind ebenfalls möglich.
-- **Flexibles Tagessoll**:
-    - **Individuelles Tagessoll pro Eintrag**: Überschreibe das Soll direkt bei der Eingabe für einen spezifischen Tag.
-    - **Sonder-Arbeitstage**: Definiere wiederkehrende Tage mit reduziertem Soll (z.B. Heiligabend und Silvester mit je 4h) in den Einstellungen.
-    - **Regelarbeitszeit**: Hinterlege dein Standard-Soll für normale Arbeitstage.
-- **Intelligente Feiertags- & Wochenendlogik**: 
-    - Berücksichtigt alle gesetzlichen Feiertage in Deutschland (nach Bundesland einstellbar).
-    - **Konfigurierbare Arbeitstage**: Wähle deine regulären Arbeitstage (z.B. Mo-Fr). 
-    - **Überstunden-Automatik**: Arbeit an freien Tagen, Wochenenden oder Feiertagen wird automatisch zu 100% als Überstunden gewertet (Soll = 0).
-- **Automatische Pausenberechnung**: Berechnet gesetzliche Pausenzeiten automatisch (30 Min ab 6h, 45 Min ab 9h Arbeitszeit).
-- **Login-Zeit Erkennung**: Kann optional die letzte Anmeldezeit des Betriebssystems (Windows, Linux, macOS) als Standard-Startzeit vorschlagen.
-- **Visualisierungen**:
-    - **Kalender-Heatmap**: Farblich kodierte Übersicht deines Monats-Saldos. Wochenenden und freie Tage werden hervorgehoben.
-    - **Statistik-Diagramme**: Monatlicher Verlauf deiner Überstunden.
-- **Gleitzeit-Ziel (Dashboard)**: Setze dir Ziele (z.B. Stunden für einen Urlaub ansparen) und verfolge den Fortschritt. Die Berechnung berücksichtigt automatisch Feiertage und deine konfigurierten Arbeitstage.
-- **Dark Mode**: Unterstützung für helles und dunkles Design (Breeze Theme).
-- **Daten-Export**: Exportiere deine Daten als CSV, Excel (.xlsx) oder PDF.
-- **Datenschutz**: Alle Daten werden lokal in einer SQLite-Datenbank (`ueberstunden_daten.db`) gespeichert. Keine Cloud, kein Tracking.
+---
 
-## 🚀 Installation
+## ✨ Features
 
-### Voraussetzungen
-- Python 3.8 oder neuer
+- **Precise time tracking** — Record start/end times and breaks. Manual correction entries are also supported.
+- **Flexible daily targets**
+  - Override the target hours for individual entries directly at the time of input.
+  - Define recurring special days with reduced targets (e.g. Christmas Eve and New Year's Eve at 4h) in settings.
+  - Set a standard target for regular working days.
+- **Smart holiday & weekend logic**
+  - Supports public holidays for many countries and regions (configurable via settings).
+  - Configure which weekdays are your regular working days (e.g. Mon–Fri).
+  - Work on days off, weekends, or public holidays is automatically counted as 100% overtime (target = 0).
+- **Automatic break calculation** — Calculates statutory break times automatically (30 min after 6h, 45 min after 9h).
+- **Login time detection** — Optionally uses the OS login time (Windows, Linux, macOS) as the default start time.
+- **Midnight shift support** — Entries spanning midnight are automatically split into two entries across the correct dates.
+- **Overlap detection** — Live preview warns you immediately if a new entry would overlap with an existing one.
+- **Visualizations**
+  - **Calendar heatmap** — Color-coded monthly overview of your balance. Weekends and days off are highlighted.
+  - **Statistics charts** — Monthly overtime trend charts.
+- **Overtime goal tracking (Dashboard)** — Set a savings goal (e.g. hours for a vacation) and track progress. Public holidays and configured working days are taken into account automatically.
+- **Dark mode** — Light and dark theme support (Breeze style).
+- **Data export** — Export your data as CSV, Excel (.xlsx), or PDF.
+- **Privacy** — All data is stored locally in `ueberstunden_daten.db`. No cloud, no tracking.
 
-### Repository klonen & Abhängigkeiten installieren
-1. Klone das Repository:
+---
+
+## 📥 Download
+
+Pre-built binaries are available on the [Releases](../../releases) page:
+
+| Platform | File |
+|---|---|
+| Linux (x86_64) | `Überstundenrechner-linux-x86_64.tar.gz` |
+| Windows (x86_64) | `Überstundenrechner-windows-AMD64.zip` |
+| macOS (Apple Silicon) | `Überstundenrechner-macos-arm64.dmg` |
+
+### Linux
+```bash
+tar -xzf Überstundenrechner-linux-x86_64.tar.gz
+cd Überstundenrechner
+./Überstundenrechner
+```
+
+### Windows
+Extract the `.zip` file and run `Überstundenrechner.exe`.
+
+### macOS
+> **Note:** The app is not signed with an Apple Developer certificate. macOS Gatekeeper may show a "damaged" warning.
+>
+> **Fix:** Open Terminal and run:
+> ```bash
+> codesign --force --deep --sign - /Applications/Überstundenrechner.app
+> ```
+> Then open the app normally. Alternatively, go to **System Settings → Privacy & Security** and click **Open Anyway**.
+
+---
+
+## 🚀 Running from Source
+
+### Requirements
+- Python 3.11 or newer
+
+### Setup
+
+1. Clone the repository:
    ```bash
-   git clone https://github.com/dein-nutzername/ueberstundenrechner.git
-   cd ueberstundenrechner
+   git clone https://github.com/Bluelightde/ueberstundenrechnerpro.git
+   cd ueberstundenrechnerpro
    ```
 
-2. Erstelle eine virtuelle Umgebung (empfohlen):
+2. Create a virtual environment:
    ```bash
    python -m venv venv
-   source venv/bin/activate  # Unter Windows: venv\Scripts\activate
+   source venv/bin/activate        # Linux / macOS
+   venv\Scripts\activate           # Windows
    ```
 
-3. Installiere die benötigten Pakete:
+3. Install dependencies:
    ```bash
    pip install -r requirements.txt
    ```
 
-## 🛠️ Benutzung
+4. Run the app:
+   ```bash
+   python main.py
+   ```
 
-Starte die Anwendung mit:
+---
+
+## ⚙️ First-Time Setup
+
+1. Open **Settings**.
+2. Select your **country** and **region/state** (important for correct public holiday calculation).
+3. Set your **standard daily target** and your regular **working days**.
+4. Define **special days** with reduced targets under Settings (e.g. Dec 24 and Dec 31 at 4h).
+5. Optionally enable **Dark Mode** or **Login Time Detection**.
+
+---
+
+## 📦 Building a Standalone Executable
+
+Use the included build script — it works on Linux, macOS, and Windows:
+
 ```bash
-python main.py
+python build.py
 ```
 
-### Erste Schritte
-1. Gehe auf **Einstellungen**.
-2. Wähle dein **Bundesland** aus (wichtig für die korrekte Feiertagsberechnung).
-3. Lege deine **Regelarbeitszeit (Soll)** und deine regulären **Arbeitstage** fest.
-4. Definiere unter **Sonder-Arbeitstage** Tage mit abweichendem Soll (z.B. 24.12. und 31.12.).
-5. (Optional) Aktiviere den **Dark Mode** oder die **Login-Zeit Erkennung**.
+The output will be placed in the `dist/` folder. The script automatically installs dependencies, runs PyInstaller, and packages the result as `.tar.gz` (Linux), `.zip` (Windows), or `.dmg` (macOS).
 
-## 📦 Kompilieren (Executable erstellen)
+### Automated builds via GitHub Actions
 
-Du kannst die Anwendung mit PyInstaller zu einer eigenständigen Datei kompilieren:
+Every push to `main` and every version tag (`v*`) triggers an automated build for all three platforms via GitHub Actions. Built artifacts are attached to the corresponding [Release](../../releases).
+
+To create a new release:
 ```bash
-pyinstaller ueberstunden.spec
+git tag v1.2.0
+git push origin v1.2.0
 ```
-Die fertige Anwendung findest du anschließend im Ordner `dist/`.
 
-## 📜 Lizenz
+---
 
-Dieses Projekt ist unter der MIT-Lizenz lizenziert. Siehe die `LICENSE`-Datei für Details.
+## 🗂️ Project Structure
+
+```
+main.py            — Entry point, main window, theme handling
+logic.py           — Core calculation logic (net time, breaks, overtime)
+database.py        — SQLite database management
+models.py          — Data structures (WorkEntry)
+config.py          — Paths and constants
+i18n.py            — Internationalization support
+ui_components.py   — Custom widgets and delegates
+dialogs.py         — Settings and edit dialogs
+exports.py         — CSV, Excel, and PDF export
+tabs/
+  main_tab.py      — Data entry and list view
+  goals_tab.py     — Overtime goals and dashboard
+  calendar_tab.py  — Calendar heatmap
+  stats_tab.py     — Statistics and charts
+```
+
+---
+
+## 💾 Data Storage
+
+| File | Description |
+|---|---|
+| `ueberstunden_daten.db` | SQLite database (next to the executable) |
+| `ueberstunden_settings.json` | App settings (JSON) |
+
+Both files are created automatically on first launch in the same directory as the executable (or script).
+
+---
+
+## 📜 License
+
+This project is licensed under the MIT License.
+
+---
+
+*Developed with the assistance of [Claude](https://claude.ai) by Anthropic.*
