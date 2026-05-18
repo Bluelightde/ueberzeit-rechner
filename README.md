@@ -6,6 +6,20 @@ All data is stored **locally** in a SQLite database. No cloud, no telemetry.
 
 ---
 
+## 📸 Screenshots
+
+![Eingabe & Liste](screenshots/Ueberzeit01.png)
+
+| Kalender-Heatmap | Diagramm & Statistik |
+|---|---|
+| ![Kalender-Heatmap](screenshots/Ueberzeit03.png) | ![Diagramm & Statistik](screenshots/Ueberzeit04.png) |
+
+| Einstellungen – Arbeitszeit | Einstellungen – Region |
+|---|---|
+| ![Einstellungen Arbeitszeit](screenshots/Ueberzeit05.png) | ![Einstellungen Region](screenshots/Ueberzeit06.png) |
+
+---
+
 ## ✨ Features
 
 - **Precise time tracking** — Record start/end times and breaks. Manual correction entries are also supported.
