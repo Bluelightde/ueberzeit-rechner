@@ -55,6 +55,8 @@ Pre-built binaries are available on the [Releases](../../releases) page:
 | Windows (x86_64) | `Überstundenrechner-windows-AMD64.zip` |
 | macOS (Apple Silicon) | `Überstundenrechner-macos-arm64.dmg` |
 
+A **sample database** (`demo_daten.db`) with realistic demo data is also available on the [Releases](../../releases) page. Copy it next to the executable and select it under Settings → Database location.
+
 ### Linux
 ```bash
 tar -xzf Überstundenrechner-linux-x86_64.tar.gz
