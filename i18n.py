@@ -186,6 +186,13 @@ _EN: dict[str, str] = {
     # --- GoalsTab ---
     "Zeitraum und Überstunden-Ziel konfigurieren": "Configure period and overtime goal",
     "Gleitzeit-Ziel aktivieren (Urlaubs-Sparer)": "Enable flextime goal (vacation saver)",
+    (
+        "💡 Aktiviere das Gleitzeit-Ziel, um deinen Fortschritt beim Ansparen "
+        "von Überstunden zu verfolgen – z.B. für einen Urlaub oder freien Tag."
+    ): (
+        "💡 Enable the flextime goal to track your progress saving up overtime "
+        "— e.g. for a vacation or a day off."
+    ),
     "Urlaub / Frei von:": "Vacation / Off from:",
     "bis:": "to:",
     " | Benötigte Überstunden:": " | Required overtime:",

@@ -136,6 +136,16 @@ class GoalsTab(QWidget):
         dashboard_layout.addWidget(self.lbl_goal_action)
 
         layout.addWidget(self.dashboard_group)
+
+        self.lbl_hint = QLabel(tr(
+            "💡 Aktiviere das Gleitzeit-Ziel, um deinen Fortschritt beim Ansparen "
+            "von Überstunden zu verfolgen – z.B. für einen Urlaub oder freien Tag."
+        ))
+        self.lbl_hint.setWordWrap(True)
+        self.lbl_hint.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.lbl_hint.setStyleSheet("color: gray; padding: 20px;")
+        layout.addWidget(self.lbl_hint)
+
         layout.addStretch()
 
     def refresh(self, entries):
@@ -180,6 +190,7 @@ class GoalsTab(QWidget):
         self.goal_end_edit.setEnabled(self.goal_active_cb.isChecked())
         self.goal_hours_spin.setEnabled(self.goal_active_cb.isChecked())
         self.dashboard_group.setVisible(self.goal_active_cb.isChecked())
+        self.lbl_hint.setVisible(not self.goal_active_cb.isChecked())
 
         if self.goal_active_cb.isChecked():
             self._update_goal_status()

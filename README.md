@@ -18,6 +18,10 @@ All data is stored **locally** in a SQLite database. No cloud, no telemetry.
 |---|---|
 | ![Einstellungen Arbeitszeit](screenshots/Ueberzeit05.png) | ![Einstellungen Region](screenshots/Ueberzeit06.png) |
 
+**Light Mode**
+
+![Light Mode](screenshots/Ueberzeit08_light.png)
+
 ---
 
 ## ✨ Features
