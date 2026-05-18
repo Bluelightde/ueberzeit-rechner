@@ -1,9 +1,26 @@
 """
 Eigenständiges Widget für den Diagramm- und Statistik-Tab.
 """
+import copy
+
+import matplotlib.path as _mpath
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg
 from matplotlib.figure import Figure
 from PyQt6.QtWidgets import QVBoxLayout, QWidget
+
+
+def _path_deepcopy_fixed(self, memo):
+    # Workaround: upstream __deepcopy__ omits memo[id(self)] assignment,
+    # causing infinite recursion when tick props are copied during canvas.draw().
+    cls = self.__class__
+    result = cls.__new__(cls)
+    memo[id(self)] = result
+    for k, v in self.__dict__.items():
+        setattr(result, k, copy.deepcopy(v, memo))
+    return result
+
+
+_mpath.Path.__deepcopy__ = _path_deepcopy_fixed
 
 from i18n import tr
 from logic import COLOR_POSITIVE, COLOR_NEGATIVE
