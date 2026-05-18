@@ -41,7 +41,10 @@
       "Bash(python -c \":*)",
       "Bash(grep -n '\"\"Einstellungen\"\"' i18n.py)",
       "Bash(pylint tabs/main_tab.py)",
-      "Bash(bash -c \"source venv/bin/activate && pylint tabs/main_tab.py 2>&1 | tail -5\")"
+      "Bash(bash -c \"source venv/bin/activate && pylint tabs/main_tab.py 2>&1 | tail -5\")",
+      "Bash(git ls-remote *)",
+      "Bash(gh run *)",
+      "Bash(gh --version)"
     ]
   }
 }

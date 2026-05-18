@@ -8,8 +8,8 @@ import os
 import shutil
 import sys
 
-from PyQt6.QtCore import QDate, Qt, QPoint
-from PyQt6.QtGui import QColor, QIcon, QPalette, QPainter, QPixmap, QPolygon
+from PyQt6.QtCore import QDate, Qt
+from PyQt6.QtGui import QColor, QIcon, QPalette
 from PyQt6.QtWidgets import (
     QApplication, QMainWindow, QTabWidget, QMessageBox, QFileDialog
 )
@@ -423,9 +423,9 @@ class UeberstundenApp(QMainWindow):
             QCalendarWidget QMenu::item:selected { background-color: #3daee9; color: #fff; }
         """ + (
             f"            QAbstractSpinBox::up-arrow   "
-            f"{{ image: url(\"{icon_dir}/arrow_up.png\");   width: 10px; height: 10px; }}\n"
+            f"{{ image: url(\"{icon_dir}/arrow_up.svg\");   width: 12px; height: 12px; }}\n"
             f"            QAbstractSpinBox::down-arrow "
-            f"{{ image: url(\"{icon_dir}/arrow_down.png\"); width: 10px; height: 10px; }}\n"
+            f"{{ image: url(\"{icon_dir}/arrow_down.svg\"); width: 12px; height: 12px; }}\n"
             if icon_dir else ""
         )
 
@@ -616,32 +616,31 @@ class UeberstundenApp(QMainWindow):
             QCalendarWidget QMenu::item:selected { background-color: #3daee9; color: #fff; }
         """ + (
             f"            QAbstractSpinBox::up-arrow   "
-            f"{{ image: url(\"{icon_dir}/arrow_up.png\");   width: 10px; height: 10px; }}\n"
+            f"{{ image: url(\"{icon_dir}/arrow_up.svg\");   width: 12px; height: 12px; }}\n"
             f"            QAbstractSpinBox::down-arrow "
-            f"{{ image: url(\"{icon_dir}/arrow_down.png\"); width: 10px; height: 10px; }}\n"
+            f"{{ image: url(\"{icon_dir}/arrow_down.svg\"); width: 12px; height: 12px; }}\n"
             if icon_dir else ""
         )
 
     def _create_arrow_icons(self):
-        """Zeichnet kleine Dreieck-Pfeile als PNG und speichert sie für die QSS-Nutzung."""
+        """Erzeugt SVG-Chevron-Pfeile für die QSS-Nutzung (verlustfrei skalierbar)."""
         icon_dir = os.path.join(BASE_DIR, '.ui_icons')
         os.makedirs(icon_dir, exist_ok=True)
         is_dark = self.settings.get("dark_mode", False)
-        color = QColor("#eff0f1") if is_dark else QColor("#31363b")
+        color = "#eff0f1" if is_dark else "#31363b"
         arrows = {
-            'up':   [QPoint(5, 1), QPoint(10, 9), QPoint(0, 9)],
-            'down': [QPoint(0, 1), QPoint(10, 1), QPoint(5, 9)],
+            'up':   'M2,8 L6,3 L10,8',
+            'down': 'M2,4 L6,9 L10,4',
         }
-        for name, pts in arrows.items():
-            px = QPixmap(10, 10)
-            px.fill(Qt.GlobalColor.transparent)
-            p = QPainter(px)
-            p.setRenderHint(QPainter.RenderHint.Antialiasing)
-            p.setBrush(color)
-            p.setPen(Qt.PenStyle.NoPen)
-            p.drawPolygon(QPolygon(pts))
-            p.end()
-            px.save(os.path.join(icon_dir, f'arrow_{name}.png'))
+        for name, path in arrows.items():
+            svg = (
+                f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 12 12">'
+                f'<path d="{path}" stroke="{color}" stroke-width="1.8" '
+                f'fill="none" stroke-linecap="round" stroke-linejoin="round"/>'
+                f'</svg>'
+            )
+            with open(os.path.join(icon_dir, f'arrow_{name}.svg'), 'w', encoding='utf-8') as f:
+                f.write(svg)
         return icon_dir.replace('\\', '/')
 
     def apply_theme(self):
