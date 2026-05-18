@@ -463,6 +463,17 @@ class MainTab(QWidget):  # pylint: disable=too-many-public-methods
             )
         )
 
+        if not is_duplicate:
+            _overlap = self.check_overlap(curr_date_str, current_temp.start, current_temp.end)
+            if _overlap:
+                self.lbl_live_calc.setStyleSheet(f"color: {COLOR_NEGATIVE};")
+                self.lbl_live_calc.setText(
+                    f"<span style='color: {COLOR_NEGATIVE};'>"
+                    f"⚠️ {tr('Überschneidung mit bestehendem Eintrag:')} {_overlap}"
+                    f"</span>"
+                )
+                return
+
         timed = [e for e in all_day if e.start and e.end]
         if not is_duplicate:
             timed.append(current_temp)
