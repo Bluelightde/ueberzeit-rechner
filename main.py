@@ -8,7 +8,7 @@ import os
 import shutil
 import sys
 
-from PyQt6.QtCore import QDate, Qt
+from PyQt6.QtCore import QDate, QLibraryInfo, Qt, QTranslator
 from PyQt6.QtGui import QColor, QIcon, QPalette
 from PyQt6.QtWidgets import (
     QApplication, QMainWindow, QTabWidget, QMessageBox, QFileDialog
@@ -20,11 +20,12 @@ from config import BASE_DIR, DB_FILE, SETTINGS_FILE, ICON_PATH, LOG_FILE
 from database import DBManager
 from dialogs import SettingsDialog, WelcomeDialog
 
-from i18n import setup_i18n, tr
+from i18n import current_language, setup_i18n, tr
 from tabs.main_tab import MainTab
 from tabs.goals_tab import GoalsTab
 from tabs.calendar_tab import CalendarTab
 from tabs.stats_tab import StatsTab
+from tabs.bereitschaft_tab import BereitschaftTab
 # pylint: enable=wrong-import-position, wrong-import-order
 
 logger = logging.getLogger(__name__)
@@ -90,16 +91,19 @@ class UeberstundenApp(QMainWindow):
         )
         self.tab_calendar = CalendarTab(settings=self.settings)
         self.tab_stats = StatsTab(settings=self.settings)
+        self.tab_bereitschaft = BereitschaftTab(db=self.db)
 
         tabs = QTabWidget()
-        tabs.addTab(self.tab_main,     tr("Eingabe && Liste"))
-        tabs.addTab(self.tab_goals,    tr("Ziele && Dashboard"))
-        tabs.addTab(self.tab_calendar, tr("Kalender-Heatmap"))
-        tabs.addTab(self.tab_stats,    tr("Diagramm && Statistik"))
+        tabs.addTab(self.tab_main,         tr("Eingabe && Liste"))
+        tabs.addTab(self.tab_goals,        tr("Ziele && Dashboard"))
+        tabs.addTab(self.tab_calendar,     tr("Kalender-Heatmap"))
+        tabs.addTab(self.tab_bereitschaft, tr("Bereitschaft"))
+        tabs.addTab(self.tab_stats,        tr("Diagramm && Statistik"))
         self.setCentralWidget(tabs)
 
         # Signals verbinden: Datenänderungen im Haupt-Tab → alle Tabs aktualisieren
         self.tab_main.data_changed.connect(self._on_data_changed)
+        self.tab_bereitschaft.data_changed.connect(self._on_data_changed)
 
         # Monatsfilter synchronisieren zwischen Haupt-Tab und Kalender-Tab
         self.tab_main.filter_changed.connect(self.tab_calendar.set_filter)
@@ -169,7 +173,8 @@ class UeberstundenApp(QMainWindow):
             ],
             "dark_mode": self.system_is_dark,
             "auto_break": True,
-            "use_login_time": False,
+            "use_login_time": True,
+            "bereitschaft_color": "#eab308",
             "workdays": [0, 1, 2, 3, 4],
             "special_days": [
                 {"month": 12, "day": 24, "target": "04:00"},
@@ -695,9 +700,11 @@ class UeberstundenApp(QMainWindow):
     def _on_data_changed(self):
         """Lädt alle Einträge aus der DB und verteilt sie an alle Tab-Widgets."""
         entries = self.db.load_all()
+        bereitschaft = self.db.load_all_bereitschaft()
         self.tab_main.refresh(entries)
         self.tab_goals.refresh(entries)
-        self.tab_calendar.refresh(entries)
+        self.tab_calendar.refresh(entries, bereitschaft)
+        self.tab_bereitschaft.refresh(bereitschaft)
         self.tab_stats.refresh(entries)
 
     # --- Einstellungs-Dialog ---
@@ -734,6 +741,7 @@ class UeberstundenApp(QMainWindow):
                 self.db.close()
                 self.db = DBManager(new_db_path)
                 self.tab_main.set_db(self.db)
+                self.tab_bereitschaft.set_db(self.db)
 
             self.settings.update(new_settings)
             self.save_settings()
@@ -774,6 +782,17 @@ if __name__ == "__main__":
         except Exception:  # pylint: disable=broad-except
             pass
     setup_i18n(_early_settings.get("language"))
+
+    # Qt-eigene Übersetzungen (z.B. Yes/No in Standard-Dialogen) laden,
+    # damit Buttons in QMessageBox/QDialogButtonBox in der App-Sprache erscheinen.
+    qt_translator = QTranslator(app)
+    qt_translations_path = QLibraryInfo.path(QLibraryInfo.LibraryPath.TranslationsPath)
+    if qt_translator.load(f"qtbase_{current_language()}", qt_translations_path):
+        app.installTranslator(qt_translator)
+    else:
+        logger.debug("Qt-Übersetzung für %s nicht gefunden in %s",
+                     current_language(), qt_translations_path)
+
     window = UeberstundenApp()
     window.show()
 

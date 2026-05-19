@@ -3,19 +3,21 @@
 Dialog-Fenster für Einstellungen und zum Bearbeiten von Einträgen.
 """
 from PyQt6.QtCore import QDate, QLocale, QTime
-from PyQt6.QtGui import QFont
+from PyQt6.QtGui import QColor, QFont
 from PyQt6.QtWidgets import (
-    QCheckBox, QComboBox, QDateEdit, QDialog,
+    QCheckBox, QColorDialog, QComboBox, QDateEdit, QDialog,
     QFileDialog, QFrame, QHBoxLayout, QHeaderView, QLabel,
     QLineEdit, QPushButton, QSpinBox,
     QTableWidget, QTabWidget, QTimeEdit, QVBoxLayout, QWidget
 )
+from ui_components import COLOR_BEREITSCHAFT
 from config import DB_FILE, get_country_list, get_subdivisions
 from i18n import available_languages, get_locale, tr
 from models import WorkEntry
 from logic import calculate_timed_entries, is_midnight_shift
 
 # pylint: disable=too-many-instance-attributes, too-many-arguments
+# pylint: disable=attribute-defined-outside-init
 class SettingsDialog(QDialog):
     """
     Dialog zum Verwalten der Benutzereinstellungen wie Standardarbeitszeiten,
@@ -62,6 +64,8 @@ class SettingsDialog(QDialog):
         self.dark_mode_cb = QCheckBox(tr("Dark Mode aktivieren"))
         self.dark_mode_cb.setChecked(current_settings.get("dark_mode", False))
         layout_system.addWidget(self.dark_mode_cb)
+
+        self._setup_bereitschaft_color_ui(layout_system, current_settings)
         layout_system.addSpacing(10)
         self._setup_db_path_ui(layout_system, current_settings)
         layout_system.addSpacing(10)
@@ -266,6 +270,50 @@ class SettingsDialog(QDialog):
         for sd in special_days:
             self.add_special_day_row(sd)
 
+    def _setup_bereitschaft_color_ui(self, layout, current_settings):
+        """Baut die Farbauswahl für die Bereitschaftslinie im Kalender."""
+        color_hex = current_settings.get("bereitschaft_color") or COLOR_BEREITSCHAFT
+        if not QColor(color_hex).isValid():
+            color_hex = COLOR_BEREITSCHAFT
+        self.bereitschaft_color = color_hex
+
+        color_row = QHBoxLayout()
+        color_row.addWidget(QLabel(tr("Farbe der Bereitschaftslinie:")))
+        self.bereitschaft_color_btn = QPushButton()
+        self.bereitschaft_color_btn.setFixedWidth(80)
+        self.bereitschaft_color_btn.clicked.connect(self._pick_bereitschaft_color)
+        self._apply_bereitschaft_color_preview()
+        color_row.addWidget(self.bereitschaft_color_btn)
+        btn_reset = QPushButton(tr("Zurücksetzen"))
+        btn_reset.clicked.connect(self._reset_bereitschaft_color)
+        color_row.addWidget(btn_reset)
+        color_row.addStretch()
+        layout.addLayout(color_row)
+
+    def _apply_bereitschaft_color_preview(self):
+        """Aktualisiert die Hintergrundfarbe des Vorschau-Buttons."""
+        color = QColor(self.bereitschaft_color)
+        text_color = "#000000" if color.lightness() > 140 else "#ffffff"
+        self.bereitschaft_color_btn.setStyleSheet(
+            f"background-color: {self.bereitschaft_color}; color: {text_color};"
+            "padding: 4px 8px;"
+        )
+        self.bereitschaft_color_btn.setText(self.bereitschaft_color.upper())
+
+    def _pick_bereitschaft_color(self):
+        """Öffnet QColorDialog zur Farbauswahl und übernimmt das Ergebnis."""
+        chosen = QColorDialog.getColor(
+            QColor(self.bereitschaft_color), self, tr("Farbe wählen")
+        )
+        if chosen.isValid():
+            self.bereitschaft_color = chosen.name()
+            self._apply_bereitschaft_color_preview()
+
+    def _reset_bereitschaft_color(self):
+        """Setzt die Bereitschaftsfarbe auf den Default zurück."""
+        self.bereitschaft_color = COLOR_BEREITSCHAFT
+        self._apply_bereitschaft_color_preview()
+
     def _setup_db_path_ui(self, layout, current_settings):
         layout.addSpacing(10)
         layout.addWidget(QLabel(f"<b>{tr('Speicherort der Datenbank:')}</b>"))
@@ -379,6 +427,7 @@ class SettingsDialog(QDialog):
             "workdays": workdays,
             "special_days": special_days,
             "break_rules": break_rules,
+            "bereitschaft_color": self.bereitschaft_color,
             "db_path": self.db_path_edit.text()
         }
 
@@ -682,6 +731,15 @@ class WelcomeDialog(QDialog):
             self.workday_checkboxes.append(cb)
         layout.addLayout(workdays_layout)
 
+        self.login_time_cb = QCheckBox(tr("Login-Zeit als Startzeit verwenden"))
+        self.login_time_cb.setToolTip(tr(
+            "Liest beim Programmstart die letzte Anmeldezeit des Benutzers aus.\n"
+            "Die Standard-Startzeit dient als Fallback, falls die Anmeldezeit\n"
+            "nicht ermittelt werden kann."
+        ))
+        self.login_time_cb.setChecked(settings.get("use_login_time", True))
+        layout.addWidget(self.login_time_cb)
+
     def _setup_buttons(self, layout):
         btn_row = QHBoxLayout()
         btn_skip = QPushButton(tr("Überspringen"))
@@ -709,4 +767,5 @@ class WelcomeDialog(QDialog):
             "state": self.region_combo.currentData() or "",
             "target_work_time": self.time_target.time().toString("HH:mm"),
             "workdays": [i for i, cb in enumerate(self.workday_checkboxes) if cb.isChecked()],
+            "use_login_time": self.login_time_cb.isChecked(),
         }

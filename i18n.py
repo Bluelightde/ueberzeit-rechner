@@ -32,6 +32,9 @@ _EN: dict[str, str] = {
     "Automatische Pausen-Berechnung": "Automatic break calculation",
     "Darstellung:": "Appearance:",
     "Dark Mode aktivieren": "Enable dark mode",
+    "Farbe der Bereitschaftslinie:": "On-call line color:",
+    "Farbe wählen": "Choose color",
+    "Zurücksetzen": "Reset",
     "Speichern": "Save",
     "Arbeitstage (Soll-Tage):": "Work days (target days):",
     "Fallback Startzeit:": "Fallback start time:",
@@ -253,8 +256,21 @@ _EN: dict[str, str] = {
     # --- CalendarTab ---
     "< Vorheriger": "< Previous",
     "Nächster >": "Next >",
+    "Heute": "Today",
     "Monat:": "Month:",
     "Monats-Saldo: {s}": "Monthly balance: {s}",
+
+    # --- BereitschaftTab ---
+    "Bereitschaft": "On-Call",
+    "Bereitschaft bearbeiten": "Edit on-call",
+    "Mit Uhrzeiten": "With times",
+    "Bis:": "To:",
+    "Uhrzeit": "Time",
+    "Notiz:": "Note:",
+    "Notiz": "Note",
+    "Notiz (optional)": "Note (optional)",
+    "ganztägig": "all day",
+    "Bereitschaft vom {d} wirklich löschen?": "Really delete on-call from {d}?",
 
     # --- StatsTab ---
     "Keine Daten vorhanden": "No data available",
@@ -330,6 +346,11 @@ def setup_i18n(lang: str | None = None) -> None:
     else:
         system_lang = QLocale.system().name()[:2].lower()
         _lang = system_lang if system_lang in TRANSLATIONS else "de"
+
+
+def current_language() -> str:
+    """Gibt den aktiven Sprachcode zurück (z.B. 'de' oder 'en')."""
+    return _lang
 
 
 def get_locale() -> QLocale:
