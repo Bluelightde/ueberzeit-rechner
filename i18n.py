@@ -276,6 +276,27 @@ _EN: dict[str, str] = {
     "Keine Daten vorhanden": "No data available",
     "Überstunden (in Stunden)": "Overtime (in hours)",
     "Monatlicher Überstunden-Verlauf": "Monthly overtime trend",
+    "Gesamt-Saldo": "Total balance",
+    "⌀ pro Monat": "Avg. per month",
+    "Bester Monat": "Best month",
+    "Schlechtester Monat": "Worst month",
+    "Längste Plus-Serie": "Longest plus streak",
+    "Längste Minus-Serie": "Longest minus streak",
+    "{n} Tage": "{n} days",
+    "Zeitraum:": "Period:",
+    "Letzte 12 Monate": "Last 12 months",
+    "Aktuelles Jahr": "Current year",
+    "Vorheriges Jahr": "Previous year",
+    "Kumulativer Saldo (Stunden)": "Cumulative balance (hours)",
+    "Saldo-Verlauf (Monats-Schlussstand) — aktuell {h:+.1f}h": (
+        "Balance over time (month-end) — current {h:+.1f}h"
+    ),
+    "⚠ {n} Einträge ohne Datum (Summe {h:+.1f}h) nicht im Verlauf enthalten": (
+        "⚠ {n} entries without date (sum {h:+.1f}h) not included in trend"
+    ),
+    "Stunden": "Hours",
+    "Monatlicher Saldo (Stunden)": "Monthly balance (hours)",
+    "⌀ Saldo je Wochentag (h)": "Avg. balance per weekday (h)",
 
     # --- Main window ---
     "Eingabe && Liste": "Input && List",
