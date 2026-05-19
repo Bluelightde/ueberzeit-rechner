@@ -6,6 +6,10 @@ All notable changes to Überzeit Rechner are documented here.
 
 ## [Unreleased]
 
+---
+
+## [1.2.1] – 2026-05-19
+
 ### Fixed
 - Overtime sum (saldo) displayed too small in compiled builds — universal `font-size` rule in the QSS overrode `QFont.setPointSize()` on all labels with explicit sizes
 - Build script broke when the venv's pyinstaller console script had a stale shebang (e.g. after the repo was moved or renamed); PyInstaller is now invoked via `python -m PyInstaller`
