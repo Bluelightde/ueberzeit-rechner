@@ -55,28 +55,28 @@ Pre-built binaries are available on the [Releases](../../releases) page:
 
 | Platform | File |
 |---|---|
-| Linux (x86_64) | `Überstundenrechner-linux-x86_64.tar.gz` |
-| Windows (x86_64) | `Überstundenrechner-windows-AMD64.zip` |
-| macOS (Apple Silicon) | `Überstundenrechner-macos-arm64.dmg` |
+| Linux (x86_64) | `Überzeit-Rechner-linux-x86_64.tar.gz` |
+| Windows (x86_64) | `Überzeit-Rechner-windows-AMD64.zip` |
+| macOS (Apple Silicon) | `Überzeit-Rechner-macos-arm64.dmg` |
 
 A **sample database** (`demo_daten.db`) with realistic demo data is also available on the [Releases](../../releases) page. Copy it next to the executable and select it under Settings → Database location.
 
 ### Linux
 ```bash
-tar -xzf Überstundenrechner-linux-x86_64.tar.gz
-cd Überstundenrechner
-./Überstundenrechner
+tar -xzf Überzeit-Rechner-linux-x86_64.tar.gz
+cd Überzeit-Rechner
+./Überzeit-Rechner
 ```
 
 ### Windows
-Extract the `.zip` file and run `Überstundenrechner.exe`.
+Extract the `.zip` file and run `Überzeit-Rechner.exe`.
 
 ### macOS
 > **Note:** The app is not signed with an Apple Developer certificate. macOS Gatekeeper may show a "damaged" warning.
 >
 > **Fix:** Open Terminal and run:
 > ```bash
-> codesign --force --deep --sign - /Applications/Überstundenrechner.app
+> codesign --force --deep --sign - /Applications/Überzeit-Rechner.app
 > ```
 > Then open the app normally. Alternatively, go to **System Settings → Privacy & Security** and click **Open Anyway**.
 

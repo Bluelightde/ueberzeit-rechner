@@ -1,5 +1,5 @@
 """
-Überstundenrechner Pro - Ein Tool zur Erfassung und Berechnung von Arbeitsstunden.
+Überzeit-Rechner - Ein Tool zur Erfassung und Berechnung von Arbeitsstunden.
 """
 import json
 import logging
@@ -53,7 +53,7 @@ def setup_logging():
 # pylint: disable=too-many-instance-attributes
 class UeberstundenApp(QMainWindow):
     """
-    Hauptfenster der Anwendung Überstunden-Rechner Pro.
+    Hauptfenster der Anwendung Überzeit-Rechner.
 
     Verwaltet die Datenbankverbindung, Einstellungen und das Tab-Layout.
     Die eigentliche UI-Logik liegt in den eigenständigen Tab-Widgets.
@@ -240,8 +240,6 @@ class UeberstundenApp(QMainWindow):
     def get_dark_stylesheet(self, icon_dir=''):
         """Gibt das CSS-Stylesheet für den Breeze Dark Modus zurück."""
         return """
-            * { font-size: 13px; }
-
             QMainWindow, QDialog { background-color: #232629; }
 
             QWidget { background-color: #232629; color: #eff0f1; }
@@ -254,7 +252,7 @@ class UeberstundenApp(QMainWindow):
                 padding: 6px 16px;
                 min-height: 24px;
             }
-            QPushButton:hover  { background-color: #4d5560; border-color: #3daee9; }
+            QPushButton:hover  { border-color: #3daee9; }
             QPushButton:pressed { background-color: #3daee9; color: #fff; border-color: #3daee9; }
             QPushButton:disabled { color: #6c7176; border-color: #3a3f44; }
 
@@ -279,24 +277,28 @@ class UeberstundenApp(QMainWindow):
             }
             QAbstractSpinBox:focus { border-color: #3daee9; }
             QAbstractSpinBox::up-button {
-                subcontrol-origin: border;
+                subcontrol-origin: padding;
                 subcontrol-position: top right;
-                width: 20px;
-                background-color: #3b4045;
-                border-left: 1px solid #4a5056;
-                border-bottom: 1px solid #4a5056;
-                border-top-right-radius: 3px;
+                width: 16px;
+                background: transparent;
+                border: none;
             }
             QAbstractSpinBox::down-button {
-                subcontrol-origin: border;
+                subcontrol-origin: padding;
                 subcontrol-position: bottom right;
-                width: 20px;
-                background-color: #3b4045;
-                border-left: 1px solid #4a5056;
-                border-bottom-right-radius: 3px;
+                width: 16px;
+                background: transparent;
+                border: none;
             }
-            QAbstractSpinBox::up-button:hover,
-            QAbstractSpinBox::down-button:hover { background-color: #3daee9; }
+
+            QDateEdit::drop-down,
+            QDateTimeEdit::drop-down {
+                subcontrol-origin: padding;
+                subcontrol-position: center right;
+                width: 18px;
+                background: transparent;
+                border: none;
+            }
 
             QComboBox::drop-down { border: none; width: 22px; }
             QComboBox::down-arrow { width: 10px; height: 10px; }
@@ -422,19 +424,11 @@ class UeberstundenApp(QMainWindow):
                 border: 1px solid #4a5056;
             }
             QCalendarWidget QMenu::item:selected { background-color: #3daee9; color: #fff; }
-        """ + (
-            f"            QAbstractSpinBox::up-arrow   "
-            f"{{ image: url(\"{icon_dir}/arrow_up.svg\");   width: 12px; height: 12px; }}\n"
-            f"            QAbstractSpinBox::down-arrow "
-            f"{{ image: url(\"{icon_dir}/arrow_down.svg\"); width: 12px; height: 12px; }}\n"
-            if icon_dir else ""
-        )
+        """ + (self._arrow_icons_css(icon_dir) if icon_dir else "")
 
     def get_light_stylesheet(self, icon_dir=''):
         """Gibt das CSS-Stylesheet für den Breeze Light Modus zurück."""
         return """
-            * { font-size: 13px; }
-
             QMainWindow, QDialog { background-color: #eff0f1; }
 
             QWidget { background-color: #eff0f1; color: #31363b; }
@@ -447,7 +441,7 @@ class UeberstundenApp(QMainWindow):
                 padding: 4px 16px;
                 min-height: 24px;
             }
-            QPushButton:hover  { background-color: #d6eaf8; border-color: #3daee9; }
+            QPushButton:hover  { border-color: #3daee9; }
             QPushButton:pressed { background-color: #3daee9; color: #fff; border-color: #3daee9; }
             QPushButton:disabled { color: #95a5a6; border-color: #bdc3c7; }
 
@@ -473,24 +467,28 @@ class UeberstundenApp(QMainWindow):
             }
             QAbstractSpinBox:focus { border-color: #3daee9; }
             QAbstractSpinBox::up-button {
-                subcontrol-origin: border;
+                subcontrol-origin: padding;
                 subcontrol-position: top right;
-                width: 20px;
-                background-color: #e3e5e7;
-                border-left: 1px solid #bdc3c7;
-                border-bottom: 1px solid #bdc3c7;
-                border-top-right-radius: 3px;
+                width: 16px;
+                background: transparent;
+                border: none;
             }
             QAbstractSpinBox::down-button {
-                subcontrol-origin: border;
+                subcontrol-origin: padding;
                 subcontrol-position: bottom right;
-                width: 20px;
-                background-color: #e3e5e7;
-                border-left: 1px solid #bdc3c7;
-                border-bottom-right-radius: 3px;
+                width: 16px;
+                background: transparent;
+                border: none;
             }
-            QAbstractSpinBox::up-button:hover,
-            QAbstractSpinBox::down-button:hover { background-color: #3daee9; }
+
+            QDateEdit::drop-down,
+            QDateTimeEdit::drop-down {
+                subcontrol-origin: padding;
+                subcontrol-position: center right;
+                width: 18px;
+                background: transparent;
+                border: none;
+            }
 
             QComboBox::drop-down { border: none; width: 22px; }
             QComboBox::down-arrow { width: 10px; height: 10px; }
@@ -615,33 +613,56 @@ class UeberstundenApp(QMainWindow):
                 border: 1px solid #bdc3c7;
             }
             QCalendarWidget QMenu::item:selected { background-color: #3daee9; color: #fff; }
-        """ + (
-            f"            QAbstractSpinBox::up-arrow   "
-            f"{{ image: url(\"{icon_dir}/arrow_up.svg\");   width: 12px; height: 12px; }}\n"
-            f"            QAbstractSpinBox::down-arrow "
+        """ + (self._arrow_icons_css(icon_dir) if icon_dir else "")
+
+    def _arrow_icons_css(self, icon_dir):
+        """Liefert die QSS-Regeln, die die Pfeil-SVGs für SpinBox- und
+        Date-Edit-Subcontrols setzen — inkl. Hover-Variante in Breeze-Blau."""
+        return (
+            f"            QAbstractSpinBox::up-arrow,\n"
+            f"            QDateTimeEdit::up-arrow "
+            f"{{ image: url(\"{icon_dir}/arrow_up.svg\"); width: 12px; height: 12px; }}\n"
+            f"            QAbstractSpinBox::down-arrow,\n"
+            f"            QDateTimeEdit::down-arrow "
             f"{{ image: url(\"{icon_dir}/arrow_down.svg\"); width: 12px; height: 12px; }}\n"
-            if icon_dir else ""
+            f"            QAbstractSpinBox::up-arrow:hover,\n"
+            f"            QDateTimeEdit::up-arrow:hover "
+            f"{{ image: url(\"{icon_dir}/arrow_up_hover.svg\"); }}\n"
+            f"            QAbstractSpinBox::down-arrow:hover,\n"
+            f"            QDateTimeEdit::down-arrow:hover "
+            f"{{ image: url(\"{icon_dir}/arrow_down_hover.svg\"); }}\n"
         )
 
     def _create_arrow_icons(self):
-        """Erzeugt SVG-Chevron-Pfeile für die QSS-Nutzung (verlustfrei skalierbar)."""
+        """Erzeugt SVG-Chevron-Pfeile für die QSS-Nutzung (verlustfrei skalierbar).
+
+        Pro Richtung werden zwei Varianten geschrieben: die Default-Variante
+        (in Textfarbe) und eine ``_hover``-Variante in Breeze-Blau, die per
+        ``:hover``-Selector eingeblendet wird.
+        """
         icon_dir = os.path.join(BASE_DIR, '.ui_icons')
         os.makedirs(icon_dir, exist_ok=True)
         is_dark = self.settings.get("dark_mode", False)
-        color = "#eff0f1" if is_dark else "#31363b"
+        default_color = "#eff0f1" if is_dark else "#31363b"
+        hover_color = "#3daee9"
+        # Flache Chevrons (Höhe 3px im 12x12-viewBox), näher zur Mitte hin
+        # positioniert, damit Up/Down im Spinbox optisch enger zusammenrücken.
         arrows = {
-            'up':   'M2,8 L6,3 L10,8',
-            'down': 'M2,4 L6,9 L10,4',
+            'up':   'M2,9 L6,5 L10,9',
+            'down': 'M2,3 L6,7 L10,3',
         }
+        variants = {'': default_color, '_hover': hover_color}
         for name, path in arrows.items():
-            svg = (
-                f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 12 12">'
-                f'<path d="{path}" stroke="{color}" stroke-width="1.8" '
-                f'fill="none" stroke-linecap="round" stroke-linejoin="round"/>'
-                f'</svg>'
-            )
-            with open(os.path.join(icon_dir, f'arrow_{name}.svg'), 'w', encoding='utf-8') as f:
-                f.write(svg)
+            for suffix, color in variants.items():
+                svg = (
+                    f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 12 12">'
+                    f'<path d="{path}" stroke="{color}" stroke-width="1.3" '
+                    f'fill="none" stroke-linecap="round" stroke-linejoin="round"/>'
+                    f'</svg>'
+                )
+                fname = f'arrow_{name}{suffix}.svg'
+                with open(os.path.join(icon_dir, fname), 'w', encoding='utf-8') as f:
+                    f.write(svg)
         return icon_dir.replace('\\', '/')
 
     def apply_theme(self):
@@ -656,6 +677,13 @@ class UeberstundenApp(QMainWindow):
 
         qt_app.setStyle("Fusion")
         qt_app.setPalette(self.get_dark_palette() if is_dark else self.get_light_palette())
+        # Default-Schriftgröße per QFont setzen, damit widget.setFont(...) sie
+        # überschreiben kann. Ein "* { font-size: ... }" im Stylesheet würde
+        # alle per QFont gesetzten PointSizes (z.B. das große Saldo-Label)
+        # überschreiben.
+        app_font = qt_app.font()
+        app_font.setPixelSize(13)
+        qt_app.setFont(app_font)
         icon_dir = self._create_arrow_icons()
         sheet = (
             self.get_dark_stylesheet(icon_dir) if is_dark else self.get_light_stylesheet(icon_dir)

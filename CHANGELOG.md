@@ -6,6 +6,16 @@ All notable changes to Überzeit Rechner are documented here.
 
 ## [Unreleased]
 
+### Fixed
+- Overtime sum (saldo) displayed too small in compiled builds — universal `font-size` rule in the QSS overrode `QFont.setPointSize()` on all labels with explicit sizes
+- Build script broke when the venv's pyinstaller console script had a stale shebang (e.g. after the repo was moved or renamed); PyInstaller is now invoked via `python -m PyInstaller`
+
+### Changed
+- Renamed build artifacts from `Überstundenrechner` to `Überzeit-Rechner` (binary, archive, app-bundle directory)
+- Spin-box arrows in compiled builds: thinner, flatter chevrons that sit closer to the center of the field; no separate button background, hover highlights only the arrow in Breeze blue
+- Push buttons in compiled builds: hover highlights only the border (no background fill)
+- Date pickers in compiled builds: removed the Fusion default contour around the calendar drop-down button
+
 ---
 
 ## [1.1.0] – 2026-05-18

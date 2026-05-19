@@ -1,5 +1,5 @@
 """
-Generiert icon.png (1024×1024) für den Überstundenrechner.
+Generiert icon.png (1024×1024) für den Überzeit-Rechner.
 Anschließend werden icon.ico (Windows) und icon.icns (macOS) erzeugt.
 """
 import io

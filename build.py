@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Build-Skript für den Überstundenrechner.
+Build-Skript für den Überzeit-Rechner.
 Läuft auf Linux, macOS und Windows.
 
 Verwendung:
@@ -23,7 +23,7 @@ from pathlib import Path
 # ---------------------------------------------------------------------------
 # Konfiguration
 # ---------------------------------------------------------------------------
-APP_NAME    = "Überstundenrechner"
+APP_NAME    = "Überzeit-Rechner"
 SPEC_FILE   = "ueberstunden.spec"
 DIST_DIR    = Path("dist")
 BUILD_DIR   = Path("build")
@@ -95,20 +95,6 @@ def find_python() -> Path:
     sys.exit(1)
 
 
-def find_pyinstaller(python: Path) -> list:
-    """Gibt den PyInstaller-Aufruf als Liste zurück."""
-    if PLAT == "win32":
-        pi = python.parent / "pyinstaller.exe"
-    else:
-        pi = python.parent / "pyinstaller"
-    if pi.exists():
-        return [str(pi)]
-    print("\n[FEHLER] pyinstaller-Binary nicht gefunden nach Installation.")
-    print("  Bitte manuell ausführen:")
-    print(f"  {python} -m pip install --force-reinstall pyinstaller")
-    sys.exit(1)
-
-
 # ---------------------------------------------------------------------------
 # Build-Schritte
 # ---------------------------------------------------------------------------
@@ -122,16 +108,6 @@ def install_deps(python: Path):
     else:
         print("  requirements.txt nicht gefunden – übersprungen.")
 
-    # Prüfen ob pyinstaller-Binary vorhanden ist.
-    # Kann fehlen wenn das venv ursprünglich mit einer anderen Python-Version
-    # erstellt wurde (Scripts werden dann nicht in bin/ angelegt).
-    if PLAT == "win32":
-        pi_bin = python.parent / "pyinstaller.exe"
-    else:
-        pi_bin = python.parent / "pyinstaller"
-    if not pi_bin.exists():
-        print("  pyinstaller-Binary fehlt – erzwinge Neuinstallation …")
-        run(python, "-m", "pip", "install", "--force-reinstall", "pyinstaller")
 
 
 def clean_old_build():
@@ -146,8 +122,11 @@ def clean_old_build():
 def run_pyinstaller(python: Path):
     """Führt PyInstaller aus, um die Anwendung zu bauen."""
     step("PyInstaller starten")
-    pi_cmd = find_pyinstaller(python)
-    run(*pi_cmd, str(SCRIPT_DIR / SPEC_FILE), cwd=str(SCRIPT_DIR))
+    # Aufruf via `python -m PyInstaller` statt des pyinstaller-Wrappers,
+    # damit eine ggf. kaputte Shebang-Zeile im venv (z.B. nach Umbenennen
+    # des Repo-Verzeichnisses) den Build nicht blockiert.
+    run(python, "-m", "PyInstaller", str(SCRIPT_DIR / SPEC_FILE),
+        cwd=str(SCRIPT_DIR))
 
 
 # ---------------------------------------------------------------------------
@@ -235,7 +214,7 @@ def summary():
 def main():
     """Haupteinstiegspunkt für das Build-Skript."""
     parser = argparse.ArgumentParser(
-        description="Baut den Überstundenrechner für die aktuelle Plattform.")
+        description="Baut den Überzeit-Rechner für die aktuelle Plattform.")
     parser.add_argument("--no-package", action="store_true",
                         help="Kein ZIP/DMG erzeugen, nur kompilieren")
     args = parser.parse_args()

@@ -8,7 +8,7 @@
 import sys
 import os
 
-APP_NAME = 'Überstundenrechner'
+APP_NAME = 'Überzeit-Rechner'
 if sys.platform == 'darwin':
     ICON_FILE = 'icon.icns'
 elif sys.platform == 'win32':
