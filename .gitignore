@@ -1,3 +1,22 @@
+# Android release signing — keystore lives outside the repo, credentials must not be committed
+android/keystore.properties
+*.jks
+*.keystore
+
+# Android build artifacts & IDE state
+android/.gradle/
+android/build/
+android/app/build/
+android/local.properties
+android/captures/
+
+# IDE / editor
+.idea/
+*.iml
+
+# Editor / collaboration notes that are personal, not project sources
+Gemini.md
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
