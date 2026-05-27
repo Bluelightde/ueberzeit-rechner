@@ -56,6 +56,13 @@ class DBManager:
         ber_columns = [row[1] for row in cursor.fetchall()]
         if "end_date" not in ber_columns:
             cursor.execute("ALTER TABLE bereitschaft_entries ADD COLUMN end_date TEXT")
+
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS device_login (
+                date TEXT PRIMARY KEY,
+                start_time TEXT NOT NULL
+            )
+        """)
         self.conn.commit()
 
     def load_all(self):
@@ -164,6 +171,26 @@ class DBManager:
         """
         cursor = self.conn.cursor()
         cursor.execute("DELETE FROM bereitschaft_entries WHERE id=?", (entry_id,))
+        self.conn.commit()
+
+    # --- Device-Login (geteilte erste Login-Zeit pro Tag) ---
+
+    def get_device_login(self, date_str: str):
+        """Gibt die erste gespeicherte Login-Zeit für ein Datum zurück oder None."""
+        cursor = self.conn.cursor()
+        cursor.execute(
+            "SELECT start_time FROM device_login WHERE date = ?", (date_str,)
+        )
+        row = cursor.fetchone()
+        return row[0] if row else None
+
+    def set_device_login(self, date_str: str, start_time: str):
+        """Speichert die erste Login-Zeit für ein Datum. Bestehende Einträge bleiben unverändert."""
+        cursor = self.conn.cursor()
+        cursor.execute(
+            "INSERT OR IGNORE INTO device_login (date, start_time) VALUES (?, ?)",
+            (date_str, start_time),
+        )
         self.conn.commit()
 
     def close(self):

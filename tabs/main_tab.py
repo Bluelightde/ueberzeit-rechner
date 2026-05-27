@@ -366,9 +366,18 @@ class MainTab(QWidget):  # pylint: disable=too-many-public-methods
     def _get_default_start_time(self):
         """Ermittelt die Startzeit für die Eingabemaske."""
         if self.settings.get("use_login_time", False):
+            today = QDate.currentDate().toString("yyyy-MM-dd")
             t = get_login_time()
-            if t and t.isValid():
-                return t
+            if self.settings.get("is_primary_device", False):
+                if t and t.isValid():
+                    self.db.set_device_login(today, t.toString("HH:mm"))
+                    return t
+            else:
+                shared = self.db.get_device_login(today)
+                if shared:
+                    return QTime.fromString(shared, "HH:mm")
+                if t and t.isValid():
+                    return t
             return QTime.fromString(self.settings.get("default_start", "07:00"), "HH:mm")
         today = QDate.currentDate().toString("yyyy-MM-dd")
         if self.settings.get("last_date") == today and self.settings.get("last_start"):

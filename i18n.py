@@ -229,7 +229,7 @@ _EN: dict[str, str] = {
 
     # --- Welcome dialog ---
     "Willkommen": "Welcome",
-    "Willkommen bei Überzeit Rechner": "Welcome to Überzeit Rechner",
+    "Willkommen beim Überzeit Rechner": "Welcome to Überzeit Rechner",
     (
         "Bitte triff ein paar grundlegende Einstellungen, "
         "damit die App von Anfang an korrekt rechnet."

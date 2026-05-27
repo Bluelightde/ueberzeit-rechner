@@ -174,6 +174,7 @@ class UeberstundenApp(QMainWindow):
             "dark_mode": self.system_is_dark,
             "auto_break": True,
             "use_login_time": True,
+            "is_primary_device": False,
             "bereitschaft_color": "#eab308",
             "workdays": [0, 1, 2, 3, 4],
             "special_days": [

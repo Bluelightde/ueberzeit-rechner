@@ -53,7 +53,25 @@
       "Bash(git remote *)",
       "Bash(git add *)",
       "Bash(git commit -m ' *)",
-      "Bash(git push *)"
+      "Bash(git push *)",
+      "Bash(/home/miw/Dokumente/GitHub/ueberzeit-rechner/venv/bin/python -m pip list)",
+      "Bash(/home/miw/Dokumente/GitHub/ueberzeit-rechner/venv/bin/python build.py)",
+      "Bash(journalctl -u systemd-logind --since today --no-pager)",
+      "Bash(journalctl -u systemd-logind --since today --grep \"session\" --no-pager)",
+      "Bash(who)",
+      "Bash(loginctl list-sessions *)",
+      "Bash(last -n 5 -F)",
+      "Bash(journalctl -u systemd-logind --grep \"New session.*miw\" --since today --no-pager)",
+      "Bash(journalctl -u systemd-logind --grep \"New session.*miw\" --since today --output=short-iso --no-pager)",
+      "Bash(/home/miw/Dokumente/GitHub/ueberzeit-rechner/venv/bin/python *)",
+      "Bash(echo \"exit=$?\")",
+      "Bash(journalctl -u systemd-logind --grep \"New session.*$\\(whoami\\)\" --since today --output=short-iso --no-pager)",
+      "WebFetch(domain:app.timebutler.com)",
+      "Bash(venv/bin/python *)",
+      "Bash(cp ueberstunden_daten.db /tmp/ueberzeit_db_backup.db)",
+      "Bash(cp ueberstunden_settings.json /tmp/ueberzeit_settings_backup.json)",
+      "Bash(QT_QPA_PLATFORM=offscreen venv/bin/python *)",
+      "Bash(pkill -f 'python main.py')"
     ]
   }
 }

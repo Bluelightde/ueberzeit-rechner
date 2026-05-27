@@ -106,6 +106,19 @@ class SettingsDialog(QDialog):
         self.login_time_cb.setChecked(current_settings.get("use_login_time", False))
         layout.addWidget(self.login_time_cb)
 
+        self.primary_device_cb = QCheckBox(
+            tr("Primäres Gerät (Login-Zeit für andere Geräte bereitstellen)")
+        )
+        self.primary_device_cb.setToolTip(tr(
+            "Speichert die erste Login-Zeit des Tages in der Datenbank.\n"
+            "Andere Geräte schlagen diese Zeit als Startzeit vor, sofern die\n"
+            "Datenbank in einem geteilten Ordner (z.B. Nextcloud, Dropbox) liegt.\n"
+            "Wirkt nur in Verbindung mit \"Login-Zeit als Startzeit verwenden\"."
+        ))
+        self.primary_device_cb.setChecked(current_settings.get("is_primary_device", False))
+        self.primary_device_cb.setEnabled(self.login_time_cb.isChecked())
+        layout.addWidget(self.primary_device_cb)
+
         time_layout = QHBoxLayout()
         self.time_start = QTimeEdit()
         self.time_start.setDisplayFormat(
@@ -332,6 +345,7 @@ class SettingsDialog(QDialog):
         Aktiviert oder deaktiviert die Startzeit-Eingabe basierend auf der Login-Zeit-Option.
         """
         self.time_start.setEnabled(not self.login_time_cb.isChecked())
+        self.primary_device_cb.setEnabled(self.login_time_cb.isChecked())
 
     def add_special_day_row(self, data=None):
         """
@@ -367,10 +381,10 @@ class SettingsDialog(QDialog):
 
     def browse_db_path(self):
         """
-        Öffnet einen Dateidialog zur Auswahl des Speicherorts der Datenbank.
+        Öffnet einen Dateidialog zur Auswahl der zu ladenden Datenbank.
         """
-        path, _ = QFileDialog.getSaveFileName(
-            self, tr("Datenbank speichern unter"),
+        path, _ = QFileDialog.getOpenFileName(
+            self, tr("Datenbank laden"),
             self.db_path_edit.text(),
             tr("SQLite Datenbank (*.db);;Alle Dateien (*)")
         )
@@ -424,6 +438,7 @@ class SettingsDialog(QDialog):
             "max_work_hours": self.max_hours_spin.value(),
             "auto_break": self.auto_break_cb.isChecked(),
             "use_login_time": self.login_time_cb.isChecked(),
+            "is_primary_device": self.primary_device_cb.isChecked(),
             "workdays": workdays,
             "special_days": special_days,
             "break_rules": break_rules,
@@ -664,7 +679,7 @@ class WelcomeDialog(QDialog):
         self._setup_buttons(layout)
 
     def _setup_header(self, layout):
-        lbl_title = QLabel(tr("Willkommen bei Überzeit Rechner"))
+        lbl_title = QLabel(tr("Willkommen beim Überzeit Rechner"))
         font_title = QFont()
         font_title.setPointSize(14)
         font_title.setBold(True)
