@@ -248,6 +248,35 @@ class TestCalculateTimedEntriesAutoPause:
         pause, _ = results[1]
         assert pause == 30
 
+    def test_anwesenheit_ueber_9h_aber_arbeitszeit_unter_9h(self):
+        # Anwesenheit 9h 11m (551 min). Mit 30 min Pause ist die Arbeitszeit
+        # 8h 41m (< 9h) → gesetzlich genügen 30 min, NICHT 45 min.
+        # Tier muss gegen die Netto-Arbeitszeit gewählt werden, nicht gegen brutto.
+        entry = make_entry(1, "06:49", "16:00")
+        results, total_net = calculate_timed_entries([entry], self.TARGET, self.MAX, is_auto=True)
+        pause, ovt = results[1]
+        assert pause == 30
+        assert total_net == 521   # 551 - 30
+        assert ovt == 41          # 521 - 480
+
+    def test_anwesenheit_9h45_braucht_45_min_pause(self):
+        # Anwesenheit 9h 45m (585 min): Mit nur 30 min Pause wäre die Arbeitszeit
+        # 9h 15m (> 9h) → das verlangt 45 min. Also greift hier echt der 45-min-Tier.
+        entry = make_entry(1, "08:00", "17:45")
+        results, total_net = calculate_timed_entries([entry], self.TARGET, self.MAX, is_auto=True)
+        pause, _ = results[1]
+        assert pause == 45
+        assert total_net == 540   # 585 - 45
+
+    def test_anwesenheit_knapp_ueber_9h_genau_30(self):
+        # Anwesenheit 9h 30m (570 min): mit 30 min Pause Arbeitszeit 9h (= 540, nicht > 9h)
+        # → 30 min reichen aus.
+        entry = make_entry(1, "08:00", "17:30")
+        results, total_net = calculate_timed_entries([entry], self.TARGET, self.MAX, is_auto=True)
+        pause, _ = results[1]
+        assert pause == 30
+        assert total_net == 540   # 570 - 30
+
 
 class TestCalculateTimedEntriesUeberstunden:
     """Prüft die Überstunden-Berechnung."""

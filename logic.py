@@ -83,10 +83,23 @@ def calculate_timed_entries(timed_entries, target_mins, max_mins, is_auto, break
         total_accumulated_gross += current_gross
 
         if is_auto:
-            req = 0
-            for rule in rules:
-                if total_accumulated_gross > rule["after"]:
-                    req = rule["break"]
+            # ArbZG §4 staffelt die Pause nach der ARBEITSZEIT (netto), nicht nach
+            # der Anwesenheit (brutto). Netto = brutto - Pause, also zirkulär.
+            # Wir wählen den kleinsten Pausen-Tier, der für die daraus resultierende
+            # Arbeitszeit konsistent ist (cand >= gesetzlich gefordert). Lücken (gap)
+            # zählen dabei als bereits genommene Pause.
+            candidates = sorted({0} | {r["break"] for r in rules})
+            req = candidates[-1]
+            for cand in candidates:
+                total_pause = max(cand, total_accumulated_gap)
+                net_work = total_accumulated_gross - total_pause
+                needed = 0
+                for rule in rules:
+                    if net_work > rule["after"]:
+                        needed = rule["break"]
+                        break
+                if cand >= needed:
+                    req = cand
                     break
             current_total_pause_needed = max(0, req - total_accumulated_gap)
             current_break = max(0, current_total_pause_needed - recorded_pause_distributed)
