@@ -4,6 +4,17 @@ All notable changes to Überzeit Rechner are documented here.
 
 ---
 
+## [1.5.0] – 2026-06-18
+
+### Added
+- **Automatic theme** — Settings → Appearance now offers **Light / Dark / Automatic (system)**, with *Automatic* as the new default. In automatic mode the app follows the OS color scheme and switches **live** when the system theme changes (no restart). Detection uses Qt's `colorScheme()` style hint with a palette-lightness fallback.
+
+### Changed
+- The dark-mode on/off checkbox was replaced by a three-way **Theme** selector; the effective light/dark value (`dark_mode`) is now derived from the selected mode.
+- Release artifact filenames now include the version, e.g. `Überzeit-Rechner-1.5.0-linux-x86_64.tar.gz` (Windows `.zip` / macOS `.dmg` accordingly). The version is read from `config.APP_VERSION`.
+
+---
+
 ## [1.4.0] – 2026-06-18
 
 ### Added

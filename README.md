@@ -43,7 +43,7 @@ All data is stored **locally** in a SQLite database. No cloud, no telemetry.
   - **Calendar heatmap** — Color-coded monthly overview of your balance. Weekends and days off are highlighted.
   - **Statistics charts** — Monthly overtime trend charts.
 - **Overtime goal tracking (Dashboard)** — Set a savings goal (e.g. hours for a vacation) and track progress. Public holidays and configured working days are taken into account automatically.
-- **Dark mode** — Light and dark theme support (Breeze style).
+- **Theme** — Light, dark, or **automatic** (follows the system color scheme and switches live); Breeze style.
 - **Data export** — Export your data as CSV, Excel (.xlsx), or PDF.
 - **Privacy** — All data is stored locally in `ueberstunden_daten.db`. No cloud, no tracking.
 

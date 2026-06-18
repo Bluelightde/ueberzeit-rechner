@@ -61,10 +61,10 @@ The application is modularized into several components:
 ## Persistent Storage
 
 - `ueberstunden_daten.db` — SQLite database (next to the script / executable).
-- `ueberstunden_settings.json` — JSON settings file. Keys: `default_start`, `default_end`, `target_work_time`, `state`, `dark_mode`, `goal_active`, `goal_start_date`, `goal_end_date`, `goal_hours`, `goal_date`, `last_date`, `last_start`.
+- `ueberstunden_settings.json` — JSON settings file. Keys include: `default_start`, `target_work_time`, `state`, `theme` (`light`/`dark`/`auto`; the effective `dark_mode` bool is derived from it), `goal_active`, `goal_start_date`, `goal_end_date`, `goal_hours`, `goal_date`, `last_date`, `last_start`.
 
 ## Theme Handling
 
 - In compiled mode (`sys.frozen`): always uses Fusion style; applies a full `QPalette` for dark/light.
 - In script mode on Linux: uses `Breeze` style; dark mode defers to the system palette.
-- Theme is applied once at startup via `apply_theme()`; changing dark mode in settings requires a restart.
+- The `theme` setting is `light`, `dark`, or `auto` (default). `apply_theme()` resolves it to an effective `dark_mode` bool — via `QStyleHints.colorScheme()` with a palette-lightness fallback — and stamps `settings['dark_mode']` (read by the calendar/stats tabs). In `auto` mode the app follows the OS scheme **live** via the `colorSchemeChanged` signal; manual changes apply immediately through `apply_theme()`. No restart needed.

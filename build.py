@@ -13,6 +13,7 @@ Optionen:
 import argparse
 import os
 import platform
+import re
 import shutil
 import subprocess
 import sys
@@ -31,6 +32,23 @@ SCRIPT_DIR  = Path(__file__).parent.resolve()
 
 PLAT        = sys.platform          # 'linux', 'darwin', 'win32'
 ARCH        = platform.machine()    # 'x86_64', 'arm64', …
+
+
+def _read_app_version() -> str:
+    """Liest APP_VERSION aus config.py, OHNE das Modul zu importieren
+    (config.py zieht Laufzeit-Abhängigkeiten, die bei der Build-Orchestrierung
+    – System-Python in der CI – evtl. noch nicht installiert sind)."""
+    try:
+        text = (SCRIPT_DIR / "config.py").read_text(encoding="utf-8")
+        match = re.search(r'^APP_VERSION\s*=\s*["\']([^"\']+)["\']', text, re.MULTILINE)
+        if match:
+            return match.group(1)
+    except OSError:
+        pass
+    return "0.0.0"
+
+
+APP_VERSION = _read_app_version()
 
 
 # ---------------------------------------------------------------------------
@@ -140,7 +158,7 @@ def package_linux():
     if not src.exists():
         print(f"  [WARNUNG] {src} nicht gefunden – übersprungen.")
         return
-    out_name = f"{APP_NAME}-linux-{ARCH}.tar.gz"
+    out_name = f"{APP_NAME}-{APP_VERSION}-linux-{ARCH}.tar.gz"
     out_path = DIST_DIR / out_name
     with tarfile.open(out_path, "w:gz") as tar:
         tar.add(src, arcname=APP_NAME)
@@ -154,7 +172,7 @@ def package_windows():
     if not src.exists():
         print(f"  [WARNUNG] {src} nicht gefunden – übersprungen.")
         return
-    out_name = f"{APP_NAME}-windows-{ARCH}.zip"
+    out_name = f"{APP_NAME}-{APP_VERSION}-windows-{ARCH}.zip"
     out_path = DIST_DIR / out_name
     with zipfile.ZipFile(out_path, "w", zipfile.ZIP_DEFLATED) as zf:
         for file in src.rglob("*"):
@@ -169,7 +187,7 @@ def package_macos():
         print(f"  [WARNUNG] {app_path} nicht gefunden – übersprungen.")
         return
 
-    out_name = f"{APP_NAME}-macos-{ARCH}.dmg"
+    out_name = f"{APP_NAME}-{APP_VERSION}-macos-{ARCH}.dmg"
     out_path = DIST_DIR / out_name
 
     # hdiutil ist auf jedem Mac vorhanden
@@ -183,7 +201,7 @@ def package_macos():
         print(f"  Paket erstellt: {out_path}")
     else:
         # Fallback: ZIP des .app-Bundles
-        out_name = f"{APP_NAME}-macos-{ARCH}.zip"
+        out_name = f"{APP_NAME}-{APP_VERSION}-macos-{ARCH}.zip"
         out_path = DIST_DIR / out_name
         with zipfile.ZipFile(out_path, "w", zipfile.ZIP_DEFLATED) as zf:
             for file in app_path.rglob("*"):

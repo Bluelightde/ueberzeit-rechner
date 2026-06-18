@@ -123,9 +123,17 @@ class SettingsDialog(QDialog):
         tab_system = QWidget()
         layout_system = QVBoxLayout(tab_system)
         layout_system.addWidget(QLabel(f"<b>{tr('Darstellung:')}</b>"))
-        self.dark_mode_cb = QCheckBox(tr("Dark Mode aktivieren"))
-        self.dark_mode_cb.setChecked(current_settings.get("dark_mode", False))
-        layout_system.addWidget(self.dark_mode_cb)
+        theme_layout = QHBoxLayout()
+        theme_layout.addWidget(QLabel(tr("Design:")))
+        self.theme_combo = QComboBox()
+        self.theme_combo.addItem(tr("Automatisch (System)"), "auto")
+        self.theme_combo.addItem(tr("Hell"), "light")
+        self.theme_combo.addItem(tr("Dunkel"), "dark")
+        _theme_idx = self.theme_combo.findData(current_settings.get("theme", "auto"))
+        self.theme_combo.setCurrentIndex(_theme_idx if _theme_idx >= 0 else 0)
+        theme_layout.addWidget(self.theme_combo)
+        theme_layout.addStretch()
+        layout_system.addLayout(theme_layout)
 
         self._setup_bereitschaft_color_ui(layout_system, current_settings)
         layout_system.addSpacing(10)
@@ -504,7 +512,7 @@ class SettingsDialog(QDialog):
             "language": self.lang_combo.currentData(),
             "country": self.country_combo.currentData(),
             "state": self.state_combo.currentData() if self.state_combo.isEnabled() else None,
-            "dark_mode": self.dark_mode_cb.isChecked(),
+            "theme": self.theme_combo.currentData(),
             "max_work_hours": self.max_hours_spin.value(),
             "auto_break": self.auto_break_cb.isChecked(),
             "use_login_time": self.login_time_cb.isChecked(),

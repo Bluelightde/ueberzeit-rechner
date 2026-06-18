@@ -69,9 +69,7 @@ class UeberstundenApp(QMainWindow):
         if os.path.exists(ICON_PATH):
             self.setWindowIcon(QIcon(ICON_PATH))
 
-        self.system_palette = QApplication.instance().palette()
-        bg_color = self.system_palette.color(QPalette.ColorRole.Window)
-        self.system_is_dark = bg_color.lightness() < 128
+        self.system_is_dark = self._system_is_dark()
 
         self.settings = self.load_settings()
         self.db = DBManager(self._resolve_db_path())
@@ -108,6 +106,14 @@ class UeberstundenApp(QMainWindow):
         # Monatsfilter synchronisieren zwischen Haupt-Tab und Kalender-Tab
         self.tab_main.filter_changed.connect(self.tab_calendar.set_filter)
         self.tab_calendar.filter_changed.connect(self.tab_main.set_filter)
+
+        # System-Theme live folgen (nur im Automatik-Modus)
+        try:
+            QApplication.instance().styleHints().colorSchemeChanged.connect(
+                self._on_system_color_scheme_changed
+            )
+        except (AttributeError, TypeError):
+            pass  # ältere Qt-Version ohne colorSchemeChanged-Signal
 
         # Erstmalige Befüllung aller Tabs
         self._on_data_changed()
@@ -171,6 +177,7 @@ class UeberstundenApp(QMainWindow):
                 {"after": 360, "break": 30},
                 {"after": 540, "break": 45},
             ],
+            "theme": "auto",
             "dark_mode": self.system_is_dark,
             "auto_break": True,
             "use_login_time": True,
@@ -680,10 +687,45 @@ class UeberstundenApp(QMainWindow):
                     f.write(svg)
         return icon_dir.replace('\\', '/')
 
+    def _system_is_dark(self):
+        """Erkennt das System-Theme – bevorzugt über die Qt-StyleHints
+        (Qt ≥ 6.5), mit Palette-Helligkeit als Fallback."""
+        app = QApplication.instance()
+        try:
+            scheme = app.styleHints().colorScheme()
+            if scheme == Qt.ColorScheme.Dark:
+                return True
+            if scheme == Qt.ColorScheme.Light:
+                return False
+        except (AttributeError, TypeError):
+            pass  # ältere Qt-Version ohne colorScheme()
+        bg = app.palette().color(QPalette.ColorRole.Window)
+        return bg.lightness() < 128
+
+    def _resolve_dark(self):
+        """Löst die theme-Einstellung (auto/light/dark) in den effektiven
+        Dunkel-Modus-Bool auf."""
+        theme = self.settings.get("theme", "auto")
+        if theme == "light":
+            return False
+        if theme == "dark":
+            return True
+        return self._system_is_dark()
+
+    def _on_system_color_scheme_changed(self, _scheme):
+        """Folgt einem System-Themewechsel live – nur im Automatik-Modus."""
+        if self.settings.get("theme", "auto") != "auto":
+            return
+        if self._system_is_dark() == self.settings.get("dark_mode"):
+            return  # keine effektive Änderung
+        self.apply_theme()
+        self._on_data_changed()  # Charts/Kalender mit neuem Theme neu zeichnen
+
     def apply_theme(self):
         """Wendet das aktuelle Theme (Hell/Dunkel) auf die gesamte Anwendung an."""
         qt_app = QApplication.instance()
-        is_dark = self.settings.get("dark_mode", False)
+        is_dark = self._resolve_dark()
+        self.settings["dark_mode"] = is_dark  # effektiver Wert für Charts/Kalender/Icons
 
         if not getattr(sys, 'frozen', False) and sys.platform.startswith('linux'):
             qt_app.setStyle("Breeze")
