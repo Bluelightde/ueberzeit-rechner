@@ -8,6 +8,9 @@ from PyQt6.QtCore import QDate
 from models import WorkEntry
 from logic import (
     get_holidays, calculate_timed_entries, is_midnight_shift, split_midnight_shift,
+    get_target_minutes_for_date, get_absence_minutes,
+    TYPE_WORK, TYPE_VACATION, TYPE_SICK, TYPE_HOLIDAY, TYPE_FLEXTIME,
+    ABSENCE_TYPES,
 )
 
 
@@ -451,3 +454,66 @@ class TestCalculateTimedEntriesUebernacht:
         assert total_net == 360
         assert pause == 0
         assert ovt == -120
+
+
+# ---------------------------------------------------------------------------
+# get_target_minutes_for_date – Soll pro Wochentag (#2)
+# ---------------------------------------------------------------------------
+
+class TestWeekdayTargets:
+    """weekday_targets liefert pro Wochentag ein eigenes Soll; "" = frei (0)."""
+
+    BASE = {"country": "DE", "state": "TH", "special_days": [], "target_work_time": "08:00"}
+
+    def test_individuelles_wochentags_soll(self):
+        # Mi (Index 2) = 6h, Sa (Index 5) = frei
+        wt = ["08:00", "08:00", "06:00", "08:00", "08:00", "", ""]
+        s = {**self.BASE, "weekday_targets": wt}
+        assert get_target_minutes_for_date("2024-06-12", [], s) == 360  # Mittwoch
+        assert get_target_minutes_for_date("2024-06-15", [], s) == 0    # Samstag (frei)
+
+    def test_fallback_ohne_weekday_targets(self):
+        # Ältere Einstellungen: workdays + Regelarbeitszeit
+        s = {**self.BASE, "workdays": [0, 1, 2, 3, 4]}
+        assert get_target_minutes_for_date("2024-06-12", [], s) == 480  # Mi Arbeitstag
+        assert get_target_minutes_for_date("2024-06-16", [], s) == 0    # Sonntag
+
+    def test_individuelles_soll_eines_eintrags_hat_vorrang(self):
+        wt = ["08:00", "08:00", "06:00", "08:00", "08:00", "", ""]
+        s = {**self.BASE, "weekday_targets": wt}
+        entry = make_entry(1, "08:00", "12:00")
+        entry.date = "2024-06-12"
+        entry.target_minutes = 300   # individuelles Tagessoll
+        assert get_target_minutes_for_date("2024-06-12", [entry], s) == 300
+
+
+# ---------------------------------------------------------------------------
+# get_absence_minutes – Eintragstypen-Korrektur (#1)
+# ---------------------------------------------------------------------------
+
+class TestAbsenceMinutes:
+    """Urlaub/Krank/Feiertag → 0 (Saldo neutral); Gleitzeitabbau → -Soll."""
+
+    TARGET = 480
+
+    def test_arbeit_ist_nicht_absenz(self):
+        assert get_absence_minutes(TYPE_WORK, self.TARGET) is None
+
+    def test_urlaub_ist_saldo_neutral(self):
+        assert get_absence_minutes(TYPE_VACATION, self.TARGET) == 0
+
+    def test_krank_ist_saldo_neutral(self):
+        assert get_absence_minutes(TYPE_SICK, self.TARGET) == 0
+
+    def test_feiertag_ist_saldo_neutral(self):
+        assert get_absence_minutes(TYPE_HOLIDAY, self.TARGET) == 0
+
+    def test_gleitzeitabbau_zieht_soll_ab(self):
+        assert get_absence_minutes(TYPE_FLEXTIME, self.TARGET) == -480
+
+    def test_alle_absencen_in_menge(self):
+        assert TYPE_VACATION in ABSENCE_TYPES
+        assert TYPE_SICK in ABSENCE_TYPES
+        assert TYPE_HOLIDAY in ABSENCE_TYPES
+        assert TYPE_WORK not in ABSENCE_TYPES
+        assert TYPE_FLEXTIME not in ABSENCE_TYPES

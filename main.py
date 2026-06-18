@@ -6,6 +6,7 @@ import logging
 import logging.handlers
 import os
 import shutil
+import sqlite3
 import sys
 
 from PyQt6.QtCore import QDate, QLibraryInfo, Qt, QTranslator
@@ -64,7 +65,7 @@ class UeberstundenApp(QMainWindow):
         """Initialisiert die Anwendung, lädt Einstellungen und baut die UI auf."""
         super().__init__()
         self.setWindowTitle("Überzeit Rechner")
-        self.resize(1000, 750)
+        self.resize(1240, 760)
 
         if os.path.exists(ICON_PATH):
             self.setWindowIcon(QIcon(ICON_PATH))
@@ -73,6 +74,7 @@ class UeberstundenApp(QMainWindow):
 
         self.settings = self.load_settings()
         self.db = DBManager(self._resolve_db_path())
+        self._auto_backup_on_start()
 
         self.apply_theme()
 
@@ -125,6 +127,7 @@ class UeberstundenApp(QMainWindow):
         Gibt den konfigurierten DB-Pfad zurück. Wenn das Verzeichnis nicht existiert
         oder die Datei nicht erreichbar ist, öffnet sich ein Dialog zur Auswahl.
         """
+
         db_path = self.settings.get("db_path", DB_FILE)
         if os.path.exists(db_path):
             return db_path
@@ -163,6 +166,42 @@ class UeberstundenApp(QMainWindow):
         self.save_settings()
         return DB_FILE
 
+    # --- Backup ---
+
+    def _backup_dir(self):
+        """Backup-Ordner neben der aktiven Datenbank-Datei."""
+        db_path = os.path.abspath(self.settings.get("db_path", DB_FILE))
+        return os.path.join(os.path.dirname(db_path), "backups")
+
+    def _auto_backup_on_start(self):
+        """Legt beim Start ein rotierendes Backup an; Fehler blockieren den Start nicht."""
+        try:
+            self.db.create_backup(self._backup_dir())
+        except (OSError, sqlite3.Error) as exc:
+            logger.warning("Automatisches Start-Backup fehlgeschlagen: %s", exc)
+
+    def create_manual_backup(self):
+        """Erstellt ein Backup on demand; gibt den Pfad zurück oder None bei Fehler."""
+        try:
+            return self.db.create_backup(self._backup_dir())
+        except (OSError, sqlite3.Error) as exc:
+            logger.error("Backup fehlgeschlagen: %s", exc)
+            return None
+
+    def restore_backup(self, src_path):
+        """Stellt die DB aus einem Backup wieder her und lädt alle Tabs neu.
+        Gibt True bei Erfolg zurück, sonst False."""
+        try:
+            self.db.restore_from(src_path)
+        except (OSError, sqlite3.Error) as exc:
+            logger.error("Wiederherstellung fehlgeschlagen: %s", exc)
+            return False
+        self.tab_main.entries = self.db.load_all()
+        self.tab_main.recalculate_all_days()
+        self.tab_main.on_settings_changed()
+        self._on_data_changed()
+        return True
+
     # --- Einstellungen ---
 
     def load_settings(self):
@@ -183,7 +222,15 @@ class UeberstundenApp(QMainWindow):
             "use_login_time": True,
             "is_primary_device": False,
             "bereitschaft_color": "#eab308",
+            "type_colors": {
+                "vacation": "#06b6d4",
+                "sick": "#f97316",
+                "holiday": "#a855f7",
+                "flextime": "#84cc16",
+                "parental": "#ec4899",
+            },
             "workdays": [0, 1, 2, 3, 4],
+            "vacation_entitlement": 30,
             "special_days": [
                 {"month": 12, "day": 24, "target": "04:00"},
                 {"month": 12, "day": 31, "target": "04:00"}
@@ -209,6 +256,13 @@ class UeberstundenApp(QMainWindow):
                     logger.warning("Einstellungsdatei enthält kein JSON-Objekt (%s), "
                                    "Standardwerte werden verwendet.",
                                    type(loaded).__name__)
+        # Per-Wochentag-Soll ableiten, falls (noch) nicht vorhanden
+        # (alte Einstellungen kennen nur workdays + target_work_time).
+        weekday_targets = defaults.get("weekday_targets")
+        if not (isinstance(weekday_targets, list) and len(weekday_targets) == 7):
+            tw = defaults.get("target_work_time", "08:00")
+            wd = defaults.get("workdays", [0, 1, 2, 3, 4])
+            defaults["weekday_targets"] = [tw if i in wd else "" for i in range(7)]
         return defaults
 
     def save_settings(self):
@@ -239,6 +293,9 @@ class UeberstundenApp(QMainWindow):
         palette.setColor(QPalette.ColorRole.Highlight,       QColor("#3daee9"))
         palette.setColor(QPalette.ColorRole.HighlightedText, QColor("#ffffff"))
         palette.setColor(QPalette.ColorRole.Link,            QColor("#3daee9"))
+        for _role in (QPalette.ColorRole.WindowText, QPalette.ColorRole.Text,
+                      QPalette.ColorRole.ButtonText):
+            palette.setColor(QPalette.ColorGroup.Disabled, _role, QColor("#95a5a6"))
         return palette
 
     def get_dark_palette(self):
@@ -257,6 +314,9 @@ class UeberstundenApp(QMainWindow):
         palette.setColor(QPalette.ColorRole.Highlight,       QColor("#3daee9"))
         palette.setColor(QPalette.ColorRole.HighlightedText, QColor("#ffffff"))
         palette.setColor(QPalette.ColorRole.Link,            QColor("#3daee9"))
+        for _role in (QPalette.ColorRole.WindowText, QPalette.ColorRole.Text,
+                      QPalette.ColorRole.ButtonText):
+            palette.setColor(QPalette.ColorGroup.Disabled, _role, QColor("#6c7176"))
         return palette
 
     def get_dark_stylesheet(self, icon_dir=''):
@@ -288,6 +348,10 @@ class UeberstundenApp(QMainWindow):
                 selection-background-color: #3daee9;
             }
             QLineEdit:focus, QComboBox:focus { border-color: #3daee9; }
+            QLineEdit:disabled, QComboBox:disabled {
+                background-color: #232629; color: #6c7176; border-color: #3a3f44;
+            }
+            QLabel:disabled, QCheckBox:disabled { color: #6c7176; }
 
             QAbstractSpinBox {
                 background-color: #1b1e20;
@@ -298,6 +362,9 @@ class UeberstundenApp(QMainWindow):
                 min-height: 24px;
             }
             QAbstractSpinBox:focus { border-color: #3daee9; }
+            QAbstractSpinBox:disabled {
+                background-color: #232629; color: #6c7176; border-color: #3a3f44;
+            }
             QAbstractSpinBox::up-button {
                 subcontrol-origin: padding;
                 subcontrol-position: top right;
@@ -478,6 +545,10 @@ class UeberstundenApp(QMainWindow):
                 selection-color: #fff;
             }
             QLineEdit:focus, QComboBox:focus { border-color: #3daee9; }
+            QLineEdit:disabled, QComboBox:disabled {
+                background-color: #e8e9ea; color: #95a5a6; border-color: #bdc3c7;
+            }
+            QLabel:disabled, QCheckBox:disabled { color: #95a5a6; }
 
             QAbstractSpinBox {
                 background-color: #fcfcfc;
@@ -488,6 +559,9 @@ class UeberstundenApp(QMainWindow):
                 min-height: 24px;
             }
             QAbstractSpinBox:focus { border-color: #3daee9; }
+            QAbstractSpinBox:disabled {
+                background-color: #e8e9ea; color: #95a5a6; border-color: #bdc3c7;
+            }
             QAbstractSpinBox::up-button {
                 subcontrol-origin: padding;
                 subcontrol-position: top right;
@@ -764,7 +838,9 @@ class UeberstundenApp(QMainWindow):
     def open_settings(self):
         """Öffnet den Einstellungs-Dialog und übernimmt geänderte Einstellungen."""
         old_db_path = self.settings.get("db_path", DB_FILE)
-        dialog = SettingsDialog(self.settings, self)
+        dialog = SettingsDialog(self.settings, self,
+                                backup_cb=self.create_manual_backup,
+                                restore_cb=self.restore_backup)
         if dialog.exec():
             new_settings = dialog.get_settings()
             new_db_path = new_settings.get("db_path", DB_FILE)

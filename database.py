@@ -2,8 +2,15 @@
 """
 Verwaltung der Datenbankverbindung und -operationen.
 """
+import glob
+import os
 import sqlite3
+from datetime import datetime
+
 from models import WorkEntry, BereitschaftEntry
+
+SCHEMA_VERSION = 2
+BACKUP_KEEP = 10
 
 class DBManager:
     """
@@ -18,10 +25,8 @@ class DBManager:
         self.create_table()
 
     def create_table(self):
-        """
-        Erstellt die 'entries'- und 'bereitschaft_entries'-Tabellen und führt
-        notwendige Migrationen durch.
-        """
+        """Erstellt die Tabellen (falls nicht vorhanden) und führt versionierte
+        Migrationen aus (siehe `_run_migrations`)."""
         cursor = self.conn.cursor()
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS entries (
@@ -32,15 +37,10 @@ class DBManager:
                 pause INTEGER,
                 minutes INTEGER,
                 reason TEXT,
-                target_minutes INTEGER DEFAULT -1
+                target_minutes INTEGER DEFAULT -1,
+                type TEXT NOT NULL DEFAULT 'work'
             )
         """)
-        # Migration: Check if target_minutes exists
-        cursor.execute("PRAGMA table_info(entries)")
-        columns = [row[1] for row in cursor.fetchall()]
-        if "target_minutes" not in columns:
-            cursor.execute("ALTER TABLE entries ADD COLUMN target_minutes INTEGER DEFAULT -1")
-
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS bereitschaft_entries (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -51,19 +51,40 @@ class DBManager:
                 end_date TEXT
             )
         """)
-        # Migration: end_date für ältere Datenbanken nachziehen
-        cursor.execute("PRAGMA table_info(bereitschaft_entries)")
-        ber_columns = [row[1] for row in cursor.fetchall()]
-        if "end_date" not in ber_columns:
-            cursor.execute("ALTER TABLE bereitschaft_entries ADD COLUMN end_date TEXT")
-
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS device_login (
                 date TEXT PRIMARY KEY,
                 start_time TEXT NOT NULL
             )
         """)
+        self._run_migrations(cursor)
         self.conn.commit()
+
+    def _run_migrations(self, cursor):
+        """Bringt das Schema über `PRAGMA user_version` schrittweise auf
+        SCHEMA_VERSION. Migrationsschritte sind idempotent."""
+        cursor.execute("PRAGMA user_version")
+        version = cursor.fetchone()[0]
+        if version >= SCHEMA_VERSION:
+            return
+        if version < 1:
+            # v0 -> v1: Spalten, die früher ad-hoc nachgezogen wurden.
+            self._ensure_column(cursor, "entries", "target_minutes",
+                                 "INTEGER DEFAULT -1")
+            self._ensure_column(cursor, "bereitschaft_entries", "end_date", "TEXT")
+        if version < 2:
+            # v1 -> v2: Eintragstypen (work/vacation/sick/holiday/flextime)
+            self._ensure_column(cursor, "entries", "type",
+                                 "TEXT NOT NULL DEFAULT 'work'")
+        cursor.execute(f"PRAGMA user_version = {SCHEMA_VERSION}")
+
+    @staticmethod
+    def _ensure_column(cursor, table, column, decl):
+        """Fügt eine Spalte hinzu, falls sie noch nicht existiert (idempotent)."""
+        cursor.execute(f"PRAGMA table_info({table})")
+        existing = [row[1] for row in cursor.fetchall()]
+        if column not in existing:
+            cursor.execute(f"ALTER TABLE {table} ADD COLUMN {column} {decl}")
 
     def load_all(self):
         """
@@ -79,10 +100,10 @@ class DBManager:
         """
         cursor = self.conn.cursor()
         cursor.execute("""
-            INSERT INTO entries (date, start, end, pause, minutes, reason, target_minutes)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO entries (date, start, end, pause, minutes, reason, target_minutes, type)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
         """, (entry.date, entry.start, entry.end, entry.pause,
-              entry.minutes, entry.reason, entry.target_minutes))
+              entry.minutes, entry.reason, entry.target_minutes, entry.entry_type))
         self.conn.commit()
         entry.id = cursor.lastrowid
 
@@ -96,10 +117,10 @@ class DBManager:
         try:
             for entry in entries:
                 cursor.execute("""
-                    INSERT INTO entries (date, start, end, pause, minutes, reason, target_minutes)
-                    VALUES (?, ?, ?, ?, ?, ?, ?)
+                    INSERT INTO entries (date, start, end, pause, minutes, reason, target_minutes, type)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                 """, (entry.date, entry.start, entry.end, entry.pause,
-                      entry.minutes, entry.reason, entry.target_minutes))
+                      entry.minutes, entry.reason, entry.target_minutes, entry.entry_type))
                 entry.id = cursor.lastrowid
             self.conn.commit()
         except sqlite3.Error:
@@ -113,9 +134,9 @@ class DBManager:
         cursor = self.conn.cursor()
         cursor.execute("""
             UPDATE entries SET date=?, start=?, end=?, pause=?, minutes=?, reason=?,
-                               target_minutes=? WHERE id=?
+                               target_minutes=?, type=? WHERE id=?
         """, (entry.date, entry.start, entry.end, entry.pause, entry.minutes,
-              entry.reason, entry.target_minutes, entry.id))
+              entry.reason, entry.target_minutes, entry.entry_type, entry.id))
         self.conn.commit()
 
     def delete(self, entry_id: int):
@@ -212,6 +233,49 @@ class DBManager:
             (date_str, start_time),
         )
         self.conn.commit()
+
+    # --- Backup / Wiederherstellung ---
+
+    def backup_to(self, dest_path):
+        """Schreibt eine konsistente Kopie der Datenbank nach dest_path
+        (SQLite-Backup-API – auch bei offener Verbindung sicher)."""
+        dest = sqlite3.connect(dest_path)
+        try:
+            with dest:
+                self.conn.backup(dest)
+        finally:
+            dest.close()
+
+    def create_backup(self, backup_dir):
+        """Legt ein zeitgestempeltes Backup in backup_dir an und behält nur die
+        letzten BACKUP_KEEP Stück. Gibt den Pfad des Backups zurück."""
+        os.makedirs(backup_dir, exist_ok=True)
+        timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+        dest = os.path.join(backup_dir, f"ueberstunden-{timestamp}.db")
+        self.backup_to(dest)
+        self._prune_backups(backup_dir)
+        return dest
+
+    @staticmethod
+    def _prune_backups(backup_dir, keep=BACKUP_KEEP):
+        """Behält nur die `keep` neuesten Backup-Dateien im Ordner."""
+        files = sorted(glob.glob(os.path.join(backup_dir, "ueberstunden-*.db")))
+        for old in (files[:-keep] if keep > 0 else files):
+            try:
+                os.remove(old)
+            except OSError:
+                pass
+
+    def restore_from(self, src_path):
+        """Ersetzt den gesamten DB-Inhalt durch das Backup `src_path` und bringt
+        das Schema anschließend auf den aktuellen Stand (Backup kann älter sein)."""
+        src = sqlite3.connect(src_path)
+        try:
+            src.backup(self.conn)
+        finally:
+            src.close()
+        self.conn.commit()
+        self.create_table()
 
     def close(self):
         """

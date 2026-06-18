@@ -249,6 +249,46 @@ COLOR_NEGATIVE = "#ef4444"  # Rot:  Minus / negativer Saldo
 COLOR_INFO     = "#3b82f6"  # Blau: Hinweise / Tipps
 
 
+
+# --- Eintragstypen (#1) ---
+TYPE_WORK = "work"
+TYPE_VACATION = "vacation"
+TYPE_SICK = "sick"
+TYPE_HOLIDAY = "holiday"
+TYPE_FLEXTIME = "flextime"
+TYPE_PARENTAL = "parental"
+
+ABSENCE_TYPES = {TYPE_VACATION, TYPE_SICK, TYPE_HOLIDAY, TYPE_PARENTAL}
+ALL_TYPES = {TYPE_WORK, TYPE_VACATION, TYPE_SICK, TYPE_HOLIDAY,
+             TYPE_FLEXTIME, TYPE_PARENTAL}
+
+
+
+def get_absence_minutes(entry_type, target_minutes):
+    """Berechnet den Überstunden-Effekt eines Nicht-Arbeits-Eintrags.
+
+    Urlaub/Krank/Feiertag (ABSENCE_TYPES): der Tag zählt als erledigt,
+    0 Überstunden (Saldo unverändert).
+
+    Gleitzeitabbau (flextime): die Soll-Stunden werden vom Saldo abgezogen
+    (Überstunden „ausgeben", z. B. für einen freien Tag).
+    """
+    if entry_type == TYPE_FLEXTIME:
+        return -target_minutes
+    if entry_type in ABSENCE_TYPES:
+        return 0
+    return None   # "work" → normale Zeitrechnung
+
+
+TYPE_LABELS = {
+    TYPE_WORK: "Arbeit",
+    TYPE_VACATION: "Urlaub",
+    TYPE_SICK: "Krank",
+    TYPE_HOLIDAY: "Feiertag",
+    TYPE_FLEXTIME: "Gleitzeitabbau",
+    TYPE_PARENTAL: "Elternzeit",
+}
+
 def fmt_date(date_str: str) -> str:
     """Konvertiert yyyy-MM-dd in das lokale Kurzformat (z.B. 03/15/24 oder 15.03.24)."""
     d = QDate.fromString(date_str, "yyyy-MM-dd")
@@ -318,10 +358,18 @@ def get_target_minutes_for_date(date_str, entries, settings):
         return 0
 
     day_idx = qdate.dayOfWeek() - 1
+    weekday_targets = settings.get("weekday_targets")
+    if isinstance(weekday_targets, list) and len(weekday_targets) == 7:
+        val = weekday_targets[day_idx]
+        if not val:
+            return 0
+        t = QTime.fromString(val, "HH:mm")
+        return t.hour() * 60 + t.minute()
+
+    # Fallback (alte Einstellungen ohne weekday_targets)
     workdays = settings.get("workdays", [0, 1, 2, 3, 4])
     if day_idx not in workdays:
         return 0
-
     return get_target_minutes(settings)
 
 

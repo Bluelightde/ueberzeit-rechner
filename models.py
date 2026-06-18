@@ -18,6 +18,7 @@ class WorkEntry:
     minutes: int
     reason: str
     target_minutes: int = -1 # -1 means use default/settings
+    entry_type: str = "work"   # "work", "vacation", "sick", "holiday", "flextime"
 
 
 @dataclass

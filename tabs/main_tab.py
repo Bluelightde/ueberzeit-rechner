@@ -19,8 +19,8 @@ from PyQt6.QtWidgets import (
 )
 
 from config import DB_FILE
-from dialogs import EditDialog
-from exports import export_csv, export_xlsx, export_pdf
+from dialogs import EditDialog, AbsenceEditDialog
+from exports import export_csv, export_xlsx, export_pdf, export_monthly_pdf
 from i18n import get_locale, tr
 from logic import (
     calculate_timed_entries, get_login_time,
@@ -28,6 +28,8 @@ from logic import (
     get_target_minutes, get_max_minutes, get_target_minutes_for_date,
     COLOR_POSITIVE, COLOR_NEGATIVE, COLOR_INFO,
     is_midnight_shift, split_midnight_shift,
+    TYPE_WORK, TYPE_VACATION, TYPE_SICK, TYPE_HOLIDAY, TYPE_FLEXTIME, TYPE_PARENTAL,
+    ABSENCE_TYPES, get_absence_minutes, TYPE_LABELS,
 )
 from models import WorkEntry
 from ui_components import set_overtime_color
@@ -94,6 +96,17 @@ class MainTab(QWidget):  # pylint: disable=too-many-public-methods
         self.date_edit.dateChanged.connect(self.update_live_calc)
         input_row1.addWidget(QLabel(tr("Datum:")))
         input_row1.addWidget(self.date_edit)
+        self.date_end_edit = QDateEdit()
+        self.date_end_edit.setCalendarPopup(True)
+        self.date_end_edit.setDisplayFormat(
+            get_locale().dateFormat(QLocale.FormatType.ShortFormat)
+        )
+        self.date_end_edit.setDate(QDate.currentDate())
+        self.date_end_edit.setEnabled(False)
+        self.lbl_date_end = QLabel(tr("bis:"))
+        self.lbl_date_end.setEnabled(False)
+        input_row1.addWidget(self.lbl_date_end)
+        input_row1.addWidget(self.date_end_edit)
 
         start_to_use = self._get_default_start_time()
 
@@ -101,41 +114,63 @@ class MainTab(QWidget):  # pylint: disable=too-many-public-methods
         self.time_start = QTimeEdit()
         self.time_start.setDisplayFormat(_time_fmt)
         self.time_start.setTime(start_to_use)
-        input_row1.addWidget(QLabel(tr("Start:")))
+        self.lbl_start = QLabel(tr("Start:"))
+        input_row1.addWidget(self.lbl_start)
         input_row1.addWidget(self.time_start)
-        btn_now_start = QPushButton(tr("Jetzt"))
-        btn_now_start.setToolTip(tr("Aktuelle Uhrzeit als Startzeit setzen"))
-        btn_now_start.clicked.connect(lambda: self.time_start.setTime(QTime.currentTime()))
-        input_row1.addWidget(btn_now_start)
+        self.btn_now_start = QPushButton(tr("Jetzt"))
+        self.btn_now_start.setToolTip(tr("Aktuelle Uhrzeit als Startzeit setzen"))
+        self.btn_now_start.clicked.connect(lambda: self.time_start.setTime(QTime.currentTime()))
+        input_row1.addWidget(self.btn_now_start)
 
         self.time_end = QTimeEdit()
         self.time_end.setDisplayFormat(_time_fmt)
-        input_row1.addWidget(QLabel(tr("Ende:")))
+        self.lbl_end = QLabel(tr("Ende:"))
+        input_row1.addWidget(self.lbl_end)
         input_row1.addWidget(self.time_end)
-        btn_now_end = QPushButton(tr("Jetzt"))
-        btn_now_end.setToolTip(tr("Aktuelle Uhrzeit als Endzeit setzen"))
-        btn_now_end.clicked.connect(self._set_now_as_end)
-        input_row1.addWidget(btn_now_end)
+        self.btn_now_end = QPushButton(tr("Jetzt"))
+        self.btn_now_end.setToolTip(tr("Aktuelle Uhrzeit als Endzeit setzen"))
+        self.btn_now_end.clicked.connect(self._set_now_as_end)
+        input_row1.addWidget(self.btn_now_end)
 
         self.pause_spin = QSpinBox()
         self.pause_spin.setRange(0, 300)
         self.pause_spin.setSuffix(" Min")
         self.pause_spin.setEnabled(not self.settings.get("auto_break", True))
-        input_row1.addWidget(QLabel(tr("Pause:")))
+        self.lbl_pause = QLabel(tr("Pause:"))
+        self.lbl_pause.setEnabled(self.pause_spin.isEnabled())
+        input_row1.addWidget(self.lbl_pause)
         input_row1.addWidget(self.pause_spin)
 
         self.reason_edit = QLineEdit()
         self.reason_edit.setPlaceholderText(tr("z.B. Regulär"))
-        input_row1.addWidget(QLabel(tr("Anlass:")))
+        self.lbl_reason = QLabel(tr("Anlass:"))
+        input_row1.addWidget(self.lbl_reason)
         input_row1.addWidget(self.reason_edit)
 
         btn_add = QPushButton(tr("Eintragen"))
         btn_add.clicked.connect(self.add_entry)
         input_row1.addWidget(btn_add)
 
+        # Eintragstyp-Auswahl und Urlaubskonto-Anzeige
+        input_row2 = QHBoxLayout()
+        self.type_combo = QComboBox()
+        self.type_combo.addItem(tr("Arbeit"), TYPE_WORK)
+        self.type_combo.addItem(tr("Urlaub"), TYPE_VACATION)
+        self.type_combo.addItem(tr("Krank"), TYPE_SICK)
+        self.type_combo.addItem(tr("Gleitzeitabbau"), TYPE_FLEXTIME)
+        self.type_combo.addItem(tr("Elternzeit"), TYPE_PARENTAL)
+        self.type_combo.currentIndexChanged.connect(self._on_type_changed)
+        input_row2.addWidget(QLabel(tr("Typ:")))
+        input_row2.addWidget(self.type_combo)
+        input_row2.addStretch()
+        self.lbl_vacation = QLabel("")
+        self.lbl_vacation.setStyleSheet("color: gray; font-size: 11px;")
+        input_row2.addWidget(self.lbl_vacation)
+        frame_layout.addLayout(input_row2)
+
         frame_layout.addLayout(input_row1)
 
-        input_row2 = QHBoxLayout()
+        target_row = QHBoxLayout()
         self.custom_target_cb = QCheckBox(tr("Indiv. Tagessoll:"))
         self.custom_target_time = QTimeEdit()
         self.custom_target_time.setDisplayFormat("HH:mm")
@@ -148,14 +183,14 @@ class MainTab(QWidget):  # pylint: disable=too-many-public-methods
         self.custom_target_cb.stateChanged.connect(self.update_live_calc)
         self.custom_target_time.timeChanged.connect(self.update_live_calc)
 
-        input_row2.addWidget(self.custom_target_cb)
-        input_row2.addWidget(self.custom_target_time)
-        input_row2.addStretch()
-        frame_layout.addLayout(input_row2)
-
+        target_row.addWidget(self.custom_target_cb)
+        target_row.addWidget(self.custom_target_time)
+        target_row.addStretch()
+        frame_layout.addLayout(target_row)
         self.lbl_live_calc = QLabel(tr("Berechne..."))
         self.lbl_live_calc.setAlignment(Qt.AlignmentFlag.AlignCenter)
         frame_layout.addWidget(self.lbl_live_calc)
+
         layout.addWidget(frame_input)
 
         self.time_start.timeChanged.connect(self.on_start_time_changed)
@@ -184,6 +219,11 @@ class MainTab(QWidget):  # pylint: disable=too-many-public-methods
         export_menu.addAction(tr("PDF  (.pdf)"),
                               lambda: export_pdf(self, self._get_export_entries(),
                                                self._get_export_title()))
+        export_menu.addAction(tr("Monats-PDF (.pdf)"),
+                              lambda: export_monthly_pdf(self, self._get_export_entries(),
+                                                         self.settings,
+                                                         self.month_filter.currentData()
+                                                         if self.month_filter.currentData() != "ALL" else None))
         btn_export.setMenu(export_menu)
         toolbar_layout.addWidget(btn_export)
 
@@ -217,6 +257,7 @@ class MainTab(QWidget):  # pylint: disable=too-many-public-methods
         self.entries = entries
         self.update_ui()
         self.update_live_calc()
+        self._update_vacation_summary()
 
     def set_filter(self, month_str):
         """Setzt den Monatsfilter ohne das filter_changed-Signal auszulösen.
@@ -252,6 +293,36 @@ class MainTab(QWidget):  # pylint: disable=too-many-public-methods
         self.time_start.blockSignals(False)
         self.on_start_time_changed(new_start)
 
+    def _on_type_changed(self, _index):
+        """Bei Nicht-Arbeit: Zeiten/Pause/indiv. Soll/Anlass ausgrauen und das
+        Datum-bis (Mehrtages-Bereich) aktivieren."""
+        selected = self.type_combo.currentData()
+        is_work = selected == TYPE_WORK
+        # Komplette Arbeitszeit-Gruppe (Felder + Labels + "Jetzt"-Buttons) ausgrauen.
+        # Nach setEnabled muss das QSS neu evaluiert werden (unpolish/polish), sonst
+        # greift die :disabled-Regel bei bereits angezeigten Widgets nicht.
+        work_widgets = (self.time_start, self.time_end, self.lbl_start, self.lbl_end,
+                        self.btn_now_start, self.btn_now_end, self.lbl_pause,
+                        self.reason_edit, self.lbl_reason, self.custom_target_cb)
+        for w in work_widgets:
+            w.setEnabled(is_work)
+        self.pause_spin.setEnabled(is_work and not self.settings.get("auto_break", True))
+        # Pause-Label folgt dem Feld: bei aktiver Auto-Pause ist beides grau
+        self.lbl_pause.setEnabled(self.pause_spin.isEnabled())
+        self.custom_target_time.setEnabled(is_work and self.custom_target_cb.isChecked())
+        self.date_end_edit.setEnabled(not is_work)
+        self.lbl_date_end.setEnabled(not is_work)
+        for w in (*work_widgets, self.pause_spin, self.custom_target_time,
+                  self.date_end_edit, self.lbl_date_end):
+            w.style().unpolish(w)
+            w.style().polish(w)
+        # Beim Wechsel auf Abwesenheit: Bereich auf Einzeltag (Starttag) setzen,
+        # damit nicht versehentlich ein riesiger Zeitraum (bis heute) entsteht.
+        if not is_work:
+            self.date_end_edit.setDate(self.date_edit.date())
+        self.update_live_calc()
+        self._update_vacation_summary()
+
     def recalculate_day(self, date_str):
         """Verteilt Pausen und Überstunden für alle Zeiteinträge eines Tages neu.
 
@@ -263,14 +334,24 @@ class MainTab(QWidget):  # pylint: disable=too-many-public-methods
         day_entries = [e for e in self.entries if e.date == date_str]
         if not day_entries:
             return
-        timed = [e for e in day_entries if e.start and e.end]
+        target_mins = get_target_minutes_for_date(date_str, self.entries, self.settings)
+        # Absenz-Einträge: Minuten aus Typ + Tagessoll ableiten (keine Zeitrechnung)
+        absence_entries = [e for e in day_entries if e.entry_type in ABSENCE_TYPES]
+        for e in absence_entries:
+            e.minutes = get_absence_minutes(e.entry_type, target_mins)
+            e.pause = 0
+            self.db.update(e)
+        # Flextime-Einträge: Überstunden ausgeben
+        flextime_entries = [e for e in day_entries if e.entry_type == TYPE_FLEXTIME]
+        for e in flextime_entries:
+            e.minutes = get_absence_minutes(e.entry_type, target_mins)
+            e.pause = 0
+            self.db.update(e)
+        timed = [e for e in day_entries if e.start and e.end and e.entry_type == TYPE_WORK]
         if not timed:
             return
-
-        target_mins = get_target_minutes_for_date(date_str, self.entries, self.settings)
         max_mins = get_max_minutes(self.settings)
         is_auto = self.settings.get("auto_break", True)
-
         break_rules = self.settings.get("break_rules")
         results, _ = calculate_timed_entries(timed, target_mins, max_mins, is_auto, break_rules)
         for e in timed:
@@ -307,42 +388,55 @@ class MainTab(QWidget):  # pylint: disable=too-many-public-methods
         filter_val = self.month_filter.currentData()
         total_overall = sum(e.minutes for e in self.entries)
 
-        row = 0
-        for i, e in enumerate(self.entries):
-            if filter_val != "ALL" and not e.date.startswith(filter_val):
-                continue
+        self._display_blocks = []
+        filtered = [e for e in self.entries
+                    if filter_val == "ALL" or e.date.startswith(filter_val)]
+        blocks = self._consolidate_blocks(filtered)
 
+        for row, block in enumerate(blocks):
+            self._display_blocks.append(block)
             self.table.insertRow(row)
-            item_date = QTableWidgetItem(fmt_date(e.date))
-            item_date.setData(Qt.ItemDataRole.UserRole, i)
+            first, last = block[0], block[-1]
+            etype = getattr(first, 'entry_type', TYPE_WORK)
+            is_multi = len(block) > 1
+
+            date_text = (f"{fmt_date(first.date)} – {fmt_date(last.date)}"
+                         if is_multi else fmt_date(first.date))
+            item_date = QTableWidgetItem(date_text)
+            item_date.setData(Qt.ItemDataRole.UserRole, row)
             item_date.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
 
-            z_str = (
-                f"{fmt_time_hhmm(e.start)} - {fmt_time_hhmm(e.end)}"
-                + (f" (-{e.pause}m)" if e.pause > 0 else "")
-                if e.start else "-"
-            )
+            if etype in ABSENCE_TYPES or etype == TYPE_FLEXTIME:
+                z_str = TYPE_LABELS.get(etype, etype)
+                if is_multi:
+                    z_str += tr(" ({n} Tage)").format(n=len(block))
+            else:
+                z_str = (
+                    f"{fmt_time_hhmm(first.start)} - {fmt_time_hhmm(first.end)}"
+                    + (f" (-{first.pause}m)" if first.pause > 0 else "")
+                    if first.start else "-"
+                )
             item_zeit = QTableWidgetItem(z_str)
             item_zeit.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
 
-            item_min = QTableWidgetItem(format_time(e.minutes, show_plus=True))
+            block_minutes = sum(e.minutes for e in block)
+            item_min = QTableWidgetItem(format_time(block_minutes, show_plus=True))
             item_min.setTextAlignment(
                 Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter
             )
-            if e.minutes > 0:
+            if block_minutes > 0:
                 item_min.setForeground(QColor(COLOR_POSITIVE))
-            elif e.minutes < 0:
+            elif block_minutes < 0:
                 item_min.setForeground(QColor(COLOR_NEGATIVE))
 
-            # Aktion-Spalte mit Buttons für Bearbeiten und Löschen
             btn_style = "padding: 2px 8px; min-height: 24px;"
             btn_edit = QPushButton(tr("Bearbeiten"))
             btn_edit.setStyleSheet(btn_style)
-            btn_edit.clicked.connect(lambda _, ent=e: self._open_edit_dialog(ent))
+            btn_edit.clicked.connect(lambda _, blk=block: self._edit_block(blk))
 
             btn_del = QPushButton(tr("Löschen"))
             btn_del.setStyleSheet(btn_style)
-            btn_del.clicked.connect(lambda _, ent=e: self.delete_entry(ent))
+            btn_del.clicked.connect(lambda _, blk=block: self._delete_block(blk))
 
             actions_widget = QWidget()
             actions_layout = QHBoxLayout(actions_widget)
@@ -354,12 +448,46 @@ class MainTab(QWidget):  # pylint: disable=too-many-public-methods
             self.table.setItem(row, 0, item_date)
             self.table.setItem(row, 1, item_zeit)
             self.table.setItem(row, 2, item_min)
-            self.table.setItem(row, 3, QTableWidgetItem(e.reason))
+            self.table.setItem(row, 3, QTableWidgetItem(first.reason))
             self.table.setCellWidget(row, 4, actions_widget)
-            row += 1
 
         self.lbl_saldo.setText(format_time(total_overall))
         set_overtime_color(self.lbl_saldo, total_overall)
+
+    def _consolidate_blocks(self, entries):
+        """Fasst aufeinanderfolgende, gleichartige Abwesenheiten (Urlaub/Krank/
+        Gleitzeitabbau/Elternzeit) zu Blöcken zusammen. Nicht-Arbeitstage
+        (Wochenende/Feiertag) dazwischen werden überbrückt. Arbeitseinträge
+        bleiben immer einzeln. Rückgabe: Liste von Blöcken (je Liste von Einträgen),
+        absteigend nach Startdatum sortiert; innerhalb eines Blocks aufsteigend."""
+        asc = sorted(entries, key=lambda e: (e.date, e.start or ""))
+        blocks = []
+        for e in asc:
+            etype = getattr(e, "entry_type", TYPE_WORK)
+            if etype != TYPE_WORK and blocks:
+                prev = blocks[-1]
+                if (getattr(prev[-1], "entry_type", TYPE_WORK) == etype
+                        and self._only_nonworkdays_between(prev[-1].date, e.date)):
+                    prev.append(e)
+                    continue
+            blocks.append([e])
+        blocks.sort(key=lambda b: b[0].date, reverse=True)
+        return blocks
+
+    def _only_nonworkdays_between(self, date_a, date_b):
+        """True, wenn jeder Kalendertag STRIKT zwischen date_a und date_b ein
+        Nicht-Arbeitstag ist (Tagessoll 0 → Wochenende/Feiertag)."""
+        qa = QDate.fromString(date_a, "yyyy-MM-dd")
+        qb = QDate.fromString(date_b, "yyyy-MM-dd")
+        if not qa.isValid() or not qb.isValid():
+            return False
+        d = qa.addDays(1)
+        while d < qb:
+            if get_target_minutes_for_date(
+                    d.toString("yyyy-MM-dd"), self.entries, self.settings) > 0:
+                return False
+            d = d.addDays(1)
+        return True
 
     # --- Input helpers ---
 
@@ -558,41 +686,62 @@ class MainTab(QWidget):  # pylint: disable=too-many-public-methods
     # --- Data modification ---
 
     def add_entry(self):
-        """Liest die Eingabefelder aus, prüft auf Überlappung und fügt den Eintrag in die DB ein."""
+        """Fügt Einträge in die DB ein.
+
+        Arbeit: ein Tageseintrag mit Zeiten (inkl. Überschneidungsprüfung).
+        Abwesenheit/Gleitzeitabbau: ein Eintrag pro Tag im gewählten
+        Datumsbereich; bei Mehrtages-Bereichen werden Nicht-Arbeitstage
+        (Soll 0, z. B. Wochenende/Feiertag) übersprungen.
+        """
         date_str = self.date_edit.date().toString("yyyy-MM-dd")
         start_str = self.time_start.time().toString("HH:mm")
         end_str = self.time_end.time().toString("HH:mm")
+        selected_type = self.type_combo.currentData()
 
-        overlap = self.check_overlap(date_str, start_str, end_str)
-        if overlap:
-            QMessageBox.warning(
-                self, tr("Überschneidung"),
-                tr(
-                    "Dieser Zeitraum überschneidet sich mit einem existierenden Eintrag:"
-                    "\n\n{overlap}\n\nBitte korrigiere die Zeiten."
-                ).format(overlap=overlap)
-            )
-            return
-
-        # Übernacht-Schichten werden als EIN Eintrag gespeichert (start > end);
-        # calculate_timed_entries rechnet die Mitternachtsüberschreitung korrekt
-        # (ein Tagessoll, eine Pause). Aufteilen auf zwei Tage würde das Soll
-        # doppelt abziehen und die Pflichtpause verlieren.
-        entry = WorkEntry(
-            id=None,
-            date=date_str,
-            start=start_str,
-            end=end_str,
-            pause=self.current_calculated_pause,
-            minutes=self.current_calculated_overtime,
-            reason=self.reason_edit.text().strip(),
-            target_minutes=(
-                self.custom_target_time.time().hour() * 60
-                + self.custom_target_time.time().minute()
-            ) if self.custom_target_cb.isChecked() else -1
-        )
-        self.db.insert(entry)
-        affected_dates = [date_str]
+        if selected_type == TYPE_WORK:
+            overlap = self.check_overlap(date_str, start_str, end_str)
+            if overlap:
+                QMessageBox.warning(
+                    self, tr("Überschneidung"),
+                    tr(
+                        "Dieser Zeitraum überschneidet sich mit einem existierenden Eintrag:"
+                        "\n\n{overlap}\n\nBitte korrigiere die Zeiten."
+                    ).format(overlap=overlap)
+                )
+                return
+            self.db.insert(WorkEntry(
+                id=None, date=date_str, start=start_str, end=end_str,
+                pause=self.current_calculated_pause,
+                minutes=self.current_calculated_overtime,
+                reason=self.reason_edit.text().strip(),
+                target_minutes=(
+                    self.custom_target_time.time().hour() * 60
+                    + self.custom_target_time.time().minute()
+                ) if self.custom_target_cb.isChecked() else -1,
+                entry_type=TYPE_WORK,
+            ))
+            affected_dates = [date_str]
+        else:
+            # Abwesenheit / Gleitzeitabbau: ein Eintrag pro Tag im Bereich
+            start_date = self.date_edit.date()
+            end_date = self.date_end_edit.date()
+            if end_date < start_date:
+                end_date = start_date
+            is_range = end_date != start_date
+            affected_dates = []
+            d = start_date
+            while d <= end_date:
+                ds = d.toString("yyyy-MM-dd")
+                if is_range and get_target_minutes_for_date(
+                        ds, self.entries, self.settings) == 0:
+                    d = d.addDays(1)
+                    continue
+                self.db.insert(WorkEntry(
+                    id=None, date=ds, start="", end="", pause=0, minutes=0,
+                    reason="", target_minutes=-1, entry_type=selected_type,
+                ))
+                affected_dates.append(ds)
+                d = d.addDays(1)
 
         self.reason_edit.clear()
         self.custom_target_cb.setChecked(False)
@@ -601,17 +750,68 @@ class MainTab(QWidget):  # pylint: disable=too-many-public-methods
         self.entries = self.db.load_all()
         self._last_added_params = (date_str, start_str, end_str)
 
-        for d in affected_dates:
-            self.recalculate_day(d)
+        for dd in affected_dates:
+            self.recalculate_day(dd)
 
+        self._update_vacation_summary()
         self.data_changed.emit()
 
-    # pylint: disable=too-many-locals, too-many-statements, too-many-branches
+
+    def _update_vacation_summary(self):
+        """Aktualisiert die Urlaubskonto-Anzeige (verbrauchte/verfügbare Tage)."""
+        current_year = str(QDate.currentDate().year())
+        used = sum(1 for e in self.entries
+                   if e.entry_type == TYPE_VACATION and e.date.startswith(current_year))
+        entitlement = self.settings.get("vacation_entitlement", 30)
+        remaining = entitlement - used
+        self.lbl_vacation.setText(tr("Urlaub: {u}/{e} Tage übrig").format(
+            u=remaining, e=entitlement))
+
     def edit_entry(self, row, _column):
-        """Öffnet den Bearbeitungs-Dialog für den Eintrag in der angeklickten Zeile."""
-        entry_idx = self.table.item(row, 0).data(Qt.ItemDataRole.UserRole)
-        entry = self.entries[entry_idx]
-        self._open_edit_dialog(entry)
+        """Doppelklick: öffnet den passenden Bearbeiten-Dialog für die Zeile."""
+        blocks = getattr(self, "_display_blocks", [])
+        if 0 <= row < len(blocks):
+            self._edit_block(blocks[row])
+
+    def _edit_block(self, block):
+        """Routet zum richtigen Dialog: Einzeleintrag → EditDialog, mehrtägige
+        Abwesenheit → AbsenceEditDialog."""
+        if len(block) == 1:
+            self._open_edit_dialog(block[0])
+        else:
+            self._open_absence_block_dialog(block)
+
+    def _open_absence_block_dialog(self, block):
+        """Bearbeitet eine zusammengefasste Abwesenheit: alte Tageseinträge
+        ersetzen durch einen neuen Bereich/Typ (ein Eintrag pro Werktag)."""
+        block = sorted(block, key=lambda e: e.date)
+        dialog = AbsenceEditDialog(block, self.settings, self)
+        if not dialog.exec():
+            return
+        new_type, start_date, end_date = dialog.get_values()
+        if end_date < start_date:
+            end_date = start_date
+        old_dates = [e.date for e in block]
+        for e in block:
+            self.db.delete(e.id)
+        self.entries = self.db.load_all()
+        is_range = end_date != start_date
+        new_dates = []
+        d = start_date
+        while d <= end_date:
+            ds = d.toString("yyyy-MM-dd")
+            if (not is_range) or get_target_minutes_for_date(
+                    ds, self.entries, self.settings) > 0:
+                self.db.insert(WorkEntry(
+                    id=None, date=ds, start="", end="", pause=0, minutes=0,
+                    reason="", target_minutes=-1, entry_type=new_type))
+                new_dates.append(ds)
+            d = d.addDays(1)
+        self.entries = self.db.load_all()
+        for ds in sorted(set(old_dates + new_dates)):
+            self.recalculate_day(ds)
+        self._update_vacation_summary()
+        self.data_changed.emit()
 
     def _open_edit_dialog(self, entry):
         """Öffnet den Bearbeitungs-Dialog für den übergebenen Arbeitseintrag."""
@@ -655,19 +855,28 @@ class MainTab(QWidget):  # pylint: disable=too-many-public-methods
                 self.recalculate_day(d)
             self.data_changed.emit()
 
-    def delete_entry(self, entry):
-        """Fragt den Benutzer nach Bestätigung und löscht dann den übergebenen Eintrag."""
-        date_str = entry.date
-        d = fmt_date(date_str)
+    def _delete_block(self, block):
+        """Löscht einen Listen-Block (Einzeleintrag oder zusammengefasste
+        mehrtägige Abwesenheit) nach Bestätigung."""
+        block = sorted(block, key=lambda e: e.date)
+        if len(block) == 1:
+            msg = tr("Eintrag vom {d} wirklich löschen?").format(
+                d=fmt_date(block[0].date))
+        else:
+            msg = tr("Abwesenheit vom {a} bis {b} ({n} Tage) wirklich löschen?").format(
+                a=fmt_date(block[0].date), b=fmt_date(block[-1].date), n=len(block))
         reply = QMessageBox.question(
-            self, tr("Löschen bestätigen"),
-            tr("Eintrag vom {d} wirklich löschen?").format(d=d),
+            self, tr("Löschen bestätigen"), msg,
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
         )
         if reply == QMessageBox.StandardButton.Yes:
-            self.db.delete(entry.id)
-            self.entries = [e for e in self.entries if e.id != entry.id]
-            self.recalculate_day(date_str)
+            ids = {e.id for e in block}
+            dates = sorted({e.date for e in block})
+            for eid in ids:
+                self.db.delete(eid)
+            self.entries = [e for e in self.entries if e.id not in ids]
+            for d in dates:
+                self.recalculate_day(d)
             self.data_changed.emit()
 
     def check_overlap(self, date_str, start_str, end_str, exclude_id=None):

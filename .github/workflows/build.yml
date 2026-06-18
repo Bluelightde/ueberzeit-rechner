@@ -21,6 +21,12 @@ jobs:
         with:
           python-version: '3.12'
 
+      - name: Tests
+        run: |
+          python -m venv venv
+          venv/bin/pip install -r requirements.txt
+          venv/bin/pytest tests/ -q
+
       - name: Build
         run: python build.py
 
@@ -42,11 +48,26 @@ jobs:
       contents: write
 
     steps:
+      - uses: actions/checkout@v4
+
       - uses: actions/download-artifact@v4
         with:
           path: artifacts
           merge-multiple: true
 
+      - name: Release-Notes aus CHANGELOG extrahieren
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          awk -v ver="$VERSION" '
+            $0 ~ "^## \\[" ver "\\]" {flag=1; next}
+            flag && /^## \[/ {flag=0}
+            flag && $0 != "---" {print}
+          ' CHANGELOG.md > release_notes.md
+          if [ ! -s release_notes.md ]; then
+            echo "Siehe CHANGELOG.md für Details." > release_notes.md
+          fi
+
       - uses: softprops/action-gh-release@v2
         with:
+          body_path: release_notes.md
           files: artifacts/*

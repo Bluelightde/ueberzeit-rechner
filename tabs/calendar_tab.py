@@ -11,7 +11,8 @@ from PyQt6.QtWidgets import (
 
 from i18n import get_locale, tr
 
-from logic import COLOR_NEGATIVE, COLOR_POSITIVE, fmt_date, format_time, get_holidays
+from logic import COLOR_NEGATIVE, COLOR_POSITIVE, fmt_date, format_time, get_holidays, \
+    TYPE_WORK, ABSENCE_TYPES, TYPE_FLEXTIME, TYPE_LABELS
 from ui_components import HeatmapDelegate, overtime_qcolor, set_overtime_color
 
 
@@ -196,11 +197,19 @@ class CalendarTab(QWidget):
         holidays = get_holidays(year, country, subdiv)
 
         day_mins = {}
+        day_type_colors = {}
+        type_colors = self.settings.get("type_colors", {})
         monthly_sum = 0
         for e in self.entries:
             if e.date.startswith(sel_date_str):
                 day_mins[e.date] = day_mins.get(e.date, 0) + e.minutes
                 monthly_sum += e.minutes
+                if e.date not in day_type_colors and e.entry_type != TYPE_WORK:
+                    color = type_colors.get(
+                        e.entry_type,
+                        type_colors.get("vacation", "#888888")
+                    )
+                    day_type_colors[e.date] = (e.entry_type, color)
 
         bereitschaft_dates = self._expand_bereitschaft(sel_date_str)
 
@@ -218,12 +227,14 @@ class CalendarTab(QWidget):
                 item = self._make_cell(
                     day, col, year, month, today,
                     day_mins, holidays, is_dark, workdays_setting, bereitschaft_dates,
+                    day_type_colors,
                 )
                 self.cal_table.setItem(row, col, item)
 
     # pylint: disable=too-many-positional-arguments,too-many-arguments
     def _make_cell(self, day, col, year, month, today,
-                   day_mins, holidays, is_dark, workdays_setting, bereitschaft_dates):
+                   day_mins, holidays, is_dark, workdays_setting, bereitschaft_dates,
+                   day_type_colors=None):
         """Erstellt ein QTableWidgetItem für eine Kalender-Zelle."""
         if day == 0:
             item = QTableWidgetItem("")
@@ -243,7 +254,10 @@ class CalendarTab(QWidget):
 
         item = QTableWidgetItem(text)
         item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
-
+        day_type_info = (day_type_colors or {}).get(date_str)
+        if day_type_info and not is_holiday:
+            type_key, _ = day_type_info
+            item.setToolTip(TYPE_LABELS.get(type_key, type_key))
         if is_holiday:
             item.setToolTip(holidays[date_str])
             item.setBackground(QColor("#1e3a8a" if is_dark else "#bfdbfe"))
@@ -256,11 +270,12 @@ class CalendarTab(QWidget):
         elif mins == 0:
             if not is_workday:
                 item.setBackground(QColor("#2d3748" if is_dark else "#e5e7eb"))
+            elif day_type_info:
+                item.setBackground(QColor(day_type_info[1]))
             else:
                 item.setBackground(QColor("#333333" if is_dark else "#ffffff"))
         else:
             item.setBackground(overtime_qcolor(mins))
-
         is_today = year == today.year() and month == today.month() and day == today.day()
         item.setData(HeatmapDelegate.IS_TODAY_ROLE, is_today)
         item.setData(HeatmapDelegate.HAS_BEREITSCHAFT_ROLE, bereitschaft is not None)

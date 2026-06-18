@@ -5,10 +5,11 @@ Unit-Tests für database.py (DBManager):
   - get_last_entry_before
 """
 # pylint: disable=missing-function-docstring, missing-class-docstring, redefined-outer-name
+import os
 import pytest
 import sqlite3
 from models import WorkEntry
-from database import DBManager
+from database import DBManager, SCHEMA_VERSION
 
 
 # ---------------------------------------------------------------------------
@@ -241,3 +242,74 @@ class TestInsertMany:
         loaded = db.load_all()
         assert len(loaded) == 1
         assert loaded[0].date == "2024-06-01"
+
+
+# ---------------------------------------------------------------------------
+# Schema-Versionierung & Migration (#6)
+# ---------------------------------------------------------------------------
+
+class TestSchemaMigration:
+
+    def test_frische_db_hat_aktuelle_version(self, db):
+        cur = db.conn.cursor()
+        cur.execute("PRAGMA user_version")
+        assert cur.fetchone()[0] == SCHEMA_VERSION
+
+    def test_alte_db_wird_migriert(self, tmp_path):
+        # "Alte" DB ohne target_minutes / end_date und mit user_version 0.
+        path = str(tmp_path / "old.db")
+        con = sqlite3.connect(path)
+        con.execute("CREATE TABLE entries (id INTEGER PRIMARY KEY AUTOINCREMENT, "
+                    "date TEXT NOT NULL, start TEXT, end TEXT, pause INTEGER, "
+                    "minutes INTEGER, reason TEXT)")
+        con.execute("CREATE TABLE bereitschaft_entries (id INTEGER PRIMARY KEY "
+                    "AUTOINCREMENT, date TEXT NOT NULL, start TEXT, end TEXT, note TEXT)")
+        con.commit()
+        con.close()
+        mgr = DBManager(path)   # öffnet -> create_table -> Migration
+        try:
+            cur = mgr.conn.cursor()
+            cur.execute("PRAGMA table_info(entries)")
+            cols = [r[1] for r in cur.fetchall()]
+            assert "target_minutes" in cols
+            assert "type" in cols   # v1->v2 Migration (Eintragstypen)
+            cur.execute("PRAGMA table_info(bereitschaft_entries)")
+            assert "end_date" in [r[1] for r in cur.fetchall()]
+            cur.execute("PRAGMA user_version")
+            assert cur.fetchone()[0] == SCHEMA_VERSION
+        finally:
+            mgr.close()
+
+
+# ---------------------------------------------------------------------------
+# Backup / Wiederherstellung (#5)
+# ---------------------------------------------------------------------------
+
+class TestBackupRestore:
+
+    def test_backup_und_restore_roundtrip(self, tmp_path):
+        mgr = DBManager(str(tmp_path / "data.db"))
+        try:
+            mgr.insert(make_entry(date="2024-06-01"))
+            backup_path = mgr.create_backup(str(tmp_path / "backups"))
+            assert os.path.exists(backup_path)
+            # Daten NACH dem Backup ändern
+            mgr.insert(make_entry(date="2024-06-02"))
+            assert len(mgr.load_all()) == 2
+            # Wiederherstellen -> Stand des Backups (nur erster Eintrag)
+            mgr.restore_from(backup_path)
+            loaded = mgr.load_all()
+            assert len(loaded) == 1
+            assert loaded[0].date == "2024-06-01"
+        finally:
+            mgr.close()
+
+    def test_prune_behaelt_nur_neueste(self, tmp_path):
+        backup_dir = tmp_path / "backups"
+        backup_dir.mkdir()
+        for day in range(1, 16):   # 15 Backups (Tag 01..15)
+            (backup_dir / f"ueberstunden-202401{day:02d}-120000.db").write_text("x")
+        DBManager._prune_backups(str(backup_dir), keep=10)
+        remaining = sorted(p.name for p in backup_dir.glob("ueberstunden-*.db"))
+        assert len(remaining) == 10
+        assert remaining[0] == "ueberstunden-20240106-120000.db"  # Tag 01-05 entfernt

@@ -4,6 +4,24 @@ All notable changes to Überzeit Rechner are documented here.
 
 ---
 
+## [1.6.0] – 2026-06-18
+
+### Added
+- **Per-weekday work targets** — each weekday (Mon–Sun) gets its own target hours (e.g. shorter Friday); replaces the flat *workdays* + single *target_work_time* model, which remains as fallback for existing settings.
+- **Entry types** — entries can be marked as *Work*, *Vacation*, *Sick*, *Holiday*, or *Flextime reduction*. Absence entries correctly neutralize the daily target; flextime entries spend accumulated overtime. A **vacation account** (entitlement vs. used days this year) is shown in the main tab.
+- **Monthly PDF report** — new "Monats-PDF (.pdf)" export in the dropdown renders a per-day table with target, balance, running total, and signature lines.
+- **Automatic database backups** — a rotating backup is created on every start (last 10 kept) in a `backups/` folder next to the database, using SQLite's consistent backup API. Settings → System & Appearance gains **"Create backup now"** and **"Restore from backup"**.
+
+### Changed
+- **Reproducible builds**: `holidays` and `pycountry` are now pinned in `requirements.txt`.
+- **Database schema is versioned** via `PRAGMA user_version` with an idempotent migration runner (v0→v1→v2), replacing the ad-hoc "does this column exist" checks.
+- Settings → Workdays is now a dedicated **"Arbeitstage"** tab with a per-weekday grid (checkbox + time); the vacation entitlement spinbox lives there too.
+
+### CI
+- Release notes are now filled automatically from the matching `CHANGELOG.md` section (no more empty release bodies).
+
+---
+
 ## [1.5.0] – 2026-06-18
 
 ### Added

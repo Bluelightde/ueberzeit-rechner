@@ -11,7 +11,8 @@ from PyQt6.QtPrintSupport import QPrinter
 from PyQt6.QtWidgets import QFileDialog, QMessageBox
 
 from i18n import get_locale, tr
-from logic import format_time, fmt_date, fmt_time_hhmm
+from logic import format_time, fmt_date, fmt_time_hhmm, get_target_minutes_for_date, \
+    TYPE_LABELS, TYPE_WORK, ABSENCE_TYPES
 
 logger = logging.getLogger(__name__)
 
@@ -197,3 +198,111 @@ def export_pdf(parent, entries, title):
     except Exception as ex:  # pylint: disable=broad-except
         QMessageBox.critical(parent, tr("Fehler"),
                              tr("Fehler beim PDF-Export:\n{ex}").format(ex=str(ex)))
+
+
+def export_monthly_pdf(parent, entries, settings, month_str=None):
+    """Monats-Stundennachweis als PDF (Tagestabelle mit Soll/lfd. Saldo)."""
+    if month_str is None:
+        today = QDate.currentDate()
+        month_str = today.toString("yyyy-MM")
+    year = int(month_str[:4])
+    month = int(month_str[5:7])
+    month_name = get_locale().monthName(month, QLocale.FormatType.LongFormat)
+    title = tr("Stundennachweis {m} {y}").format(m=month_name, y=year)
+
+    file_name, _ = QFileDialog.getSaveFileName(
+        parent, tr("Monats-PDF exportieren"),
+        f"stundennachweis_{month_str}.pdf", tr("PDF Dateien (*.pdf)"))
+    if not file_name:
+        return
+    try:
+        month_entries = [e for e in entries if e.date.startswith(month_str)]
+        html = _generate_monthly_pdf_html(month_entries, settings, month_str, title)
+        printer = QPrinter(QPrinter.PrinterMode.HighResolution)
+        printer.setOutputFormat(QPrinter.OutputFormat.PdfFormat)
+        printer.setOutputFileName(file_name)
+        doc = QTextDocument()
+        doc.setHtml(html)
+        doc.setPageSize(QSizeF(printer.pageRect(QPrinter.Unit.Point).size()))
+        doc.print(printer)
+        QMessageBox.information(parent, tr("Erfolg"),
+                                tr("Monats-PDF erfolgreich exportiert!"))
+    except Exception as ex:
+        QMessageBox.critical(parent, tr("Fehler"),
+                             tr("Fehler beim PDF-Export:\n{ex}").format(ex=str(ex)))
+
+
+def _generate_monthly_pdf_html(entries, settings, month_str, title):
+    """HTML für eine Monats-Tagestabelle."""
+    year, month = int(month_str[:4]), int(month_str[5:7])
+    locale = get_locale()
+    date_entries = {}
+    for e in entries:
+        date_entries.setdefault(e.date, []).append(e)
+    first = QDate(year, month, 1)
+    last = QDate(year, month, first.daysInMonth())
+    curr = first
+    running = 0
+    rows_html = ""
+    while curr <= last:
+        ds = curr.toString("yyyy-MM-dd")
+        day_ents = date_entries.get(ds, [])
+        dow = locale.dayName(curr.dayOfWeek(), QLocale.FormatType.ShortFormat)
+        target = get_target_minutes_for_date(ds, day_ents, settings)
+        if not day_ents:
+            rows_html += (
+                f"<tr><td>{html.escape(fmt_date(ds))}</td>"
+                f"<td>{dow}</td><td>–</td>"
+                f"<td style='text-align:right'>{format_time(target)}</td>"
+                f"<td style='text-align:right'>0</td>"
+                f"<td style='text-align:right'>{format_time(running, show_plus=True)}</td></tr>"
+            )
+        else:
+            for e in day_ents:
+                if e.entry_type in ABSENCE_TYPES:
+                    z_str = TYPE_LABELS.get(e.entry_type, e.entry_type)
+                elif e.start:
+                    z_str = f"{fmt_time_hhmm(e.start)} - {fmt_time_hhmm(e.end)}"
+                else:
+                    z_str = "–"
+                col_ov = "#059669" if e.minutes > 0 else ("#dc2626" if e.minutes < 0 else "inherit")
+                running += e.minutes
+                rows_html += (
+                    f"<tr><td>{html.escape(fmt_date(ds))}</td>"
+                    f"<td>{dow}</td><td>{html.escape(z_str)}</td>"
+                    f"<td style='text-align:right'>{format_time(target)}</td>"
+                    f"<td style='text-align:right;color:{col_ov}'>"
+                    f"{format_time(e.minutes, show_plus=True)}</td>"
+                    f"<td style='text-align:right'>{format_time(running, show_plus=True)}</td></tr>"
+                )
+        curr = curr.addDays(1)
+    total_mins = sum(e.minutes for e in entries)
+    return f"""<html><head><meta charset="utf-8"><style>
+        body {{ font-family: Arial, sans-serif; font-size: 10px; color: #111; }}
+        h2 {{ font-size: 14px; margin-bottom: 2px; }}
+        p.sub {{ color: #666; font-size: 9px; margin-top: 0; margin-bottom: 8px; }}
+        table {{ width: 100%; border-collapse: collapse; margin-top: 8px; }}
+        th {{ background: #3b82f6; color: #fff; padding: 4px 6px; text-align: left; font-size: 9px; }}
+        td {{ border-bottom: 1px solid #e5e7eb; padding: 3px 6px; }}
+        tr.sum td {{ background: #dbeafe; font-weight: bold; }}
+        tr.sign td {{ border: none; padding-top: 24px; font-size: 10px; }}
+    </style></head><body>
+    <h2>{html.escape(title)}</h2>
+    <p class="sub">Monat {month:02d}/{year}
+       &nbsp;·&nbsp; {tr('Saldo:')} {format_time(total_mins, show_plus=True)}</p>
+    <table>
+      <tr><th>{tr('Datum')}</th><th>{tr('Tag')}</th><th>{tr('Zeiten / Typ')}</th>
+          <th style='text-align:right'>{tr('Soll')}</th>
+          <th style='text-align:right'>{tr('Saldo')}</th>
+          <th style='text-align:right'>{tr('Lfd.')}</th></tr>
+      {rows_html}
+      <tr class="sum">
+        <td colspan="4">{tr('Monatssumme')}</td>
+        <td style='text-align:right'>{format_time(total_mins, show_plus=True)}</td>
+        <td></td></tr>
+      <tr class="sign">
+        <td colspan="2">{tr('Datum:')} ___________________</td>
+        <td colspan="2">{tr('Arbeitnehmer:')} ___________________</td>
+        <td colspan="2">{tr('Arbeitgeber:')} ___________________</td></tr>
+    </table>
+    </body></html>"""

@@ -2,13 +2,14 @@
 """
 Dialog-Fenster für Einstellungen und zum Bearbeiten von Einträgen.
 """
+import os
 import platform
 
 from PyQt6.QtCore import QDate, QLocale, QTime, Qt, PYQT_VERSION_STR, QT_VERSION_STR
 from PyQt6.QtGui import QColor, QFont, QPixmap
 from PyQt6.QtWidgets import (
-    QCheckBox, QColorDialog, QComboBox, QDateEdit, QDialog,
-    QFileDialog, QFrame, QHBoxLayout, QHeaderView, QLabel,
+    QCheckBox, QColorDialog, QComboBox, QDateEdit, QDialog, QGridLayout,
+    QFileDialog, QFrame, QHBoxLayout, QHeaderView, QLabel, QMessageBox,
     QLineEdit, QPushButton, QSpinBox,
     QTableWidget, QTabWidget, QTimeEdit, QVBoxLayout, QWidget
 )
@@ -16,8 +17,9 @@ from ui_components import COLOR_BEREITSCHAFT
 from config import APP_VERSION, DB_FILE, ICON_PATH, get_country_list, get_subdivisions
 from i18n import available_languages, get_locale, tr
 from models import WorkEntry
-from logic import calculate_timed_entries, is_midnight_shift
-
+from logic import calculate_timed_entries, is_midnight_shift, \
+    TYPE_WORK, TYPE_VACATION, TYPE_SICK, TYPE_HOLIDAY, TYPE_FLEXTIME, TYPE_PARENTAL, \
+    ABSENCE_TYPES
 
 class AboutDialog(QDialog):
     """Kleines Info-Fenster mit Programmname, Version und rechtlichen Hinweisen."""
@@ -85,13 +87,16 @@ class SettingsDialog(QDialog):
     Dialog zum Verwalten der Benutzereinstellungen wie Standardarbeitszeiten,
     Bundesland und Sonderarbeitstage.
     """
-    def __init__(self, current_settings, parent=None):
+    def __init__(self, current_settings, parent=None, backup_cb=None, restore_cb=None):
         """
         Initialisiert den Einstellungsdialog mit den aktuellen Werten.
         """
         super().__init__(parent)
+        self._backup_cb = backup_cb
+        self._restore_cb = restore_cb
+        self._db_path = current_settings.get("db_path", DB_FILE)
         self.setWindowTitle(tr("Einstellungen"))
-        self.resize(500, 480)
+        self.resize(650, 520)
         main_layout = QVBoxLayout(self)
 
         self.tabs = QTabWidget()
@@ -101,7 +106,6 @@ class SettingsDialog(QDialog):
         tab_work = QWidget()
         layout_work = QVBoxLayout(tab_work)
         self._setup_time_settings_ui(layout_work, current_settings)
-        self._setup_workdays_ui(layout_work, current_settings)
         layout_work.addSpacing(10)
         layout_work.addWidget(QLabel(f"<b>{tr('Pausen-Regelung:')}</b>"))
         self.auto_break_cb = QCheckBox(tr("Automatische Pausen-Berechnung"))
@@ -110,6 +114,23 @@ class SettingsDialog(QDialog):
         self._setup_break_rules_ui(layout_work, current_settings)
         layout_work.addStretch()
         self.tabs.addTab(tab_work, tr("Arbeitszeit && Pause"))
+
+        # Tab: Arbeitstage & Soll pro Wochentag
+        tab_days = QWidget()
+        layout_days = QVBoxLayout(tab_days)
+        self._setup_workdays_ui(layout_days, current_settings)
+        ent_layout = QHBoxLayout()
+        ent_layout.addWidget(QLabel(tr("Urlaubsanspruch:")))
+        self.vacation_spin = QSpinBox()
+        self.vacation_spin.setRange(0, 365)
+        self.vacation_spin.setValue(current_settings.get("vacation_entitlement", 30))
+        ent_layout.addWidget(self.vacation_spin)
+        ent_layout.addWidget(QLabel(tr("Tage / Jahr")))
+        ent_layout.addStretch()
+        layout_days.addLayout(ent_layout)
+        layout_days.addSpacing(10)
+        layout_days.addStretch()
+        self.tabs.addTab(tab_days, tr("Arbeitstage"))
 
         # Tab 2: Region & Feiertage
         tab_region = QWidget()
@@ -137,6 +158,8 @@ class SettingsDialog(QDialog):
 
         self._setup_bereitschaft_color_ui(layout_system, current_settings)
         layout_system.addSpacing(10)
+        self._setup_type_colors_ui(layout_system, current_settings)
+        layout_system.addSpacing(10)
         self._setup_db_path_ui(layout_system, current_settings)
         layout_system.addSpacing(10)
         btn_wizard = QPushButton(tr("Einrichtungsassistenten erneut aufrufen"))
@@ -145,6 +168,14 @@ class SettingsDialog(QDialog):
         btn_about = QPushButton(tr("Über das Programm"))
         btn_about.clicked.connect(self._open_about)
         layout_system.addWidget(btn_about)
+        backup_layout = QHBoxLayout()
+        btn_backup = QPushButton(tr("Backup jetzt erstellen"))
+        btn_backup.clicked.connect(self._do_backup)
+        btn_restore = QPushButton(tr("Aus Backup wiederherstellen"))
+        btn_restore.clicked.connect(self._do_restore)
+        backup_layout.addWidget(btn_backup)
+        backup_layout.addWidget(btn_restore)
+        layout_system.addLayout(backup_layout)
         layout_system.addStretch()
         self.tabs.addTab(tab_system, tr("System && Design"))
 
@@ -153,19 +184,33 @@ class SettingsDialog(QDialog):
         main_layout.addWidget(self.btn_save)
 
     def _setup_workdays_ui(self, layout, current_settings):
-        layout.addSpacing(10)
-        layout.addWidget(QLabel(f"<b>{tr('Arbeitstage (Soll-Tage):')}</b>"))
+        layout.addWidget(QLabel(f"<b>{tr('Arbeitstage & Soll pro Wochentag:')}</b>"))
+        layout.addWidget(QLabel(tr("Häkchen = Arbeitstag; die Zeit ist das jeweilige Tagessoll.")))
         self.workday_checkboxes = []
-        workdays_layout = QHBoxLayout()
-        days = [get_locale().dayName(i + 1, QLocale.FormatType.ShortFormat)
+        self.weekday_time_edits = []
+        days = [get_locale().dayName(i + 1, QLocale.FormatType.LongFormat)
                 for i in range(7)]
-        selected_workdays = current_settings.get("workdays", [0, 1, 2, 3, 4])
+        targets = current_settings.get("weekday_targets")
+        if not (isinstance(targets, list) and len(targets) == 7):
+            tw = current_settings.get("target_work_time", "08:00")
+            wd = current_settings.get("workdays", [0, 1, 2, 3, 4])
+            targets = [tw if i in wd else "" for i in range(7)]
+        default_target = current_settings.get("target_work_time", "08:00")
+        grid = QGridLayout()
         for i, day_name in enumerate(days):
             cb = QCheckBox(day_name)
-            cb.setChecked(i in selected_workdays)
-            workdays_layout.addWidget(cb)
+            cb.setChecked(bool(targets[i]))
+            time_edit = QTimeEdit()
+            time_edit.setDisplayFormat("HH:mm")
+            time_edit.setTime(QTime.fromString(targets[i] or default_target, "HH:mm"))
+            time_edit.setEnabled(bool(targets[i]))
+            cb.stateChanged.connect(
+                lambda _s, te=time_edit, c=cb: te.setEnabled(c.isChecked()))
+            grid.addWidget(cb, i, 0)
+            grid.addWidget(time_edit, i, 1)
             self.workday_checkboxes.append(cb)
-        layout.addLayout(workdays_layout)
+            self.weekday_time_edits.append(time_edit)
+        layout.addLayout(grid)
 
     def _setup_time_settings_ui(self, layout, current_settings):
         layout.addWidget(QLabel(f"<b>{tr('Tages-Standardwerte:')}</b>"))
@@ -401,6 +446,56 @@ class SettingsDialog(QDialog):
         self.bereitschaft_color = COLOR_BEREITSCHAFT
         self._apply_bereitschaft_color_preview()
 
+
+    # --- Typ-Farben ---
+
+    def _setup_type_colors_ui(self, layout, current_settings):
+        """Baut Farbwähler für jeden Eintragstyp (außer Arbeit)."""
+        layout.addWidget(QLabel(f"<b>{tr('Farben für Eintragstypen:')}</b>"))
+        type_colors = current_settings.get("type_colors", {})
+        self._type_color_btns = {}
+        self._type_colors = {}
+        types = [
+            (TYPE_VACATION, tr("Urlaub")),
+            (TYPE_SICK, tr("Krank")),
+            (TYPE_FLEXTIME, tr("Gleitzeitabbau")),
+            (TYPE_PARENTAL, tr("Elternzeit")),
+        ]
+        for t_key, t_label in types:
+            color = type_colors.get(t_key, "#888888")
+            self._type_colors[t_key] = color
+            row = QHBoxLayout()
+            row.addWidget(QLabel(f"  {t_label}:"))
+            btn = QPushButton()
+            btn.setFixedWidth(80)
+            t = t_key  # capture
+            btn.clicked.connect(lambda _, k=t: self._pick_type_color(k))
+            row.addWidget(btn)
+            row.addStretch()
+            layout.addLayout(row)
+            self._type_color_btns[t_key] = btn
+        self._apply_type_color_buttons()
+
+    def _apply_type_color_buttons(self):
+        for t_key, btn in self._type_color_btns.items():
+            color = self._type_colors.get(t_key, "#888888")
+            qc = QColor(color)
+            txt = "#000000" if qc.lightness() > 140 else "#ffffff"
+            btn.setStyleSheet(
+                f"background-color: {color}; color: {txt}; padding: 4px 8px;")
+            btn.setText(color.upper())
+
+    def _pick_type_color(self, t_key):
+        chosen = QColorDialog.getColor(
+            QColor(self._type_colors.get(t_key, "#888888")),
+            self, tr("Farbe wählen"))
+        if chosen.isValid():
+            self._type_colors[t_key] = chosen.name()
+            self._apply_type_color_buttons()
+
+    def _type_colors_dict(self):
+        return dict(self._type_colors)
+
     def _setup_db_path_ui(self, layout, current_settings):
         layout.addSpacing(10)
         layout.addWidget(QLabel(f"<b>{tr('Speicherort der Datenbank:')}</b>"))
@@ -487,11 +582,51 @@ class SettingsDialog(QDialog):
         """Öffnet das 'Über'-Fenster mit Versions- und Lizenzinfo."""
         AboutDialog(self).exec()
 
+    def _do_backup(self):
+        """Erstellt sofort ein Backup über den Callback und meldet das Ergebnis."""
+        if not self._backup_cb:
+            return
+        path = self._backup_cb()
+        if path:
+            QMessageBox.information(
+                self, tr("Backup"), tr("Backup erstellt:\n{p}").format(p=path))
+        else:
+            QMessageBox.warning(self, tr("Backup"), tr("Backup fehlgeschlagen."))
+
+    def _do_restore(self):
+        """Lässt ein Backup auswählen und stellt es nach Rückfrage wieder her."""
+        if not self._restore_cb:
+            return
+        start_dir = os.path.join(
+            os.path.dirname(os.path.abspath(self._db_path)), "backups")
+        path, _ = QFileDialog.getOpenFileName(
+            self, tr("Backup auswählen"), start_dir, tr("Datenbank (*.db)"))
+        if not path:
+            return
+        reply = QMessageBox.question(
+            self, tr("Wiederherstellen"),
+            tr("Alle aktuellen Daten werden durch das Backup ersetzt. Fortfahren?"))
+        if reply != QMessageBox.StandardButton.Yes:
+            return
+        if self._restore_cb(path):
+            QMessageBox.information(
+                self, tr("Wiederherstellen"), tr("Daten wiederhergestellt."))
+        else:
+            QMessageBox.warning(
+                self, tr("Wiederherstellen"), tr("Wiederherstellung fehlgeschlagen."))
+
     def get_settings(self):
         """
         Gibt die im Dialog eingestellten Werte als Dictionary zurück.
         """
-        workdays = [i for i, cb in enumerate(self.workday_checkboxes) if cb.isChecked()]
+        weekday_targets = []
+        workdays = []
+        for i, cb in enumerate(self.workday_checkboxes):
+            if cb.isChecked():
+                weekday_targets.append(self.weekday_time_edits[i].time().toString("HH:mm"))
+                workdays.append(i)
+            else:
+                weekday_targets.append("")
         special_days = []
         for r in range(self.special_days_table.rowCount()):
             day = self.special_days_table.cellWidget(r, 0).value()
@@ -518,9 +653,12 @@ class SettingsDialog(QDialog):
             "use_login_time": self.login_time_cb.isChecked(),
             "is_primary_device": self.primary_device_cb.isChecked(),
             "workdays": workdays,
+            "weekday_targets": weekday_targets,
+            "vacation_entitlement": self.vacation_spin.value(),
             "special_days": special_days,
             "break_rules": break_rules,
             "bereitschaft_color": self.bereitschaft_color,
+            "type_colors": self._type_colors_dict(),
             "db_path": self.db_path_edit.text()
         }
 
@@ -628,6 +766,18 @@ class EditDialog(QDialog):
         layout.addWidget(QLabel(tr("Anlass:")))
         layout.addWidget(self.reason_edit)
 
+        self.type_combo = QComboBox()
+        self.type_combo.addItem(tr("Arbeit"), TYPE_WORK)
+        self.type_combo.addItem(tr("Urlaub"), TYPE_VACATION)
+        self.type_combo.addItem(tr("Krank"), TYPE_SICK)
+        self.type_combo.addItem(tr("Gleitzeitabbau"), TYPE_FLEXTIME)
+        self.type_combo.addItem(tr("Elternzeit"), TYPE_PARENTAL)
+        _idx = self.type_combo.findData(getattr(self.entry, 'entry_type', TYPE_WORK))
+        self.type_combo.setCurrentIndex(_idx if _idx >= 0 else 0)
+        self.type_combo.currentIndexChanged.connect(self._on_edit_type_changed)
+        layout.addWidget(QLabel(tr("Typ:")))
+        layout.addWidget(self.type_combo)
+
     def _setup_custom_target_ui(self, layout):
         self.custom_target_cb = QCheckBox(tr("Individuelles Tagessoll für diesen Tag"))
         self.custom_target_cb.setChecked(self.entry.target_minutes != -1)
@@ -667,6 +817,20 @@ class EditDialog(QDialog):
         self.pause_spin.setEnabled(is_checked and not self.auto_break)
         if is_checked:
             self.recalc_minutes()
+
+    def _on_edit_type_changed(self, _index):
+        """Bei Nicht-Arbeit: Zeiten/Pause/indiv. Soll/Anlass ausgrauen."""
+        selected = self.type_combo.currentData()
+        is_work = selected == TYPE_WORK
+        self.reason_edit.setEnabled(is_work)
+        self.has_times_cb.setEnabled(is_work)
+        # custom_target_* wird erst nach diesem Combo aufgebaut → defensiv prüfen
+        if hasattr(self, "custom_target_cb"):
+            self.custom_target_cb.setEnabled(is_work)
+            self.custom_target_time.setEnabled(is_work and self.custom_target_cb.isChecked())
+        if not is_work:
+            self.has_times_cb.setChecked(False)
+            self.toggle_times(0)
 
     def recalc_minutes(self):
         """
@@ -725,6 +889,7 @@ class EditDialog(QDialog):
             self.entry.target_minutes = t.hour() * 60 + t.minute()
         else:
             self.entry.target_minutes = -1
+        self.entry.entry_type = self.type_combo.currentData()
 
         if self.has_times_cb.isChecked():
             self.entry.start = self.time_start.time().toString("HH:mm")
@@ -862,3 +1027,54 @@ class WelcomeDialog(QDialog):
             "workdays": [i for i, cb in enumerate(self.workday_checkboxes) if cb.isChecked()],
             "use_login_time": self.login_time_cb.isChecked(),
         }
+
+
+class AbsenceEditDialog(QDialog):
+    """Bearbeiten einer (mehrtägigen) Abwesenheit: Typ und Datum von/bis."""
+
+    def __init__(self, block, settings, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle(tr("Abwesenheit bearbeiten"))
+        self.setMinimumWidth(340)
+        block = sorted(block, key=lambda e: e.date)
+        cur_type = getattr(block[0], "entry_type", TYPE_VACATION)
+
+        layout = QVBoxLayout(self)
+        self.type_combo = QComboBox()
+        self.type_combo.addItem(tr("Urlaub"), TYPE_VACATION)
+        self.type_combo.addItem(tr("Krank"), TYPE_SICK)
+        self.type_combo.addItem(tr("Gleitzeitabbau"), TYPE_FLEXTIME)
+        self.type_combo.addItem(tr("Elternzeit"), TYPE_PARENTAL)
+        _idx = self.type_combo.findData(cur_type)
+        self.type_combo.setCurrentIndex(_idx if _idx >= 0 else 0)
+        layout.addWidget(QLabel(tr("Typ:")))
+        layout.addWidget(self.type_combo)
+
+        _fmt = get_locale().dateFormat(QLocale.FormatType.ShortFormat)
+        self.start_edit = QDateEdit()
+        self.start_edit.setCalendarPopup(True)
+        self.start_edit.setDisplayFormat(_fmt)
+        self.start_edit.setDate(QDate.fromString(block[0].date, "yyyy-MM-dd"))
+        layout.addWidget(QLabel(tr("Von:")))
+        layout.addWidget(self.start_edit)
+
+        self.end_edit = QDateEdit()
+        self.end_edit.setCalendarPopup(True)
+        self.end_edit.setDisplayFormat(_fmt)
+        self.end_edit.setDate(QDate.fromString(block[-1].date, "yyyy-MM-dd"))
+        layout.addWidget(QLabel(tr("Bis:")))
+        layout.addWidget(self.end_edit)
+
+        btns = QHBoxLayout()
+        btn_ok = QPushButton(tr("Speichern"))
+        btn_ok.clicked.connect(self.accept)
+        btn_cancel = QPushButton(tr("Abbrechen"))
+        btn_cancel.clicked.connect(self.reject)
+        btns.addWidget(btn_ok)
+        btns.addWidget(btn_cancel)
+        layout.addLayout(btns)
+
+    def get_values(self):
+        """(entry_type, start_QDate, end_QDate)."""
+        return (self.type_combo.currentData(),
+                self.start_edit.date(), self.end_edit.date())
