@@ -3,6 +3,7 @@
 Hilfsfunktionen für den Export von Arbeitseinträgen (CSV, Excel, PDF).
 """
 import csv
+import html
 import logging
 from PyQt6.QtCore import QDate, QLocale, QSizeF
 from PyQt6.QtGui import QTextDocument
@@ -141,10 +142,10 @@ def _generate_pdf_html(entries, title):
         col_ov = "#059669" if e.minutes > 0 else ("#dc2626" if e.minutes < 0 else "inherit")
         rows_html += (
             f"<tr style='background:{bg}'>"
-            f"<td>{d}</td><td>{zeitraum}</td>"
+            f"<td>{html.escape(d)}</td><td>{html.escape(zeitraum)}</td>"
             f"<td style='color:{col_ov};text-align:right'>"
             f"{format_time(e.minutes, show_plus=True)}</td>"
-            f"<td>{e.reason}</td></tr>"
+            f"<td>{html.escape(e.reason or '')}</td></tr>"
         )
 
     return f"""
@@ -158,7 +159,7 @@ def _generate_pdf_html(entries, title):
         tr.sum td {{ background: #dbeafe; font-weight: bold; }}
     </style></head><body>
     <h2>{tr('Überstunden-Nachweis')}</h2>
-    <p class="sub">{title} &nbsp;·&nbsp;
+    <p class="sub">{html.escape(title)} &nbsp;·&nbsp;
        {tr('Erstellt am {d}').format(
            d=get_locale().toString(QDate.currentDate(), QLocale.FormatType.ShortFormat)
        )}</p>

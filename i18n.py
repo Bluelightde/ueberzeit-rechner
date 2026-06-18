@@ -100,21 +100,8 @@ _EN: dict[str, str] = {
     "⚠️ Max. {h}h erreicht!": "⚠️ Max. {h}h reached!",
     "⚠️ Ruhezeit verletzt ({r}h < 11h)": "⚠️ Rest period violated ({r}h < 11h)",
     "Überschneidung mit bestehendem Eintrag:": "Overlap with existing entry:",
-    "Mitternachtsschicht: {m1}m heute, {m2}m morgen. Gesamt: {tot}": (
-        "Midnight shift: {m1}m today, {m2}m tomorrow. Total: {tot}"
-    ),
 
     # --- MainTab: Dialoge / Meldungen ---
-    "Mitternachtsschicht": "Midnight shift",
-    (
-        "Der Eintrag wurde auf zwei Tage aufgeteilt:\n"
-        "- {d1}: {s1} - 00:00\n"
-        "- {d2}: 00:00 - {e2}"
-    ): (
-        "The entry has been split into two days:\n"
-        "- {d1}: {s1} - 00:00\n"
-        "- {d2}: 00:00 - {e2}"
-    ),
     "Löschen bestätigen": "Confirm deletion",
     "Eintrag vom {d} wirklich löschen?": "Really delete entry from {d}?",
     "Überschneidung": "Overlap",
@@ -241,12 +228,19 @@ _EN: dict[str, str] = {
     "Los geht's →": "Get Started →",
     "Einrichtungsassistenten erneut aufrufen": "Run Setup Wizard Again",
 
+    # --- Über-Fenster ---
+    "Über das Programm": "About",
+    "Über Überzeit Rechner": "About Überzeit Rechner",
+    "Überstunden- und Arbeitszeit-Rechner": "Overtime and working-time calculator",
+    "© 2026 Micha Weiß · MIT-Lizenz": "© 2026 Micha Weiß · MIT License",
+    "Schließen": "Close",
+
     # --- Settings section headers ---
     "Arbeitszeit && Pause": "Working time && Break",
     "Region && Feiertage": "Region && Holidays",
     "System && Design": "System && Appearance",
-    "⚠️ Mitternachtsschicht: Wird beim Speichern in zwei Tage aufgeteilt.": (
-        "⚠️ Midnight shift: Will be split into two days when saved."
+    "⚠️ Mitternachtsschicht: Wird als ein Eintrag dem Starttag zugerechnet.": (
+        "⚠️ Midnight shift: Counted as a single entry on the start day."
     ),
 
     # --- Sprache ---

@@ -173,10 +173,21 @@ class StatsTab(QWidget):
 
     @staticmethod
     def _longest_streaks(daily: dict):
-        """Berechnet die längste Plus- und Minus-Serie (in Tagen)."""
+        """Längste Plus-/Minus-Serie in aufeinanderfolgenden Kalendertagen.
+
+        Tage ohne Eintrag (Lücken im Kalender) unterbrechen die Serie — es zählen
+        echte aufeinanderfolgende Kalendertage, nicht nur erfasste Tage.
+        """
         plus_max = minus_max = plus_cur = minus_cur = 0
-        for date_str in sorted(daily.keys()):
-            value = daily[date_str]
+        if not daily:
+            return 0, 0
+        first = QDate.fromString(min(daily.keys()), "yyyy-MM-dd")
+        last = QDate.fromString(max(daily.keys()), "yyyy-MM-dd")
+        if not first.isValid() or not last.isValid():
+            return 0, 0
+        curr = first
+        while curr <= last:
+            value = daily.get(curr.toString("yyyy-MM-dd"), 0)
             if value > 0:
                 plus_cur += 1
                 minus_cur = 0
@@ -187,7 +198,20 @@ class StatsTab(QWidget):
                 minus_max = max(minus_max, minus_cur)
             else:
                 plus_cur = minus_cur = 0
+            curr = curr.addDays(1)
         return plus_max, minus_max
+
+    @staticmethod
+    def _month_span(monthly: dict) -> int:
+        """Anzahl Kalendermonate vom frühesten bis spätesten erfassten Monat
+        (inklusive, Lücken mitgezählt); 0 wenn keine Daten vorliegen."""
+        if not monthly:
+            return 0
+        keys = monthly.keys()
+        first, last = min(keys), max(keys)
+        fy, fm = int(first[:4]), int(first[5:7])
+        ly, lm = int(last[:4]), int(last[5:7])
+        return (ly - fy) * 12 + (lm - fm) + 1
 
     def _update_kpis(self, entries, all_entries):
         """Berechnet und setzt alle KPI-Werte.
@@ -199,7 +223,7 @@ class StatsTab(QWidget):
         daily, monthly = self._aggregate(entries)
         total_all = sum(e.minutes for e in all_entries)
         period_sum = sum(monthly.values())
-        avg = (period_sum / len(monthly)) if monthly else 0
+        avg = (period_sum / self._month_span(monthly)) if monthly else 0
 
         best = max(monthly.items(), key=lambda kv: kv[1], default=None)
         worst = min(monthly.items(), key=lambda kv: kv[1], default=None)

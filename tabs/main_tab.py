@@ -489,65 +489,37 @@ class MainTab(QWidget):  # pylint: disable=too-many-public-methods
 
         manual_sum = sum(e.minutes for e in all_day if not (e.start and e.end))
 
-        # Dauerberechnung
-        if is_midnight_shift(current_temp.start, current_temp.end):
-            p1, p2 = split_midnight_shift(curr_date_str, current_temp.start, current_temp.end)
+        # Dauerberechnung — Übernacht-Schichten (start > end) rechnet
+        # calculate_timed_entries über die 24h-Korrektur korrekt.
+        results, total_net = calculate_timed_entries(
+            timed, target_mins, max_mins, is_auto, self.settings.get("break_rules")
+        )
 
-            def get_mins(s, e):
-                ts = QTime.fromString(s, "HH:mm")
-                te = QTime.fromString(e, "HH:mm")
-                diff = ts.secsTo(te) // 60
-                if diff < 0:
-                    diff += 24 * 60
-                return diff
-
-            m1 = get_mins(p1[1], p1[2])
-            m2 = get_mins(p2[1], p2[2])
-            total_net = m1 + m2 # Vereinfachte Netto-Anzeige für Vorschau
-
-            # Für die Vorschau am aktuellen Tag nehmen wir nur den ersten Teil
-            # Aber wir zeigen dem Nutzer, dass es gesplittet wird.
-            calc_text = tr(
-                "Mitternachtsschicht: {m1}m heute, {m2}m morgen. "
-                "Gesamt: {tot}"
-            ).format(m1=m1, m2=m2, tot=format_time(total_net))
-
-            # Warnung hinzufügen
-            span_style = f"style='color: {COLOR_INFO};'"
-            calc_text = f"<span {span_style}>{calc_text} (Wird beim Eintragen gesplittet)</span>"
-
-            self.current_calculated_pause = 0
-            self.current_calculated_overtime = 0 # Wird beim recalculate_day nach Split berechnet
+        # Wenn wir den temp-Eintrag übersprungen haben, nehmen wir die Werte
+        # vom letzten echten Eintrag für die Anzeige/Speicherung
+        if not is_duplicate:
+            entry_pause, entry_overtime = results[-1]
         else:
-            results, total_net = calculate_timed_entries(
-                timed, target_mins, max_mins, is_auto, self.settings.get("break_rules")
-            )
+            # Dummy-Werte oder wir lassen sie wie sie sind
+            entry_pause = self.current_calculated_pause
+            entry_overtime = self.current_calculated_overtime
 
-            # Wenn wir den temp-Eintrag übersprungen haben, nehmen wir die Werte
-            # vom letzten echten Eintrag für die Anzeige/Speicherung
-            if not is_duplicate:
-                entry_pause, entry_overtime = results[-1]
-            else:
-                # Dummy-Werte oder wir lassen sie wie sie sind
-                entry_pause = self.current_calculated_pause
-                entry_overtime = self.current_calculated_overtime
+        if is_auto and not is_duplicate:
+            self.pause_spin.blockSignals(True)
+            self.pause_spin.setValue(entry_pause)
+            self.pause_spin.blockSignals(False)
 
-            if is_auto and not is_duplicate:
-                self.pause_spin.blockSignals(True)
-                self.pause_spin.setValue(entry_pause)
-                self.pause_spin.blockSignals(False)
+        if not is_duplicate:
+            self.current_calculated_pause = entry_pause
+            self.current_calculated_overtime = entry_overtime
 
-            if not is_duplicate:
-                self.current_calculated_pause = entry_pause
-                self.current_calculated_overtime = entry_overtime
-
-            final_total_overtime = (total_net - target_mins) + manual_sum
-            calc_text = tr(
-                "Netto (Tag): {net} ➔ <b>{ot} Überstunden (Tag-Saldo)</b>"
-            ).format(
-                net=format_time(total_net),
-                ot=format_time(final_total_overtime, show_plus=True),
-            )
+        final_total_overtime = (total_net - target_mins) + manual_sum
+        calc_text = tr(
+            "Netto (Tag): {net} ➔ <b>{ot} Überstunden (Tag-Saldo)</b>"
+        ).format(
+            net=format_time(total_net),
+            ot=format_time(final_total_overtime, show_plus=True),
+        )
 
         warnings = []
         if total_net >= max_mins:
@@ -602,53 +574,25 @@ class MainTab(QWidget):  # pylint: disable=too-many-public-methods
             )
             return
 
-        # Mitternachts-Splitting
-        if is_midnight_shift(start_str, end_str):
-            p1, p2 = split_midnight_shift(date_str, start_str, end_str)
-
-            # Eintrag 1 (bis 00:00)
-            e1 = WorkEntry(
-                id=None, date=p1[0], start=p1[1], end=p1[2],
-                pause=0, minutes=0, # Wird durch recalculate_day gesetzt
-                reason=self.reason_edit.text().strip(),
-                target_minutes=-1 # Bei Split nutzen wir Standard
-            )
-            # Eintrag 2 (ab 00:00)
-            e2 = WorkEntry(
-                id=None, date=p2[0], start=p2[1], end=p2[2],
-                pause=0, minutes=0,
-                reason=self.reason_edit.text().strip(),
-                target_minutes=-1
-            )
-            self.db.insert(e1)
-            self.db.insert(e2)
-
-            QMessageBox.information(
-                self, tr("Mitternachtsschicht"),
-                tr("Der Eintrag wurde auf zwei Tage aufgeteilt:\n"
-                   "- {d1}: {s1} - 00:00\n"
-                   "- {d2}: 00:00 - {e2}").format(
-                       d1=fmt_date(p1[0]), s1=p1[1],
-                       d2=fmt_date(p2[0]), e2=p2[2]
-                   )
-            )
-            affected_dates = [p1[0], p2[0]]
-        else:
-            entry = WorkEntry(
-                id=None,
-                date=date_str,
-                start=start_str,
-                end=end_str,
-                pause=self.current_calculated_pause,
-                minutes=self.current_calculated_overtime,
-                reason=self.reason_edit.text().strip(),
-                target_minutes=(
-                    self.custom_target_time.time().hour() * 60
-                    + self.custom_target_time.time().minute()
-                ) if self.custom_target_cb.isChecked() else -1
-            )
-            self.db.insert(entry)
-            affected_dates = [date_str]
+        # Übernacht-Schichten werden als EIN Eintrag gespeichert (start > end);
+        # calculate_timed_entries rechnet die Mitternachtsüberschreitung korrekt
+        # (ein Tagessoll, eine Pause). Aufteilen auf zwei Tage würde das Soll
+        # doppelt abziehen und die Pflichtpause verlieren.
+        entry = WorkEntry(
+            id=None,
+            date=date_str,
+            start=start_str,
+            end=end_str,
+            pause=self.current_calculated_pause,
+            minutes=self.current_calculated_overtime,
+            reason=self.reason_edit.text().strip(),
+            target_minutes=(
+                self.custom_target_time.time().hour() * 60
+                + self.custom_target_time.time().minute()
+            ) if self.custom_target_cb.isChecked() else -1
+        )
+        self.db.insert(entry)
+        affected_dates = [date_str]
 
         self.reason_edit.clear()
         self.custom_target_cb.setChecked(False)
@@ -700,43 +644,11 @@ class MainTab(QWidget):  # pylint: disable=too-many-public-methods
                 )
                 return
 
-            # Mitternachts-Splitting beim Bearbeiten
-            if dialog.has_times_cb.isChecked() and is_midnight_shift(new_start, new_end):
-                p1, p2 = split_midnight_shift(new_date, new_start, new_end)
-
-                # Alten Eintrag löschen
-                self.db.delete(entry.id)
-
-                # Zwei neue hinzufügen
-                e1 = WorkEntry(
-                    id=None, date=p1[0], start=p1[1], end=p1[2],
-                    pause=0, minutes=0,
-                    reason=dialog.reason_edit.text().strip(),
-                    target_minutes=-1
-                )
-                e2 = WorkEntry(
-                    id=None, date=p2[0], start=p2[1], end=p2[2],
-                    pause=0, minutes=0,
-                    reason=dialog.reason_edit.text().strip(),
-                    target_minutes=-1
-                )
-                self.db.insert(e1)
-                self.db.insert(e2)
-
-                affected_dates = [old_date, p1[0], p2[0]]
-                QMessageBox.information(
-                    self, tr("Mitternachtsschicht"),
-                    tr("Der Eintrag wurde auf zwei Tage aufgeteilt:\n"
-                       "- {d1}: {s1} - 00:00\n"
-                       "- {d2}: 00:00 - {e2}").format(
-                           d1=fmt_date(p1[0]), s1=p1[1],
-                           d2=fmt_date(p2[0]), e2=p2[2]
-                       )
-                )
-            else:
-                dialog.apply_to_entry()
-                self.db.update(entry)
-                affected_dates = [old_date, entry.date]
+            # Übernacht-Schichten bleiben EIN Eintrag (siehe add_entry);
+            # calculate_timed_entries in recalculate_day rechnet sie korrekt.
+            dialog.apply_to_entry()
+            self.db.update(entry)
+            affected_dates = [old_date, entry.date]
 
             self.entries = self.db.load_all()
             for d in sorted(list(set(affected_dates))):
@@ -916,8 +828,7 @@ class MainTab(QWidget):  # pylint: disable=too-many-public-methods
             if os.path.exists(current_db):
                 shutil.copy2(current_db, current_db + ".backup")
 
-            for entry in pending:
-                self.db.insert(entry)
+            self.db.insert_many(pending)
 
             self.entries = self.db.load_all()
             for d in sorted(list(affected_dates)):

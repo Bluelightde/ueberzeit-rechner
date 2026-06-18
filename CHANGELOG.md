@@ -4,7 +4,31 @@ All notable changes to Überzeit Rechner are documented here.
 
 ---
 
-## [Unreleased]
+## [1.4.0] – 2026-06-18
+
+### Added
+- **"About" window** in Settings → System & Appearance ("Über das Programm" button) showing the app version, a short description, the Python/PyQt6/Qt versions, and the license. The version comes from a single source (`config.APP_VERSION`).
+
+### Fixed
+- **Overnight overtime balance corrupted**: a shift ending exactly at `00:00` created a phantom next-day entry that subtracted a full day's target, and a shift crossing midnight (e.g. `22:00–06:00`) had its daily target subtracted twice and its mandatory break dropped. Such shifts are now counted once, correctly.
+- **CSV import is now atomic** — if any row fails, the whole batch is rolled back instead of leaving half-imported, un-consolidated entries.
+- **Corrupt settings no longer crash startup**: a settings file that is invalid JSON or not a JSON object falls back to defaults; settings are now written atomically (temp file + rename) so an interrupted save can't corrupt them.
+- Settings dialog no longer raises on a settings file with incomplete break-rule or special-day entries.
+- **PDF export escapes free-text fields** (reason, title), so characters like `<`, `>`, `&` no longer corrupt the exported table.
+- Statistics **"⌀ per month"** now divides by the number of calendar months in the period (gaps included) instead of only the months that contain data.
+- Statistics **longest plus/minus streak** now counts consecutive calendar days; gaps between recorded days correctly break the streak.
+- Goal **"extra minutes per day"** tip rounds up, so the goal is actually reached on the planned date instead of being undershot.
+- The welcome wizard's first-run flag is now cleared only when the wizard is completed; cancelling it no longer permanently skips onboarding.
+
+### Changed
+- Overnight shifts are stored as a single entry on the start day (consistent with CSV import) instead of being split across two calendar days.
+
+---
+
+## [1.3.1] – 2026-05-29
+
+### Fixed
+- **Auto-pause break tier** now follows net working time instead of gross attendance (ArbZG §4): just over 9 h of attendance no longer wrongly triggered the 45-minute mandatory break.
 
 ---
 

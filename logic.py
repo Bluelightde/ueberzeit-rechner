@@ -350,6 +350,11 @@ def is_midnight_shift(start_str: str, end_str: str) -> bool:
     e = QTime.fromString(end_str, "HH:mm")
     if not s.isValid() or not e.isValid():
         return False
+    # Endzeit exakt um Mitternacht ist das Tagesende desselben Tages, keine
+    # Überschreitung — andernfalls erzeugt split_midnight_shift ein leeres
+    # Folgesegment (00:00–00:00) mit Phantom-Soll am nächsten Tag.
+    if end_str == "00:00":
+        return False
     return e < s
 
 

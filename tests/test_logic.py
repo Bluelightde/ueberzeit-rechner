@@ -6,7 +6,9 @@ Unit-Tests für logic.py:
 # pylint: disable=missing-function-docstring
 from PyQt6.QtCore import QDate
 from models import WorkEntry
-from logic import get_holidays, calculate_timed_entries
+from logic import (
+    get_holidays, calculate_timed_entries, is_midnight_shift, split_midnight_shift,
+)
 
 
 # ---------------------------------------------------------------------------
@@ -383,3 +385,69 @@ class TestCalculateTimedEntriesMehrereEintraege:
             [e2, e1], self.TARGET, self.MAX, is_auto=True
         )
         assert net_normal == net_rev
+
+
+# ---------------------------------------------------------------------------
+# is_midnight_shift / split_midnight_shift – Mitternachts-Erkennung
+# ---------------------------------------------------------------------------
+
+class TestIsMidnightShift:
+    """Endzeit exakt 00:00 ist Tagesende (gleicher Tag), keine Überschreitung."""
+
+    def test_ende_genau_mitternacht_ist_keine_ueberschreitung(self):
+        # 18:00–00:00 endet am selben Tag → kein Mitternachts-Split (Regression P1)
+        assert is_midnight_shift("18:00", "00:00") is False
+
+    def test_echte_nachtschicht_ueber_mitternacht(self):
+        assert is_midnight_shift("22:00", "06:00") is True
+
+    def test_normale_tagschicht(self):
+        assert is_midnight_shift("08:00", "17:00") is False
+
+    def test_leere_oder_unvollstaendige_zeiten(self):
+        assert is_midnight_shift("", "06:00") is False
+        assert is_midnight_shift("22:00", "") is False
+
+    def test_split_bei_mitternachtsende_liefert_kein_segment(self):
+        # Kein leeres Folgesegment (00:00–00:00) am nächsten Tag (Regression P1)
+        assert split_midnight_shift("2024-01-15", "18:00", "00:00") == (None, None)
+
+    def test_split_echte_nachtschicht(self):
+        p1, p2 = split_midnight_shift("2024-01-15", "22:00", "06:00")
+        assert p1 == ("2024-01-15", "22:00", "00:00")
+        assert p2 == ("2024-01-16", "00:00", "06:00")
+
+
+# ---------------------------------------------------------------------------
+# calculate_timed_entries – Übernacht-Schichten als EIN Eintrag (Regression P2)
+# ---------------------------------------------------------------------------
+
+class TestCalculateTimedEntriesUebernacht:
+    """Eine Übernacht-Schicht wird als ein Eintrag korrekt gerechnet:
+    nur EIN Tagessoll abgezogen und die Pflichtpause nicht verloren."""
+
+    TARGET = 480   # 8 Stunden
+    MAX = 600      # 10 Stunden
+
+    def test_nachtschicht_ein_eintrag_korrektes_soll_und_pause(self):
+        # 22:00–06:00 = 8h brutto → 30 min Pause → 450 netto → 450 - 480 = -30
+        # (NICHT -480 wie beim fehlerhaften Aufteilen auf zwei Tage)
+        entry = make_entry(1, "22:00", "06:00")
+        results, total_net = calculate_timed_entries(
+            [entry], self.TARGET, self.MAX, is_auto=True
+        )
+        pause, ovt = results[1]
+        assert total_net == 450
+        assert pause == 30
+        assert ovt == -30
+
+    def test_ende_mitternacht_zaehlt_zum_starttag(self):
+        # 18:00–00:00 = 6h brutto, keine Pflichtpause → 360 netto → 360 - 480 = -120
+        entry = make_entry(1, "18:00", "00:00")
+        results, total_net = calculate_timed_entries(
+            [entry], self.TARGET, self.MAX, is_auto=True
+        )
+        pause, ovt = results[1]
+        assert total_net == 360
+        assert pause == 0
+        assert ovt == -120

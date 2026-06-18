@@ -6,6 +6,7 @@ Unit-Tests für database.py (DBManager):
 """
 # pylint: disable=missing-function-docstring, missing-class-docstring, redefined-outer-name
 import pytest
+import sqlite3
 from models import WorkEntry
 from database import DBManager
 
@@ -211,3 +212,32 @@ class TestGetLastEntryBefore:
         db.insert(make_entry(date="2024-06-01", end="17:00"))
         result = db.get_last_entry_before("2024-06-10")
         assert isinstance(result, WorkEntry)
+
+
+# ---------------------------------------------------------------------------
+# insert_many – atomarer Batch-Import (Regression: kein Teilimport)
+# ---------------------------------------------------------------------------
+
+class TestInsertMany:
+
+    def test_alle_eintraege_committet_und_ids_gesetzt(self, db):
+        entries = [make_entry(date=f"2024-06-{10 + i:02d}") for i in range(3)]
+        db.insert_many(entries)
+        assert all(e.id is not None for e in entries)
+        assert len(db.load_all()) == 3
+
+    def test_fehler_rollt_kompletten_batch_zurueck(self, db):
+        # Vorbestand (eigene, committete Transaktion) bleibt erhalten.
+        db.insert(make_entry(date="2024-06-01"))
+        # Mittlerer Eintrag verletzt NOT NULL (date=None) → IntegrityError.
+        bad_batch = [
+            make_entry(date="2024-06-10"),
+            make_entry(date=None),
+            make_entry(date="2024-06-12"),
+        ]
+        with pytest.raises(sqlite3.Error):
+            db.insert_many(bad_batch)
+        # Rollback: NICHTS aus dem fehlgeschlagenen Batch bleibt zurück.
+        loaded = db.load_all()
+        assert len(loaded) == 1
+        assert loaded[0].date == "2024-06-01"

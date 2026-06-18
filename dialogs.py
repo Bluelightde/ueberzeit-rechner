@@ -2,8 +2,10 @@
 """
 Dialog-Fenster für Einstellungen und zum Bearbeiten von Einträgen.
 """
-from PyQt6.QtCore import QDate, QLocale, QTime
-from PyQt6.QtGui import QColor, QFont
+import platform
+
+from PyQt6.QtCore import QDate, QLocale, QTime, Qt, PYQT_VERSION_STR, QT_VERSION_STR
+from PyQt6.QtGui import QColor, QFont, QPixmap
 from PyQt6.QtWidgets import (
     QCheckBox, QColorDialog, QComboBox, QDateEdit, QDialog,
     QFileDialog, QFrame, QHBoxLayout, QHeaderView, QLabel,
@@ -11,10 +13,70 @@ from PyQt6.QtWidgets import (
     QTableWidget, QTabWidget, QTimeEdit, QVBoxLayout, QWidget
 )
 from ui_components import COLOR_BEREITSCHAFT
-from config import DB_FILE, get_country_list, get_subdivisions
+from config import APP_VERSION, DB_FILE, ICON_PATH, get_country_list, get_subdivisions
 from i18n import available_languages, get_locale, tr
 from models import WorkEntry
 from logic import calculate_timed_entries, is_midnight_shift
+
+
+class AboutDialog(QDialog):
+    """Kleines Info-Fenster mit Programmname, Version und rechtlichen Hinweisen."""
+
+    def __init__(self, parent=None):
+        """Baut das 'Über'-Fenster auf."""
+        super().__init__(parent)
+        self.setWindowTitle(tr("Über Überzeit Rechner"))
+        self.setMinimumWidth(340)
+
+        layout = QVBoxLayout(self)
+        layout.setSpacing(8)
+
+        pixmap = QPixmap(ICON_PATH)
+        if not pixmap.isNull():
+            icon_label = QLabel()
+            icon_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            icon_label.setPixmap(pixmap.scaledToWidth(
+                96, Qt.TransformationMode.SmoothTransformation))
+            layout.addWidget(icon_label)
+
+        title = QLabel("Überzeit Rechner")
+        title_font = QFont()
+        title_font.setPointSize(16)
+        title_font.setBold(True)
+        title.setFont(title_font)
+        title.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        layout.addWidget(title)
+
+        version = QLabel(tr("Version {v}").format(v=APP_VERSION))
+        version.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        layout.addWidget(version)
+
+        desc = QLabel(tr("Überstunden- und Arbeitszeit-Rechner"))
+        desc.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        desc.setStyleSheet("color: gray;")
+        layout.addWidget(desc)
+
+        layout.addSpacing(6)
+
+        tech = QLabel(
+            f"Python {platform.python_version()} · "
+            f"PyQt6 {PYQT_VERSION_STR} · Qt {QT_VERSION_STR}"
+        )
+        tech.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        tech.setStyleSheet("color: gray; font-size: 11px;")
+        layout.addWidget(tech)
+
+        legal = QLabel(tr("© 2026 Micha Weiß · MIT-Lizenz"))
+        legal.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        legal.setStyleSheet("color: gray; font-size: 11px;")
+        layout.addWidget(legal)
+
+        layout.addSpacing(6)
+
+        btn_close = QPushButton(tr("Schließen"))
+        btn_close.clicked.connect(self.accept)
+        layout.addWidget(btn_close)
+
 
 # pylint: disable=too-many-instance-attributes, too-many-arguments
 # pylint: disable=attribute-defined-outside-init
@@ -72,6 +134,9 @@ class SettingsDialog(QDialog):
         btn_wizard = QPushButton(tr("Einrichtungsassistenten erneut aufrufen"))
         btn_wizard.clicked.connect(self._open_welcome_wizard)
         layout_system.addWidget(btn_wizard)
+        btn_about = QPushButton(tr("Über das Programm"))
+        btn_about.clicked.connect(self._open_about)
+        layout_system.addWidget(btn_about)
         layout_system.addStretch()
         self.tabs.addTab(tab_system, tr("System && Design"))
 
@@ -174,7 +239,8 @@ class SettingsDialog(QDialog):
             {"after": 360, "break": 30},
             {"after": 540, "break": 45},
         ])
-        for rule in sorted(rules, key=lambda r: r["after"]):
+        valid_rules = [r for r in rules if isinstance(r, dict)]
+        for rule in sorted(valid_rules, key=lambda r: r.get("after", 0)):
             self.add_break_rule_row(rule)
 
     def add_break_rule_row(self, data=None):
@@ -186,14 +252,14 @@ class SettingsDialog(QDialog):
 
         after_edit = QTimeEdit()
         after_edit.setDisplayFormat("HH:mm")
-        after_mins = data["after"] if data else 360
+        after_mins = data.get("after", 360) if data else 360
         after_edit.setTime(QTime(after_mins // 60, after_mins % 60))
         self.break_rules_table.setCellWidget(row, 0, after_edit)
 
         break_spin = QSpinBox()
         break_spin.setRange(0, 120)
         break_spin.setSuffix(" min")
-        break_spin.setValue(data["break"] if data else 30)
+        break_spin.setValue(data.get("break", 30) if data else 30)
         self.break_rules_table.setCellWidget(row, 1, break_spin)
 
     def remove_break_rule_row(self):
@@ -358,17 +424,17 @@ class SettingsDialog(QDialog):
 
         day_spin = QSpinBox()
         day_spin.setRange(1, 31)
-        day_spin.setValue(data["day"] if data else 1)
+        day_spin.setValue(data.get("day", 1) if data else 1)
         self.special_days_table.setCellWidget(row, 0, day_spin)
 
         month_spin = QSpinBox()
         month_spin.setRange(1, 12)
-        month_spin.setValue(data["month"] if data else 1)
+        month_spin.setValue(data.get("month", 1) if data else 1)
         self.special_days_table.setCellWidget(row, 1, month_spin)
 
         time_edit = QTimeEdit()
         time_edit.setDisplayFormat("HH:mm")
-        time_edit.setTime(QTime.fromString(data["target"] if data else "04:00", "HH:mm"))
+        time_edit.setTime(QTime.fromString(data.get("target", "04:00") if data else "04:00", "HH:mm"))
         self.special_days_table.setCellWidget(row, 2, time_edit)
 
     def remove_special_day_row(self):
@@ -408,6 +474,10 @@ class SettingsDialog(QDialog):
             self.time_target.setTime(QTime.fromString(result["target_work_time"], "HH:mm"))
             for i, cb in enumerate(self.workday_checkboxes):
                 cb.setChecked(i in result["workdays"])
+
+    def _open_about(self):
+        """Öffnet das 'Über'-Fenster mit Versions- und Lizenzinfo."""
+        AboutDialog(self).exec()
 
     def get_settings(self):
         """
@@ -602,7 +672,7 @@ class EditDialog(QDialog):
         e_str = self.time_end.time().toString("HH:mm")
 
         if is_midnight_shift(s_str, e_str):
-            msg = tr("⚠️ Mitternachtsschicht: Wird beim Speichern in zwei Tage aufgeteilt.")
+            msg = tr("⚠️ Mitternachtsschicht: Wird als ein Eintrag dem Starttag zugerechnet.")
             self.lbl_warning.setText(msg)
         else:
             self.lbl_warning.setText("")

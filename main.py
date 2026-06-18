@@ -191,17 +191,26 @@ class UeberstundenApp(QMainWindow):
         if os.path.exists(SETTINGS_FILE):
             try:
                 with open(SETTINGS_FILE, "r", encoding="utf-8") as f:
-                    defaults.update(json.load(f))
-            except (json.JSONDecodeError, OSError) as exc:
+                    loaded = json.load(f)
+            except (json.JSONDecodeError, OSError, ValueError) as exc:
                 logger.warning("Einstellungsdatei konnte nicht gelesen werden, "
                                "Standardwerte werden verwendet: %s", exc)
+            else:
+                if isinstance(loaded, dict):
+                    defaults.update(loaded)
+                else:
+                    logger.warning("Einstellungsdatei enthält kein JSON-Objekt (%s), "
+                                   "Standardwerte werden verwendet.",
+                                   type(loaded).__name__)
         return defaults
 
     def save_settings(self):
-        """Speichert die aktuellen Einstellungen in die JSON-Datei."""
+        """Speichert die aktuellen Einstellungen atomar in die JSON-Datei."""
+        tmp_file = SETTINGS_FILE + ".tmp"
         try:
-            with open(SETTINGS_FILE, "w", encoding="utf-8") as f:
+            with open(tmp_file, "w", encoding="utf-8") as f:
                 json.dump(self.settings, f)
+            os.replace(tmp_file, SETTINGS_FILE)
         except OSError as exc:
             logger.error("Einstellungen konnten nicht gespeichert werden: %s", exc)
 
@@ -804,7 +813,7 @@ if __name__ == "__main__":
             window.tab_main.on_settings_changed()
             window.tab_main.recalculate_all_days()
             window._on_data_changed()  # pylint: disable=protected-access
-        window.settings["first_run"] = False
-        window.save_settings()
+            window.settings["first_run"] = False
+            window.save_settings()
 
     sys.exit(app.exec())

@@ -86,6 +86,26 @@ class DBManager:
         self.conn.commit()
         entry.id = cursor.lastrowid
 
+    def insert_many(self, entries):
+        """Fügt mehrere Arbeitseinträge in EINER Transaktion ein (alles-oder-nichts).
+
+        Bei einem Fehler wird die gesamte Transaktion zurückgerollt, sodass keine
+        teilweise importierten Einträge zurückbleiben.
+        """
+        cursor = self.conn.cursor()
+        try:
+            for entry in entries:
+                cursor.execute("""
+                    INSERT INTO entries (date, start, end, pause, minutes, reason, target_minutes)
+                    VALUES (?, ?, ?, ?, ?, ?, ?)
+                """, (entry.date, entry.start, entry.end, entry.pause,
+                      entry.minutes, entry.reason, entry.target_minutes))
+                entry.id = cursor.lastrowid
+            self.conn.commit()
+        except sqlite3.Error:
+            self.conn.rollback()
+            raise
+
     def update(self, entry: WorkEntry):
         """
         Aktualisiert einen bestehenden Arbeitseintrag in der Datenbank.

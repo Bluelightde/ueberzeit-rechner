@@ -256,6 +256,6 @@ class GoalsTab(QWidget):
                     "Tipp: Wenn du ab sofort jeden Tag "
                     "<b>{m} Minuten</b> länger machst, "
                     "erreichst du dein Ziel punktgenau."
-                ).format(m=int(extra_per_day))
+                ).format(m=math.ceil(extra_per_day))
             )
             self.lbl_goal_action.setStyleSheet(f"color: {COLOR_INFO};")
