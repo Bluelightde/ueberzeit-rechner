@@ -1,5 +1,6 @@
 package de.bluelight.ueberzeitrechner.data
 
+import androidx.room.Transaction
 import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
@@ -53,4 +54,16 @@ interface EntriesDao {
 
     @Query("DELETE FROM bereitschaft_entries")
     suspend fun clearBereitschaft()
+
+    @Transaction
+    suspend fun replaceAllEntries(entries: List<WorkEntryEntity>) {
+        clearEntries()
+        entries.forEach { insertEntry(it) }
+    }
+
+    @Transaction
+    suspend fun replaceAllBereitschaft(entries: List<BereitschaftEntryEntity>) {
+        clearBereitschaft()
+        entries.forEach { insertBereitschaft(it) }
+    }
 }

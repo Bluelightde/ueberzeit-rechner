@@ -205,6 +205,70 @@ class TestAddEntry:
         sick = sorted(e.date for e in rows if e.entry_type == TYPE_SICK)
         assert sick == ["2024-06-03", "2024-06-04", "2024-06-05"]
 
+    def test_absenz_setzt_keinen_work_duplikat_marker(self, tab):
+        # Nach dem Speichern einer Abwesenheit darf _last_added_params NICHT
+        # als Arbeits-Eintrag markiert sein (sonst Fehlverhalten in der Vorschau).
+        self._drive_entry(tab, "2024-06-11", "08:00", "17:00",
+                          "Urlaub", etype=TYPE_VACATION)
+        assert tab._last_added_params is None
+
+    def test_arbeitseintrag_setzt_work_duplikat_marker(self, tab):
+        self._drive_entry(tab, "2024-06-12", "08:00", "17:00", "Arbeit")
+        assert tab._last_added_params == (("2024-06-12", "08:00", "17:00"), TYPE_WORK)
+
+    def test_csv_import_ueberspringt_ungueltige_daten(self, tab, tmp_path):
+        import unittest.mock as mock
+        from PyQt6.QtWidgets import QMessageBox
+        csv_path = tmp_path / "import.csv"
+        csv_path.write_text(
+            "Datum;Minuten;Anlass;Start;Ende;Pause\n"
+            "03.06.2024;30;OK1;08:00;17:00;30\n"
+            "NICHTSGUELTIG;0;Muell;;;\n"
+            "2024-06-04;0;OK2;08:00;16:30;0\n",
+            encoding="utf-8",
+        )
+        # Backup-Ziel auf tmp lenken, damit der Test nicht die echte DB sichert.
+        tab.settings = {**tab.settings, "db_path": str(tmp_path / "real.db")}
+        with mock.patch("tabs.main_tab.QFileDialog.getOpenFileName",
+                        return_value=(str(csv_path), "")), \
+                mock.patch.object(QMessageBox, "question",
+                                  return_value=QMessageBox.StandardButton.Yes), \
+                mock.patch.object(QMessageBox, "information"), \
+                mock.patch.object(QMessageBox, "critical"):
+            tab.import_csv()
+        dates = sorted(e.date for e in tab.db.load_all())
+        # Nur die zwei parsebaren Zeilen landen in der DB; der Müll-String nicht.
+        assert dates == ["2024-06-03", "2024-06-04"]
+        assert "NICHTSGUELTIG" not in dates
+
+    def test_edit_dialog_lehnt_ueberschneidung_ab(self, tab):
+        import unittest.mock as mock
+        from PyQt6.QtWidgets import QMessageBox
+        from dialogs import EditDialog
+        from logic import get_target_minutes, get_max_minutes
+        # Bestehender Eintrag 08:00-12:00; neuer Eintrag soll sich überschneiden.
+        tab.db.insert(WorkEntry(id=None, date="2024-06-20", start="08:00", end="12:00",
+                                pause=0, minutes=0, reason="A", entry_type=TYPE_WORK))
+        tab.db.insert(WorkEntry(id=None, date="2024-06-20", start="14:00", end="16:00",
+                                pause=0, minutes=0, reason="B", entry_type=TYPE_WORK))
+        tab.entries = tab.db.load_all()
+        target = [e for e in tab.entries if e.reason == "B"][0]
+        dlg = EditDialog(target, tab.entries, get_target_minutes(tab.settings),
+                         get_max_minutes(tab.settings), tab.settings.get("auto_break", True),
+                         tab.settings.get("break_rules"), tab)
+        # Zeiten so setzen, dass sie mit Eintrag A (08:00-12:00) kollidieren.
+        dlg.has_times_cb.setChecked(True)
+        dlg.time_start.setTime(QTime(9, 0))
+        dlg.time_end.setTime(QTime(10, 0))
+        accepted = {"value": None}
+        with mock.patch.object(QMessageBox, "warning") as warn, \
+                mock.patch("PyQt6.QtWidgets.QDialog.accept",
+                           side_effect=lambda *a: accepted.update(value=True)):
+            dlg.validate_and_accept()
+        # Überschneidung erkannt -> Warnung gezeigt, Dialog NICHT akzeptiert.
+        assert warn.called
+        assert accepted["value"] is None
+
 
 class TestCalendarRendering:
     """Regression: der Kalender MUSS Zellen tatsächlich in die Tabelle einfügen."""

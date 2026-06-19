@@ -20,12 +20,15 @@ abstract class AppDatabase : RoomDatabase() {
 
         fun getDatabase(context: Context): AppDatabase {
             return INSTANCE ?: synchronized(this) {
+                // No fallbackToDestructiveMigration(): a future schema change must ship
+                // an explicit Migration via addMigrations(...) instead of silently
+                // wiping the user's data. The current schema is version 2; there is no
+                // earlier published version to migrate from.
                 val instance = Room.databaseBuilder(
                     context.applicationContext,
                     AppDatabase::class.java,
                     "ueberstunden_daten.db"
                 )
-                    .fallbackToDestructiveMigration()
                     .build()
                 INSTANCE = instance
                 instance

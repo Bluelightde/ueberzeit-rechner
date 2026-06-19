@@ -4,6 +4,23 @@ All notable changes to Überzeit Rechner are documented here.
 
 ---
 
+## [1.7.0] – 2026-06-19
+
+### Security
+- **Hardcoded Android signing password removed** from `.claude/settings.local.json`. Keystore credentials must live only in the gitignored `android/keystore.properties`, never in the repository.
+
+### Fixed
+- **Edit dialog validates overlaps before closing** — editing a work entry into a time range that collides with another entry is now rejected inside the dialog (with a warning) instead of silently discarding the edit after the dialog had already closed.
+- **CSV import rejects unparseable dates** — rows whose date matches no known format are skipped instead of being stored verbatim as an invalid date string.
+- **Live preview no longer mis-detects absences as duplicates** — the "just saved" marker is only set for work entries (which carry start/end times), so saving an absence and then a work entry with the same widget times is no longer wrongly treated as a duplicate.
+
+### Android
+- **Explicit database migrations** — `fallbackToDestructiveMigration()` was removed so a future schema change must ship a real migration instead of silently wiping the user's data.
+- **Atomic external-DB import** — data is read in full and then replaced inside a single transaction (`replaceAllEntries`/`replaceAllBereitschaft`); a failed import no longer leaves the local database empty.
+- **Minified release builds** — R8 code and resource shrinking is enabled with ProGuard keep rules for Room and Compose.
+
+---
+
 ## [1.6.0] – 2026-06-18
 
 ### Added

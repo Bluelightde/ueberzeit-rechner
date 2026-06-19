@@ -528,6 +528,11 @@ class MainTab(QWidget):  # pylint: disable=too-many-public-methods
         max_mins = get_max_minutes(self.settings)
         is_auto = self.settings.get("auto_break", True)
 
+        # Linear scan for the smallest duration reaching the daily target. A
+        # binary search is NOT valid here: with auto-break the net work time is
+        # non-monotonic in duration (crossing a break tier, e.g. >6h, drops net
+        # by the new break), so the first satisfying duration must be found by
+        # scanning from zero.
         duration_mins = 0
         for duration_mins in range(0, max_mins * 2 + 1):
             temp = WorkEntry(
@@ -589,14 +594,13 @@ class MainTab(QWidget):  # pylint: disable=too-many-public-methods
 
         all_day = [e for e in self.entries if e.date == curr_date_str]
 
-        # Intelligenz: Wenn die aktuellen Formular-Zeiten exakt dem entsprechen,
-        # was wir gerade gespeichert haben, zählen wir sie in der Vorschau nicht doppelt.
+        # Avoid double-counting the current form fields when they match the last
+        # saved work entry. Absence entries have no start/end, so they are compared
+        # only by date and type.
         is_duplicate = (
-            hasattr(self, "_last_added_params") and
+            self._last_added_params is not None and
             self._last_added_params == (
-                curr_date_str,
-                current_temp.start,
-                current_temp.end
+                (curr_date_str, current_temp.start, current_temp.end), TYPE_WORK
             )
         )
 
@@ -748,7 +752,12 @@ class MainTab(QWidget):  # pylint: disable=too-many-public-methods
         self.date_edit.setDate(QDate.currentDate())
 
         self.entries = self.db.load_all()
-        self._last_added_params = (date_str, start_str, end_str)
+        # Only work entries carry start/end times that the live preview could
+        # double-count; absences have no times, so leave the marker cleared.
+        if selected_type == TYPE_WORK:
+            self._last_added_params = ((date_str, start_str, end_str), TYPE_WORK)
+        else:
+            self._last_added_params = None
 
         for dd in affected_dates:
             self.recalculate_day(dd)
@@ -822,38 +831,19 @@ class MainTab(QWidget):  # pylint: disable=too-many-public-methods
             get_max_minutes(self.settings), self.settings.get("auto_break", True),
             self.settings.get("break_rules"), self
         )
-        if dialog.exec():
-            new_date = dialog.date_edit.date().toString("yyyy-MM-dd")
-            new_start = (
-                dialog.time_start.time().toString("HH:mm")
-                if dialog.has_times_cb.isChecked() else ""
-            )
-            new_end = (
-                dialog.time_end.time().toString("HH:mm")
-                if dialog.has_times_cb.isChecked() else ""
-            )
+        if not dialog.exec():
+            return
 
-            overlap = self.check_overlap(new_date, new_start, new_end, exclude_id=entry.id)
-            if overlap:
-                QMessageBox.warning(
-                    self, tr("Überschneidung"),
-                    tr(
-                        "Die Änderungen überschneiden sich mit einem anderen Eintrag:"
-                        "\n\n{overlap}\n\nBitte korrigiere die Zeiten."
-                    ).format(overlap=overlap)
-                )
-                return
+        # Validation is already performed inside EditDialog.validate_and_accept().
+        new_date = entry.date
 
-            # Übernacht-Schichten bleiben EIN Eintrag (siehe add_entry);
-            # calculate_timed_entries in recalculate_day rechnet sie korrekt.
-            dialog.apply_to_entry()
-            self.db.update(entry)
-            affected_dates = [old_date, entry.date]
+        self.db.update(entry)
+        affected_dates = [old_date, new_date]
 
-            self.entries = self.db.load_all()
-            for d in sorted(list(set(affected_dates))):
-                self.recalculate_day(d)
-            self.data_changed.emit()
+        self.entries = self.db.load_all()
+        for d in sorted(set(affected_dates)):
+            self.recalculate_day(d)
+        self.data_changed.emit()
 
     def _delete_block(self, block):
         """Löscht einen Listen-Block (Einzeleintrag oder zusammengefasste
@@ -1000,9 +990,9 @@ class MainTab(QWidget):  # pylint: disable=too-many-public-methods
                         if not parsed_date:
                             logger.warning(
                                 "Datum '%s' konnte in keinem Format geparst werden, "
-                                "wird unverändert übernommen", date_str
+                                "überspringe Zeile.", date_str
                             )
-                            parsed_date = date_str
+                            continue
 
                         pending.append(WorkEntry(
                             id=None, date=parsed_date, start=start_str,

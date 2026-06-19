@@ -306,19 +306,19 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     SQLiteDatabase.OPEN_READONLY
                 )
 
-                // Replace, don't append — otherwise repeated imports multiply the data.
-                dao.clearEntries()
-                dao.clearBereitschaft()
+                // Load all data before touching the local DB so we can replace atomically.
+                val workEntries = readEntriesFromExternalDb(srcDb)
+                val berEntries = readBereitschaftFromExternalDb(srcDb)
 
-                val workCount = importEntries(srcDb)
-                val berCount = importBereitschaft(srcDb)
-
+                // Replace atomically via a transaction; if anything fails the local DB
+                // keeps its previous data.
+                dao.replaceAllEntries(workEntries)
+                dao.replaceAllBereitschaft(berEntries)
                 // Try to keep the URI for write-back. Fails silently if the provider
                 // didn't flag the URI as persistable — then auto-sync stays disabled
                 // but import itself still succeeded.
                 rememberSourceUri(context, uri)
-
-                _importStatus.value = ImportStatus.Success(workCount, berCount)
+                _importStatus.value = ImportStatus.Success(workEntries.size, berEntries.size)
             } catch (e: Exception) {
                 _importStatus.value = ImportStatus.Error(
                     e.message ?: e::class.java.simpleName
@@ -483,12 +483,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    private suspend fun importEntries(srcDb: SQLiteDatabase): Int {
+    private suspend fun readEntriesFromExternalDb(srcDb: SQLiteDatabase): List<WorkEntryEntity> {
+        val result = mutableListOf<WorkEntryEntity>()
         val hasTable = srcDb.rawQuery(
             "SELECT name FROM sqlite_master WHERE type='table' AND name='entries'",
             null
         ).use { it.count > 0 }
-        if (!hasTable) return 0
+        if (!hasTable) return result
 
         val cols = srcDb.rawQuery("PRAGMA table_info(entries)", null).use { c ->
             buildSet { while (c.moveToNext()) add(c.getString(1)) }
@@ -498,11 +499,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         val sql = "SELECT date, start, end, pause, minutes, reason" +
                 (if (hasTarget) ", target_minutes" else "") + " FROM entries"
 
-        var count = 0
         srcDb.rawQuery(sql, null).use { c ->
             while (c.moveToNext()) {
                 val date = c.getString(0) ?: continue
-                val entity = WorkEntryEntity(
+                result += WorkEntryEntity(
                     date = date,
                     start = c.getString(1),
                     end = c.getString(2),
@@ -511,19 +511,18 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     reason = c.getString(5),
                     targetMinutes = if (hasTarget && !c.isNull(6)) c.getInt(6) else -1
                 )
-                dao.insertEntry(entity)
-                count++
             }
         }
-        return count
+        return result
     }
 
-    private suspend fun importBereitschaft(srcDb: SQLiteDatabase): Int {
+    private suspend fun readBereitschaftFromExternalDb(srcDb: SQLiteDatabase): List<BereitschaftEntryEntity> {
+        val result = mutableListOf<BereitschaftEntryEntity>()
         val hasTable = srcDb.rawQuery(
             "SELECT name FROM sqlite_master WHERE type='table' AND name='bereitschaft_entries'",
             null
         ).use { it.count > 0 }
-        if (!hasTable) return 0
+        if (!hasTable) return result
 
         val cols = srcDb.rawQuery("PRAGMA table_info(bereitschaft_entries)", null).use { c ->
             buildSet { while (c.moveToNext()) add(c.getString(1)) }
@@ -533,21 +532,18 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         val sql = "SELECT date, start, end, note" +
                 (if (hasEndDate) ", end_date" else "") + " FROM bereitschaft_entries"
 
-        var count = 0
         srcDb.rawQuery(sql, null).use { c ->
             while (c.moveToNext()) {
                 val date = c.getString(0) ?: continue
-                val entity = BereitschaftEntryEntity(
+                result += BereitschaftEntryEntity(
                     date = date,
                     start = c.getString(1),
                     end = c.getString(2),
                     note = c.getString(3),
                     endDate = if (hasEndDate) c.getString(4) else null
                 )
-                dao.insertBereitschaft(entity)
-                count++
             }
         }
-        return count
+        return result
     }
 }

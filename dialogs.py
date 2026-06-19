@@ -695,7 +695,7 @@ class EditDialog(QDialog):
         layout.addWidget(self.lbl_warning)
 
         btn_save = QPushButton(tr("Speichern"))
-        btn_save.clicked.connect(self.accept)
+        btn_save.clicked.connect(self.validate_and_accept)
         layout.addWidget(btn_save)
 
         if bool(self.entry.start and self.entry.end):
@@ -875,6 +875,35 @@ class EditDialog(QDialog):
             self.pause_spin.blockSignals(False)
 
         self.min_spinbox.setValue(entry_overtime)
+
+    def validate_and_accept(self):
+        """Prüft Überschneidungen bevor der Dialog geschlossen wird."""
+        if not self.has_times_cb.isChecked():
+            self.apply_to_entry()
+            super().accept()
+            return
+
+        curr_date_str = self.date_edit.date().toString("yyyy-MM-dd")
+        s_str = self.time_start.time().toString("HH:mm")
+        e_str = self.time_end.time().toString("HH:mm")
+
+        overlap = self.parent().check_overlap(curr_date_str, s_str, e_str, exclude_id=self.entry.id)
+        if overlap:
+            QMessageBox.warning(
+                self, tr("Überschneidung"),
+                tr(
+                    "Die gewählten Zeiten überschneiden sich mit einem anderen Eintrag:\n\n"
+                    "{overlap}\n\nBitte korrigiere die Zeiten."
+                ).format(overlap=overlap)
+            )
+            return
+
+        self.apply_to_entry()
+        super().accept()
+
+    def accept(self):
+        # Validation entry point for the Save button; keyboard Enter still routes here.
+        self.validate_and_accept()
 
     def apply_to_entry(self):
         """

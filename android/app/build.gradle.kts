@@ -8,6 +8,7 @@ plugins {
 
 // Load release-signing credentials from android/keystore.properties (gitignored).
 // If the file is missing we just skip the signing config, so debug builds still work.
+// The password must NOT be stored in the repository or in .claude/settings.local.json.
 val keystoreProperties = Properties().apply {
     val file = rootProject.file("keystore.properties")
     if (file.exists()) load(file.inputStream())
@@ -21,8 +22,8 @@ android {
         applicationId = "de.bluelight.ueberzeitrechner"
         minSdk = 26
         targetSdk = 34
-        versionCode = 1
-        versionName = "1.0.0"
+        versionCode = 2
+        versionName = "1.0.1"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
@@ -43,7 +44,8 @@ android {
 
     buildTypes {
         release {
-            isMinifyEnabled = false
+            isMinifyEnabled = true
+            isShrinkResources = true
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
