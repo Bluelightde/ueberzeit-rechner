@@ -184,13 +184,13 @@ def export_pdf(parent, entries, title):
     if not file_name:
         return
     try:
-        html = _generate_pdf_html(entries, title)
+        html_content = _generate_pdf_html(entries, title)
         printer = QPrinter(QPrinter.PrinterMode.HighResolution)
         printer.setOutputFormat(QPrinter.OutputFormat.PdfFormat)
         printer.setOutputFileName(file_name)
 
         doc = QTextDocument()
-        doc.setHtml(html)
+        doc.setHtml(html_content)
         doc.setPageSize(QSizeF(printer.pageRect(QPrinter.Unit.Point).size()))
         doc.print(printer)
 

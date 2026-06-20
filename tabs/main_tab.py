@@ -773,8 +773,8 @@ class MainTab(QWidget):  # pylint: disable=too-many-public-methods
                    if e.entry_type == TYPE_VACATION and e.date.startswith(current_year))
         entitlement = self.settings.get("vacation_entitlement", 30)
         remaining = entitlement - used
-        self.lbl_vacation.setText(tr("Urlaub: {u}/{e} Tage übrig").format(
-            u=remaining, e=entitlement))
+        self.lbl_vacation.setText(tr("Urlaub: {r}/{e} Tage übrig").format(
+            r=remaining, e=entitlement))
 
     def edit_entry(self, row, _column):
         """Doppelklick: öffnet den passenden Bearbeiten-Dialog für die Zeile."""

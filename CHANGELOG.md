@@ -4,6 +4,17 @@ All notable changes to Überzeit Rechner are documented here.
 
 ---
 
+## [1.7.1] – 2026-06-20
+
+### Fixed
+- **No settings written while building the Goals tab** — the goal-hours auto-calculation no longer persists settings as a side effect of widget construction. The computed value is now stored on the first regular data refresh instead of during `__init__`.
+- **PDF export no longer shadows the stdlib `html` module** — the local HTML string in `export_pdf` was renamed so a later `html.escape()` call in that function cannot silently break.
+
+### Changed
+- **Vacation summary placeholder renamed** from `{u}` to `{r}` (remaining) in both the source string and the English catalog, so a translator reordering the placeholders can no longer swap "remaining" and "entitlement".
+
+---
+
 ## [1.7.0] – 2026-06-19
 
 ### Security

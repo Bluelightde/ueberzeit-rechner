@@ -38,7 +38,7 @@ class GoalsTab(QWidget):
         self._build_ui()
 
         if self.settings.get("goal_hours", 0) == 0:
-            self.auto_calculate_goal_hours()
+            self._recalculate_goal_hours()
 
     # pylint: disable=too-many-locals, too-many-statements
     def _build_ui(self):
@@ -158,7 +158,16 @@ class GoalsTab(QWidget):
         self.on_goal_changed()
 
     def auto_calculate_goal_hours(self):
-        """Berechnet die benötigten Überstunden automatisch anhand des gewählten Zeitraums."""
+        """Berechnet die Überstunden neu und speichert (Slot für dateChanged)."""
+        self._recalculate_goal_hours()
+        self.on_goal_changed()
+
+    def _recalculate_goal_hours(self):
+        """Berechnet die benötigten Überstunden anhand des gewählten Zeitraums.
+
+        Setzt nur den Spinbox-Wert – ohne Persistenz und ohne Signale, damit die
+        Methode auch während der Konstruktion gefahrlos aufgerufen werden kann.
+        """
         start_d = self.goal_start_edit.date()
         end_d = self.goal_end_edit.date()
         if start_d > end_d:
@@ -175,8 +184,6 @@ class GoalsTab(QWidget):
         self.goal_hours_spin.blockSignals(True)
         self.goal_hours_spin.setValue(math.ceil(total_target_mins / 60.0))
         self.goal_hours_spin.blockSignals(False)
-
-        self.on_goal_changed()
 
     def on_goal_changed(self):
         """Wird aufgerufen, wenn sich die Ziel-Einstellungen ändern."""

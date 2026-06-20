@@ -56,7 +56,7 @@ _EN: dict[str, str] = {
     "Gleitzeitabbau": "Flextime reduction",
     "Elternzeit": "Parental leave",
     "bis:": "to:",
-    "Urlaub: {u}/{e} Tage übrig": "Vacation: {u}/{e} days left",
+    "Urlaub: {r}/{e} Tage übrig": "Vacation: {r}/{e} days left",
     "Urlaubsanspruch:": "Vacation entitlement:",
     "Tage / Jahr": "days/year",
     " ({n} Tage)": " ({n} days)",
