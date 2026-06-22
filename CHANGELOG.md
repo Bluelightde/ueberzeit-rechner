@@ -4,6 +4,32 @@ All notable changes to Überzeit Rechner are documented here.
 
 ---
 
+## [1.8.0] – 2026-06-22
+
+### Added
+- **Anwesenheits-Tab (Login/Logout-Historie)** — neuer Tab "Anwesenheit" zeigt die vergangenen Tage mit Login- und Logout-Zeit sowie der Anwesenheitsdauer an. Die Zeiten werden aus den System-Protokollen ausgelesen — die App muss dafür nicht laufen. So kann man vergessene Einträge anhand der Anwesenheitszeiten später nachholen.
+  - Login- und Logout-Zeiten werden beim App-Start aus `journalctl` (systemd-logind) bzw. `last` ausgelesen und in die Datenbank übernommen.
+  - Es werden bis zu 30 Tage zurückliegender Sessions erfasst — auch Tage, an denen die App nicht geöffnet war.
+  - Verwaiste Sessions (Shutdown/Crash ohne Logout-Event) werden mit Shutdown-Zeiten aus `last -F reboot` ergänzt.
+  - Pro Tag gilt: frühester Login bleibt erhalten, spätester Logout gewinnt.
+  - Bei Logout am Folgetag (Nachtschicht) wird die Anwesenheitsdauer korrekt mit +24h berechnet.
+  - Monatsfilter und "Aktualisieren"-Button zum Neuladen der Tabelle.
+- **System-Session-Erkennung** — neue Funktion `get_system_sessions()` in `logic.py` für plattformübergreifende Login/Logout-Erkennung (Linux: journalctl+last, macOS: last -y, Windows: nicht unterstützt).
+- **Datenbank-Migration v3** — `device_login`-Tabelle erhält neue `end_time`-Spalte (Logout-Zeit); bestehende Datenbanken werden automatisch migriert.
+
+### Changed
+- `device_login`-Tabelle: bisher nur `start_time` (Login), jetzt auch `end_time` (Logout).
+- `set_device_login()` nutzt jetzt UPSERT (`ON CONFLICT DO UPDATE WHERE start_time = ''`), sodass ein Login auch nachträglich eingetragen wird, wenn bereits ein Logout-Eintrag existiert.
+- Neue DBManager-Methoden: `set_device_logout()` (Logout speichern/aktualisieren), `load_all_device_logins()` (alle Login/Logout-Einträge laden).
+- `_on_data_changed()` aktualisiert jetzt auch den Anwesenheits-Tab.
+- DB-Wechsel in Einstellungen: `set_db()` wird auch für den Session-Tab aufgerufen.
+- `closeEvent` zeichnet keinen Logout mehr auf — stattdessen werden System-Sessions beim Start synchronisiert.
+
+### Tests
+- 9 neue Tests für `device_login`/`set_device_logout`/`load_all_device_logins` (Login/Logout speichern, Überschreiben, Login-nach-Logout, Sortierung, Migration v2→v3).
+
+---
+
 ## [1.7.1] – 2026-06-20
 
 ### Fixed

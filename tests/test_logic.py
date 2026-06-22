@@ -9,6 +9,7 @@ from models import WorkEntry
 from logic import (
     get_holidays, calculate_timed_entries, is_midnight_shift, split_midnight_shift,
     get_target_minutes_for_date, get_absence_minutes,
+    get_system_sessions, _merge_sessions,
     TYPE_WORK, TYPE_VACATION, TYPE_SICK, TYPE_HOLIDAY, TYPE_FLEXTIME,
     ABSENCE_TYPES,
 )
@@ -517,3 +518,67 @@ class TestAbsenceMinutes:
         assert TYPE_HOLIDAY in ABSENCE_TYPES
         assert TYPE_WORK not in ABSENCE_TYPES
         assert TYPE_FLEXTIME not in ABSENCE_TYPES
+
+
+
+# ---------------------------------------------------------------------------
+# System-Session-Erkennung (get_system_sessions / _merge_sessions)
+# ---------------------------------------------------------------------------
+
+class TestGetSystemSessions:
+    """get_system_sessions() liefert eine Liste von Session-Dicts."""
+
+    def test_return_type_is_list(self):
+        """Auf jedem System muss mindestens eine leere Liste zurückkommen."""
+        result = get_system_sessions()
+        assert isinstance(result, list)
+
+    def test_sessions_have_required_keys(self):
+        """Jede Session muss date/login/logout Keys haben."""
+        for s in get_system_sessions():
+            assert "date" in s
+            assert "login" in s
+            assert "logout" in s
+
+
+class TestMergeSessions:
+    """_merge_sessions führt mehrere Sessions pro Tag zusammen."""
+
+    def test_fruehester_login_gewinnt(self):
+        sessions = [
+            {"date": "2024-06-01", "login": "09:00", "logout": "17:00"},
+            {"date": "2024-06-01", "login": "07:30", "logout": "16:00"},
+        ]
+        merged = _merge_sessions(sessions)
+        assert len(merged) == 1
+        assert merged[0]["login"] == "07:30"
+
+    def test_spätester_logout_gewinnt(self):
+        sessions = [
+            {"date": "2024-06-01", "login": "07:30", "logout": "16:00"},
+            {"date": "2024-06-01", "login": "09:00", "logout": "18:00"},
+        ]
+        merged = _merge_sessions(sessions)
+        assert merged[0]["logout"] == "18:00"
+
+    def test_leerer_logout_wird_nicht_ueberschrieben(self):
+        sessions = [
+            {"date": "2024-06-01", "login": "07:30", "logout": ""},
+            {"date": "2024-06-01", "login": "09:00", "logout": "17:00"},
+        ]
+        merged = _merge_sessions(sessions)
+        assert merged[0]["logout"] == "17:00"
+        assert merged[0]["login"] == "07:30"
+
+    def test_sortierung_absteigend(self):
+        sessions = [
+            {"date": "2024-06-01", "login": "07:30", "logout": ""},
+            {"date": "2024-06-03", "login": "08:00", "logout": ""},
+            {"date": "2024-06-02", "login": "07:45", "logout": ""},
+        ]
+        merged = _merge_sessions(sessions)
+        dates = [s["date"] for s in merged]
+        assert dates == ["2024-06-03", "2024-06-02", "2024-06-01"]
+
+    def test_leere_liste(self):
+        assert _merge_sessions([]) == []

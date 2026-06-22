@@ -9,7 +9,7 @@ from datetime import datetime
 
 from models import WorkEntry, BereitschaftEntry
 
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 3
 BACKUP_KEEP = 10
 
 class DBManager:
@@ -54,7 +54,8 @@ class DBManager:
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS device_login (
                 date TEXT PRIMARY KEY,
-                start_time TEXT NOT NULL
+                start_time TEXT NOT NULL,
+                end_time TEXT
             )
         """)
         self._run_migrations(cursor)
@@ -76,6 +77,9 @@ class DBManager:
             # v1 -> v2: Eintragstypen (work/vacation/sick/holiday/flextime)
             self._ensure_column(cursor, "entries", "type",
                                  "TEXT NOT NULL DEFAULT 'work'")
+        if version < 3:
+            # v2 -> v3: Logout-Zeit (end_time) für Anwesenheits-Übersicht
+            self._ensure_column(cursor, "device_login", "end_time", "TEXT")
         cursor.execute(f"PRAGMA user_version = {SCHEMA_VERSION}")
 
     @staticmethod
@@ -226,13 +230,51 @@ class DBManager:
         return row[0] if row else None
 
     def set_device_login(self, date_str: str, start_time: str):
-        """Speichert die erste Login-Zeit für ein Datum. Bestehende Einträge bleiben unverändert."""
+        """Speichert die erste Login-Zeit für ein Datum.
+
+        Ist noch kein Eintrag für den Tag vorhanden, wird einer angelegt.
+        Existiert bereits einer mit leerer start_time (z.B. durch ein
+        vorheriges set_device_logout kurz nach Mitternacht), wird die
+        start_time nachträglich gesetzt. Eine bereits gesetzte start_time
+        bleibt unverändert (frühester Login des Tages gewinnt).
+        """
         cursor = self.conn.cursor()
         cursor.execute(
-            "INSERT OR IGNORE INTO device_login (date, start_time) VALUES (?, ?)",
+            "INSERT INTO device_login (date, start_time) VALUES (?, ?) "
+            "ON CONFLICT(date) DO UPDATE SET start_time = excluded.start_time "
+            "WHERE device_login.start_time = ''",
             (date_str, start_time),
         )
         self.conn.commit()
+
+    def set_device_logout(self, date_str: str, end_time: str):
+        """Speichert/aktualisiert die Logout-Zeit für ein Datum.
+
+        Existiert noch kein Login-Eintrag für den Tag, wird einer angelegt
+        (start_time bleibt leer – z.B. wenn die App erst nach dem Login
+        gestartet wurde). Andernfalls wird nur end_time aktualisiert.
+        """
+        cursor = self.conn.cursor()
+        cursor.execute(
+            "INSERT INTO device_login (date, start_time, end_time) "
+            "VALUES (?, '', ?) "
+            "ON CONFLICT(date) DO UPDATE SET end_time = excluded.end_time",
+            (date_str, end_time),
+        )
+        self.conn.commit()
+
+    def load_all_device_logins(self):
+        """Lädt alle gespeicherten Login-/Logout-Zeiten, sortiert nach Datum
+        (absteigend). Gibt eine Liste von Dicts mit 'date', 'start', 'end' zurück."""
+        cursor = self.conn.cursor()
+        cursor.execute(
+            "SELECT date, start_time, end_time FROM device_login "
+            "ORDER BY date DESC"
+        )
+        return [
+            {"date": row[0], "start": row[1] or "", "end": row[2] or ""}
+            for row in cursor.fetchall()
+        ]
 
     # --- Backup / Wiederherstellung ---
 

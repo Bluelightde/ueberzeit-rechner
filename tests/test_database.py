@@ -273,6 +273,10 @@ class TestSchemaMigration:
             cols = [r[1] for r in cur.fetchall()]
             assert "target_minutes" in cols
             assert "type" in cols   # v1->v2 Migration (Eintragstypen)
+            # v2->v3 Migration (end_time in device_login) — Tabelle existiert
+            # nach Migration automatisch; Spalte muss vorhanden sein.
+            cur.execute("PRAGMA table_info(device_login)")
+            assert "end_time" in [r[1] for r in cur.fetchall()]
             cur.execute("PRAGMA table_info(bereitschaft_entries)")
             assert "end_date" in [r[1] for r in cur.fetchall()]
             cur.execute("PRAGMA user_version")
@@ -280,6 +284,98 @@ class TestSchemaMigration:
         finally:
             mgr.close()
 
+
+# ---------------------------------------------------------------------------
+# Device-Login / Logout (Anwesenheits-Übersicht)
+# ---------------------------------------------------------------------------
+
+class TestDeviceLoginLogout:
+
+    def test_set_device_login_speichert_erste_zeit(self, db):
+        db.set_device_login("2024-06-01", "07:30")
+        assert db.get_device_login("2024-06-01") == "07:30"
+
+    def test_set_device_login_ignoriert_bestehenden(self, db):
+        db.set_device_login("2024-06-01", "07:30")
+        db.set_device_login("2024-06-01", "09:00")  # früherer Login bleibt
+        assert db.get_device_login("2024-06-01") == "07:30"
+
+    def test_set_device_logout_aktualisiert_bestehenden(self, db):
+        db.set_device_login("2024-06-01", "07:30")
+        db.set_device_logout("2024-06-01", "17:00")
+        rows = db.load_all_device_logins()
+        assert len(rows) == 1
+        assert rows[0] == {"date": "2024-06-01", "start": "07:30", "end": "17:00"}
+
+    def test_set_device_logout_legt_eintrag_ohne_login_an(self, db):
+        """Logout ohne vorherigen Login → start_time leer, end_time gesetzt."""
+        db.set_device_logout("2024-06-02", "18:00")
+        rows = db.load_all_device_logins()
+        assert rows[0] == {"date": "2024-06-02", "start": "", "end": "18:00"}
+
+    def test_set_device_login_fuellt_leeren_start_nach_logout(self, db):
+        """Logout erstellt Zeile mit leerem start_time; späterer Login füllt sie.
+
+        Realistisches Szenario: App schließt kurz nach Mitternacht (Logout
+        erstellt Zeile für den neuen Tag mit leerem start), wird später am
+        gleichen Tag wieder geöffnet (Login muss start_time nachträglich
+        setzen können)."""
+        db.set_device_logout("2024-06-02", "00:10")
+        db.set_device_login("2024-06-02", "08:00")
+        rows = db.load_all_device_logins()
+        assert rows[0]["start"] == "08:00"
+        assert rows[0]["end"] == "00:10"  # Logout bleibt erhalten
+
+    def test_set_device_logout_ueberschreibt_bestehende_end_time(self, db):
+        db.set_device_login("2024-06-01", "07:30")
+        db.set_device_logout("2024-06-01", "16:00")
+        db.set_device_logout("2024-06-01", "18:30")
+        rows = db.load_all_device_logins()
+        assert rows[0]["end"] == "18:30"
+        assert rows[0]["start"] == "07:30"  # start unverändert
+
+    def test_load_all_device_logins_sortiert_absteigend(self, db):
+        db.set_device_login("2024-06-01", "07:30")
+        db.set_device_login("2024-06-03", "08:00")
+        db.set_device_login("2024-06-02", "07:45")
+        rows = db.load_all_device_logins()
+        dates = [r["date"] for r in rows]
+        assert dates == ["2024-06-03", "2024-06-02", "2024-06-01"]
+
+    def test_get_device_login_none_wenn_nicht_vorhanden(self, db):
+        assert db.get_device_login("1999-01-01") is None
+
+    def test_migriert_v2_db_bekommt_end_time_spalte(self, tmp_path):
+        """Eine DB mit user_version 2 (device_login ohne end_time) wird
+        korrekt auf v3 migriert."""
+        path = str(tmp_path / "v2.db")
+        con = sqlite3.connect(path)
+        con.execute("CREATE TABLE entries (id INTEGER PRIMARY KEY AUTOINCREMENT, "
+                    "date TEXT NOT NULL, start TEXT, end TEXT, pause INTEGER, "
+                    "minutes INTEGER, reason TEXT, target_minutes INTEGER DEFAULT -1, "
+                    "type TEXT NOT NULL DEFAULT 'work')")
+        con.execute("CREATE TABLE bereitschaft_entries (id INTEGER PRIMARY KEY "
+                    "AUTOINCREMENT, date TEXT NOT NULL, start TEXT, end TEXT, "
+                    "note TEXT, end_date TEXT)")
+        con.execute("CREATE TABLE device_login (date TEXT PRIMARY KEY, "
+                    "start_time TEXT NOT NULL)")
+        con.execute("PRAGMA user_version = 2")
+        con.execute("INSERT INTO device_login (date, start_time) VALUES ('2024-06-01', '07:30')")
+        con.commit()
+        con.close()
+        mgr = DBManager(path)
+        try:
+            cur = mgr.conn.cursor()
+            cur.execute("PRAGMA table_info(device_login)")
+            assert "end_time" in [r[1] for r in cur.fetchall()]
+            cur.execute("PRAGMA user_version")
+            assert cur.fetchone()[0] == SCHEMA_VERSION
+            # Bestehende Daten bleiben erhalten
+            rows = mgr.load_all_device_logins()
+            assert rows[0]["start"] == "07:30"
+            assert rows[0]["end"] == ""
+        finally:
+            mgr.close()
 
 # ---------------------------------------------------------------------------
 # Backup / Wiederherstellung (#5)

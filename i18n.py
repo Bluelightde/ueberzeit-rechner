@@ -342,6 +342,25 @@ _EN: dict[str, str] = {
     "Ziele && Dashboard": "Goals && Dashboard",
     "Kalender-Heatmap": "Calendar Heatmap",
     "Diagramm && Statistik": "Chart && Statistics",
+    "Anwesenheit": "Attendance",
+
+    # --- SessionTab (Anwesenheit) ---
+    "Aktualisieren": "Refresh",
+    "Login": "Login",
+    "Logout": "Logout",
+    "Anwesend": "Present",
+    (
+        "Hier werden deine Login- und Logout-Zeiten aus den "
+        "System-Protokollen ausgelesen – die App muss dafür nicht "
+        "laufen. Die Zeiten dienen als Gedächtnisstütze, es wird "
+        "kein Arbeitseintrag erstellt. Du kannst vergessene Einträge "
+        "anhand dieser Übersicht später nachholen."
+    ): (
+        "Your login and logout times are read from the system logs "
+        "– the app does not need to be running. These times serve as "
+        "a memory aid, no work entry is created. You can catch up "
+        "on forgotten entries later using this overview."
+    ),
 
     # --- DB not found dialog ---
     "Datenbank nicht gefunden": "Database not found",

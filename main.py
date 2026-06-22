@@ -27,6 +27,7 @@ from tabs.goals_tab import GoalsTab
 from tabs.calendar_tab import CalendarTab
 from tabs.stats_tab import StatsTab
 from tabs.bereitschaft_tab import BereitschaftTab
+from tabs.session_tab import SessionTab
 # pylint: enable=wrong-import-position, wrong-import-order
 
 logger = logging.getLogger(__name__)
@@ -92,13 +93,15 @@ class UeberstundenApp(QMainWindow):
         self.tab_calendar = CalendarTab(settings=self.settings)
         self.tab_stats = StatsTab(settings=self.settings)
         self.tab_bereitschaft = BereitschaftTab(db=self.db)
+        self.tab_session = SessionTab(db=self.db)
 
         tabs = QTabWidget()
         tabs.addTab(self.tab_main,         tr("Eingabe && Liste"))
         tabs.addTab(self.tab_goals,        tr("Ziele && Dashboard"))
         tabs.addTab(self.tab_calendar,     tr("Kalender-Heatmap"))
         tabs.addTab(self.tab_bereitschaft, tr("Bereitschaft"))
-        tabs.addTab(self.tab_stats,        tr("Diagramm && Statistik"))
+        tabs.addTab(self.tab_session,    tr("Anwesenheit"))
+        tabs.addTab(self.tab_stats,      tr("Diagramm && Statistik"))
         self.setCentralWidget(tabs)
 
         # Signals verbinden: Datenänderungen im Haupt-Tab → alle Tabs aktualisieren
@@ -119,6 +122,37 @@ class UeberstundenApp(QMainWindow):
 
         # Erstmalige Befüllung aller Tabs
         self._on_data_changed()
+        self._sync_system_sessions()
+
+    def _sync_system_sessions(self):
+        """Liest Login/Logout-Sessions aus den System-Protokollen und
+        füllt die Anwesenheits-Historie nach.
+
+        Die Daten stammen aus journalctl/last – nicht aus der App selbst.
+        So werden auch Tage erfasst, an denen die App nicht lief.
+        Pro Tag gilt: früher Login bleibt erhalten, später Logout gewinnt.
+        """
+        try:
+            from logic import get_system_sessions
+            sessions = get_system_sessions()
+            if not sessions:
+                return
+            for s in sessions:
+                date_str = s["date"]
+                login_str = s.get("login", "")
+                logout_str = s.get("logout", "")
+                # Login nur setzen, wenn heute noch keiner existiert
+                # (frühester Login gewinnt) oder der bestehende leer ist.
+                if login_str:
+                    existing = self.db.get_device_login(date_str)
+                    if existing is None:
+                        self.db.set_device_login(date_str, login_str)
+                # Logout setzen / aktualisieren (spätester gewinnt)
+                if logout_str:
+                    self.db.set_device_logout(date_str, logout_str)
+            self.tab_session.refresh_from_db()
+        except Exception as exc:  # pylint: disable=broad-except
+            logger.warning("System-Sessions konnten nicht synchronisiert werden: %s", exc)
 
     # --- Datenbankpfad ---
 
@@ -831,6 +865,7 @@ class UeberstundenApp(QMainWindow):
         self.tab_goals.refresh(entries)
         self.tab_calendar.refresh(entries, bereitschaft)
         self.tab_bereitschaft.refresh(bereitschaft)
+        self.tab_session.refresh(self.db.load_all_device_logins())
         self.tab_stats.refresh(entries)
 
     # --- Einstellungs-Dialog ---
@@ -870,6 +905,7 @@ class UeberstundenApp(QMainWindow):
                 self.db = DBManager(new_db_path)
                 self.tab_main.set_db(self.db)
                 self.tab_bereitschaft.set_db(self.db)
+                self.tab_session.set_db(self.db)
 
             self.settings.update(new_settings)
             self.save_settings()
@@ -881,7 +917,6 @@ class UeberstundenApp(QMainWindow):
 
             # Tabs über Einstellungsänderung informieren und UI neu laden
             self.tab_main.on_settings_changed()
-            # Filter zurücksetzen, damit alle Einträge sichtbar sind
             self.tab_main.set_filter("ALL")
             self._on_data_changed()
 
