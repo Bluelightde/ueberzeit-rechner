@@ -471,7 +471,7 @@ class MainTab(QWidget):  # pylint: disable=too-many-public-methods
                     prev.append(e)
                     continue
             blocks.append([e])
-        blocks.sort(key=lambda b: b[0].date, reverse=True)
+        blocks.sort(key=lambda b: (b[0].date, b[0].start or ""), reverse=True)
         return blocks
 
     def _only_nonworkdays_between(self, date_a, date_b):

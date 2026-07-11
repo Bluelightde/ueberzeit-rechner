@@ -118,6 +118,16 @@ class TestAddEntry:
         for e in rows:
             assert e.date == "2024-06-06"
 
+    def test_eintraege_selber_tag_sortiert_absteigend(self, tab):
+        # Drei Arbeitseinträge am selben Tag, unterschiedlich Uhrzeiten.
+        # In der Tabelle MUSS der späteste oben stehen (neueste zuerst).
+        self._drive_entry(tab, "2024-06-06", "08:00", "12:00", "Vormittag")
+        self._drive_entry(tab, "2024-06-06", "14:00", "18:00", "Nachmittag")
+        self._drive_entry(tab, "2024-06-06", "06:00", "07:00", "Fruehschicht")
+        tab.update_ui()
+        starts = [block[0].start for block in tab._display_blocks]
+        assert starts == ["14:00", "08:00", "06:00"], f"Sortierung falsch: {starts}"
+
     def test_nach_add_entry_sind_felder_zurueckgesetzt(self, tab):
         self._drive_entry(tab, "2024-06-07", "08:00", "16:00", "Nach add_entry")
         assert tab.reason_edit.text() == ""

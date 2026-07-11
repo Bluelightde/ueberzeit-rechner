@@ -4,6 +4,14 @@ All notable changes to Überzeit Rechner are documented here.
 
 ---
 
+## [1.8.1] – 2026-07-11
+
+### Fixed
+- **Sortierung der Einträge auf der Hauptseite** — Arbeitseinträge am selben Tag wurden innerhalb des Tages nach aufsteigender Startzeit angezeigt statt absteigend. Der neueste Eintrag (späteste Uhrzeit) steht nun ganz oben. Betroffen war `_consolidate_blocks` in `tabs/main_tab.py`: der Sortierschlüssel enthielt nur das Datum, nicht die Uhrzeit.
+
+### Tests
+- Neuer Regressionstest `test_eintraege_selber_tag_sortiert_absteigend` (drei Einträge am selben Tag mit unterschiedlichen Uhrzeiten → Anzeige-Reihenfolge absteigend nach Startzeit).
+
 ## [1.8.0] – 2026-06-22
 
 ### Added
