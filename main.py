@@ -8,11 +8,12 @@ import os
 import shutil
 import sqlite3
 import sys
+import threading
 
-from PyQt6.QtCore import QDate, QLibraryInfo, Qt, QTranslator
+from PyQt6.QtCore import QDate, QLibraryInfo, Qt, QTimer, QTranslator
 from PyQt6.QtGui import QColor, QIcon, QPalette
 from PyQt6.QtWidgets import (
-    QApplication, QMainWindow, QTabWidget, QMessageBox, QFileDialog
+    QApplication, QMainWindow, QTabWidget, QMessageBox, QFileDialog, QWidget
 )
 
 # Configuration must be imported before matplotlib for MPLCONFIGDIR
@@ -25,7 +26,6 @@ from i18n import current_language, setup_i18n, tr
 from tabs.main_tab import MainTab
 from tabs.goals_tab import GoalsTab
 from tabs.calendar_tab import CalendarTab
-from tabs.stats_tab import StatsTab
 from tabs.bereitschaft_tab import BereitschaftTab
 from tabs.session_tab import SessionTab
 # pylint: enable=wrong-import-position, wrong-import-order
@@ -91,7 +91,10 @@ class UeberstundenApp(QMainWindow):
             save_settings_cb=self.save_settings,
         )
         self.tab_calendar = CalendarTab(settings=self.settings)
-        self.tab_stats = StatsTab(settings=self.settings)
+        # StatsTab wird lazy geladen: Erst beim ersten Tab-Klick wird
+        # matplotlib importiert und StatsTab konstruiert. Spart ~200-500 ms
+        # Startup-Zeit (matplotlib-Import + canvas.draw der 3 Diagramme).
+        self.tab_stats = None
         self.tab_bereitschaft = BereitschaftTab(db=self.db)
         self.tab_session = SessionTab(db=self.db)
 
@@ -101,7 +104,15 @@ class UeberstundenApp(QMainWindow):
         tabs.addTab(self.tab_calendar,     tr("Kalender-Heatmap"))
         tabs.addTab(self.tab_bereitschaft, tr("Bereitschaft"))
         tabs.addTab(self.tab_session,    tr("Anwesenheit"))
-        tabs.addTab(self.tab_stats,      tr("Diagramm && Statistik"))
+        self._stats_placeholder = QWidget()
+        self._stats_tab_index = tabs.addTab(self._stats_placeholder, tr("Diagramm && Statistik"))
+        # Wichtig: connect erst NACH allen addTab-Aufrufen — sonst feuert das
+        # implizite currentChanged(0) beim ersten addTab bereits auf den Handler.
+        # Die Lazy-Optimierung hängt davon ab, dass die App immer auf Tab 0
+        # startet. Sollte jemals eine "letzten Tab wiederherstellen"-Funktion
+        # hinzukommen, müsste _ensure_stats_tab erst nach window.show()
+        # scharfgeschaltet werden (z.B. via QTimer.singleShot(0, ...)).
+        tabs.currentChanged.connect(self._ensure_stats_tab)
         self.setCentralWidget(tabs)
 
         # Signals verbinden: Datenänderungen im Haupt-Tab → alle Tabs aktualisieren
@@ -122,7 +133,9 @@ class UeberstundenApp(QMainWindow):
 
         # Erstmalige Befüllung aller Tabs
         self._on_data_changed()
-        self._sync_system_sessions()
+        # System-Sessions asynchron abfragen, damit der Start nicht auf
+        # journalctl/last-Subprocesses wartet (~70 ms warm, kalt deutlich mehr).
+        QTimer.singleShot(0, self._sync_system_sessions)
 
     def _sync_system_sessions(self):
         """Liest Login/Logout-Sessions aus den System-Protokollen und
@@ -866,7 +879,28 @@ class UeberstundenApp(QMainWindow):
         self.tab_calendar.refresh(entries, bereitschaft)
         self.tab_bereitschaft.refresh(bereitschaft)
         self.tab_session.refresh(self.db.load_all_device_logins())
-        self.tab_stats.refresh(entries)
+        if self.tab_stats is not None:
+            self.tab_stats.refresh(entries)
+        self._pending_entries = entries
+
+    def _ensure_stats_tab(self, index):
+        """Lazy-Initialisierung des Statistik-Tabs beim ersten Sichtbarwerden.
+
+        currentChanged feuert bei jedem Tab-Wechsel — egal ob per Maus,
+        Tastatur (Strg+Tab/Pfeiltasten) oder programmatisch. So wird der
+        StatsTab (inkl. matplotlib-Import) robust geladen, sobald der Nutzer
+        den Statistik-Tab das erste Mal betritt.
+        """
+        if index != self._stats_tab_index or self.tab_stats is not None:
+            return
+        from tabs.stats_tab import StatsTab  # noqa: WPS433 — bewusst lazy
+        self.tab_stats = StatsTab(settings=self.settings)
+        if hasattr(self, "_pending_entries"):
+            self.tab_stats.refresh(self._pending_entries)
+        tabs = self.centralWidget()
+        tabs.removeTab(self._stats_tab_index)
+        tabs.insertTab(self._stats_tab_index, self.tab_stats, tr("Diagramm && Statistik"))
+        tabs.setCurrentIndex(self._stats_tab_index)
 
     # --- Einstellungs-Dialog ---
 
@@ -929,6 +963,30 @@ class UeberstundenApp(QMainWindow):
         super().closeEvent(event)
 
 
+def _preload_stats_modules():
+    """Wärmt den Modul-Cache für den Statistik-Tab (matplotlib + StatsTab) vor.
+
+    Der Import von ``tabs.stats_tab`` zieht auf Modulebene matplotlib und das
+    Qt-Agg-Backend nach — mit Abstand der teuerste Teil beim ersten Öffnen des
+    Tabs (~0,6–3 s je nach Datenträger-Cache). Läuft im Hintergrund-Thread und
+    führt bewusst NUR Imports aus; die Figure-/Canvas-Konstruktion bleibt dem
+    Main-Thread in ``_ensure_stats_tab`` vorbehalten. Ist der Import dort noch
+    nicht durch, greift weiterhin der synchrone Fallback — Python serialisiert
+    konkurrierende Imports desselben Moduls über den Import-Lock.
+    """
+    try:
+        import tabs.stats_tab  # noqa: F401  pylint: disable=import-outside-toplevel,unused-import
+    except Exception:  # pylint: disable=broad-except  # Preload darf die App nie stören
+        logger.debug("StatsTab-Preload fehlgeschlagen", exc_info=True)
+
+
+def _start_stats_preload():
+    """Startet den StatsTab-Modul-Preload in einem Daemon-Thread."""
+    threading.Thread(
+        target=_preload_stats_modules, name="stats-preload", daemon=True
+    ).start()
+
+
 if __name__ == "__main__":
     setup_logging()
     logger.info("Anwendung gestartet")
@@ -958,6 +1016,10 @@ if __name__ == "__main__":
 
     window = UeberstundenApp()
     window.show()
+
+    # matplotlib + StatsTab-Modul im Hintergrund vorladen, damit der erste
+    # Klick auf den Statistik-Tab nicht durch den matplotlib-Import blockiert.
+    _start_stats_preload()
 
     if window.settings.get("first_run", True):
         dlg = WelcomeDialog(window.settings, window)
