@@ -188,6 +188,8 @@ class EintragenTest(Grundlage):
         e, = self.eintraege()
         self.assertEqual((e.start, e.end, e.pause, e.minutes), ('07:12', '15:50', 30, 8))
         self.assertNotIn('Bei der Arbeit seit', self.c.get('/').text)
+        self.post('/stempeln/kommen', start='16:00')                   # Soll schon erfüllt
+        self.assertIn('Tagessoll ist heute schon erfüllt', self.c.get('/').text)
 
     def test_einstellungen_rechnen_alles_neu(self):
         self.post('/eintragen', art='work', datum='2026-10-12', start='07:00', ende='16:00')

@@ -23,7 +23,7 @@
     <div style="flex:1">
       <div class="leise klein">Bei der Arbeit seit {{ lauf.start }}{% if lauf.datum != datum %} am {{ datum_kurz(lauf.datum) }}{% endif %}</div>
       <div class="uhr zahl" data-laufzeit>{{ '%d:%02d' % (lauf.seit // 60, lauf.seit % 60) }}</div>
-      <div class="leise klein">Tagessoll erreicht um <b>{{ lauf.ende_soll }}</b></div>
+      <div class="leise klein">{% if lauf.ende_soll == lauf.start %}Tagessoll ist heute schon erfüllt{% else %}Tagessoll erreicht um <b>{{ lauf.ende_soll }}</b>{% endif %}</div>
     </div>
   </div>
   <form method="post" action="{{ url_for('gehen') }}" style="margin-top:12px">
