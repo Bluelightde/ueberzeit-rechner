@@ -4,6 +4,29 @@ All notable changes to Überzeit Rechner are documented here.
 
 ---
 
+## [Unreleased]
+
+### Added
+- **Server-Version `web/`** — Überzeit läuft zusätzlich im Browser und als installierbare App (PWA) auf dem Handy, z. B. im
+  eigenen Homelab mit Docker Compose (`compose.yml` in der Repo-Wurzel, Anleitung `web/README.md`). Jede Person hat eigene
+  Daten; Anmeldung über OpenID Connect (Authentik) mit Gruppenprüfung, Notzugang per Passwort nur direkt im LAN.
+  - Heute: Gesamtsaldo, Urlaubskonto, „Kommen/Feierabend“ mit laufender Uhr, Eintragen mit Live-Vorschau (Pause,
+    Tag-Saldo, Ende fürs Tagessoll, Überschneidung, Ruhezeit, Höchstarbeitszeit).
+  - Einträge (Monatsliste, mehrtägige Abwesenheiten zusammengefasst), Kalender mit Tagessaldo, Feiertagen, Abwesenheiten
+    und Bereitschaft, Statistik, Ziel (Überstunden ansparen), Bereitschaft, Einstellungen wie in der Desktop-App.
+  - **Austausch mit der Desktop-App:** `ueberstunden_daten.db` und `ueberstunden_settings.json` hochladen; Export als
+    Datenbank im Desktop-Format (dort als Datenbank-Speicherort wählbar) und als CSV.
+- **`kern.py`** — die Rechenregeln (Feiertage, Tagessoll, Pausen nach ArbZG, Überstunden, Mitternachtsschichten,
+  Überschneidungen) ohne PyQt, gemeinsam für Desktop und Server.
+
+### Changed
+- `logic.py` importiert die Rechenregeln aus `kern.py` (gleiche Namen, gleiches Verhalten — 28.300 Vergleiche mit der
+  bisherigen Qt-Fassung identisch, Desktop-Tests unverändert grün). Feiertage werden je Jahr/Land/Region zwischengespeichert.
+
+### Tests
+- `tests/test_kern.py` (Rechenregeln ohne Qt), `web/tests/test_web.py` (20 Prüfungen der Server-Version). Gegenprobe:
+  263 Zufallseinträge, von `MainTab.recalculate_all_days` und der Server-Version gerechnet, auf die Minute gleich.
+
 ## [1.8.1] – 2026-07-11
 
 ### Fixed

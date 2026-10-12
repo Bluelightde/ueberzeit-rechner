@@ -1,0 +1,56 @@
+{% extends 'base.html' %}
+{% from '_teile.html' import betrag with context %}
+{% block titel %}Statistik{% endblock %}
+{% block inhalt %}
+<form class="monatswahl" method="get" data-sofort>
+  <select name="jahr" aria-label="Zeitraum">
+    {% for j in s.jahre %}<option value="{{ j }}" {{ 'selected' if j == wahl }}>{{ j }}</option>{% endfor %}
+    <option value="alle" {{ 'selected' if wahl == 'alle' }}>Gesamter Zeitraum</option>
+  </select>
+</form>
+<div class="raster2" style="margin-bottom:14px">
+  <div class="kennzahl"><div class="name">Gesamtsaldo</div><div class="wert">{{ betrag(s.gesamt) }}</div></div>
+  <div class="kennzahl"><div class="name">{{ 'Im Jahr ' ~ jahr if jahr else 'Im Zeitraum' }}</div><div class="wert">{{ betrag(s.zeitraum) }}</div></div>
+  <div class="kennzahl"><div class="name">Ø pro Monat</div><div class="wert">{{ betrag(s.schnitt) }}</div></div>
+  <div class="kennzahl"><div class="name">Längste Serie</div><div class="wert"><span class="plus">{{ s.plus_serie }}</span> / <span class="minus">{{ s.minus_serie }}</span> <span class="leise klein">Tage</span></div></div>
+  {% if s.bester %}<div class="kennzahl"><div class="name">Bester Monat</div><div class="wert">{{ betrag(s.bester[1]) }}</div><div class="leise klein">{{ monat_name(s.bester[0]) }}</div></div>{% endif %}
+  {% if s.schlechtester %}<div class="kennzahl"><div class="name">Schwächster Monat</div><div class="wert">{{ betrag(s.schlechtester[1]) }}</div><div class="leise klein">{{ monat_name(s.schlechtester[0]) }}</div></div>{% endif %}
+</div>
+
+<section class="karte">
+  <h2>Saldo je Monat</h2>
+  {% if s.balken %}
+  <div class="balken" style="--anzahl: {{ s.balken|length }}">
+    {% for b in s.balken %}
+      <div class="spalte" title="{{ monat_name(b.monat) }}: {{ zeit(b.minuten, true) }}">
+        <div class="o">{% if b.minuten > 0 %}<div class="b" style="height: {{ (b.anteil * 100)|round(1) }}%"></div>{% endif %}</div>
+        <div class="u">{% if b.minuten < 0 %}<div class="b" style="height: {{ (b.anteil * 100)|round(1) }}%"></div>{% endif %}</div>
+      </div>
+    {% endfor %}
+  </div>
+  <div class="balken-namen" style="--anzahl: {{ s.balken|length }}">{% for b in s.balken %}<span>{{ b.name if jahr else b.monat[2:4] ~ '/' ~ b.monat[5:7] }}</span>{% endfor %}</div>
+  {% else %}<div class="leer"><i class="bi bi-bar-chart"></i>Noch keine Daten.</div>{% endif %}
+</section>
+
+<section class="karte">
+  <h2>Ø Saldo je Wochentag</h2>
+  <ul class="liste">
+  {% for w in s.wochentage %}
+    <li><span style="width:2.2em;font-weight:800">{{ w.name }}</span>
+      <span class="mitte"><span class="fortschrittsbalken" style="display:block;height:10px"><span style="display:block;height:100%;width: {{ (w.anteil * 100)|round(1) }}%;background: var(--{{ 'plus' if w.minuten >= 0 else 'minus' }})"></span></span></span>
+      <span class="betrag" style="min-width:5em">{{ betrag(w.minuten) if w.tage else '–' }}</span></li>
+  {% endfor %}
+  </ul>
+</section>
+
+{% if s.abwesend %}
+<section class="karte">
+  <h2>Abwesenheiten</h2>
+  <div class="raster3">
+    {% for art, anzahl in s.abwesend|dictsort %}
+      <div class="kennzahl"><div class="name"><i class="bi {{ art_symbol[art] }}" style="color: {{ art_farbe[art] }}"></i> {{ art_name[art] }}</div><div class="wert">{{ anzahl }} <span class="leise klein">Tage</span></div></div>
+    {% endfor %}
+  </div>
+</section>
+{% endif %}
+{% endblock %}

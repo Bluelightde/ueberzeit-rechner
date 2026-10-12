@@ -1,0 +1,38 @@
+{% extends 'base.html' %}
+{% from '_teile.html' import betrag with context %}
+{% block titel %}Ziel{% endblock %}
+{% block inhalt %}
+{% if ziel %}
+<section class="karte">
+  <h2><i class="bi bi-flag"></i> Fortschritt <span class="rechts">{{ ziel.prozent }} % erreicht</span></h2>
+  <div class="fortschrittsbalken"><div style="width: {{ ziel.prozent }}%"></div></div>
+  <div class="raster3" style="margin-top:12px">
+    <div class="kennzahl"><div class="name">Angespart</div><div class="wert">{{ betrag(ziel.stand, false) }}</div></div>
+    <div class="kennzahl"><div class="name">Fehlt noch</div><div class="wert">{{ zeit(ziel.fehlt) }}</div></div>
+    <div class="kennzahl"><div class="name">Arbeitstage bis dahin</div><div class="wert">{{ ziel.arbeitstage if ziel.arbeitstage is not none else '–' }}</div></div>
+  </div>
+  <p style="margin:12px 0 0;font-weight:700" class="{{ 'plus' if ziel.zustand == 'erreicht' else ('minus' if ziel.zustand in ('begonnen', 'keine_tage') else '') }}">
+    {% if ziel.zustand == 'erreicht' %}🎉 Geschafft! Du hast genug Überstunden für diesen Zeitraum angespart.
+    {% elif ziel.zustand == 'begonnen' %}⚠️ Der Zeitraum hat bereits begonnen oder ist heute.
+    {% elif ziel.zustand == 'keine_tage' %}Keine regulären Arbeitstage mehr zum Ansparen übrig.
+    {% else %}Tipp: Wenn du ab morgen jeden Arbeitstag <b>{{ ziel.pro_tag }} Minuten</b> länger machst, erreichst du dein Ziel punktgenau.{% endif %}
+  </p>
+</section>
+{% endif %}
+<section class="karte">
+  <h2><i class="bi bi-sliders"></i> Ziel festlegen</h2>
+  <p class="leise klein" style="margin-top:-4px">Überstunden für eine freie Zeit ansparen, z. B. eine Urlaubswoche. Ohne Stundenangabe werden die Sollstunden des Zeitraums berechnet (Feiertage und freie Tage zählen nicht).</p>
+  <form method="post">
+    <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+    <label class="haken"><input type="checkbox" name="aktiv" value="1" {{ 'checked' if w.goal_active }}> Ziel verfolgen</label>
+    <div class="raster2">
+      <div><label for="von">Freie Zeit von</label><input type="date" id="von" name="von" value="{{ von }}"></div>
+      <div><label for="bis">bis einschließlich</label><input type="date" id="bis" name="bis" value="{{ bis }}"></div>
+    </div>
+    <label for="stunden">Benötigte Stunden</label>
+    <input type="number" id="stunden" name="stunden" min="0" value="{{ w.goal_hours or '' }}">
+    <label class="haken"><input type="checkbox" name="stunden_berechnen" value="1"> Stunden aus dem Zeitraum berechnen</label>
+    <div style="margin-top:14px"><button class="knopf breit" type="submit"><i class="bi bi-check2"></i> Speichern</button></div>
+  </form>
+</section>
+{% endblock %}

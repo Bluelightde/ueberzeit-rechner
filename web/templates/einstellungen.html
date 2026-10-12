@@ -1,0 +1,62 @@
+{% extends 'base.html' %}
+{% block titel %}Einstellungen{% endblock %}
+{% block inhalt %}
+<form method="post">
+<input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+<section class="karte">
+  <h2><i class="bi bi-calendar-week"></i> Arbeitstage und Tagessoll</h2>
+  <table class="tabelle">
+    {% for name in wochentage %}{% set soll = w.weekday_targets[loop.index0] if w.weekday_targets else '' %}
+    <tr><td><label class="haken" style="margin:0"><input type="checkbox" name="tag_{{ loop.index0 }}" value="1" {{ 'checked' if soll }}> {{ name }}</label></td>
+        <td style="width:9em"><input type="time" name="soll_{{ loop.index0 }}" value="{{ soll or w.target_work_time }}" aria-label="Soll {{ name }}"></td></tr>
+    {% endfor %}
+  </table>
+  <div class="raster2">
+    <div><label for="default_start">Üblicher Arbeitsbeginn</label><input type="time" id="default_start" name="default_start" value="{{ w.default_start }}"></div>
+    <div><label for="max_work_hours">Höchstens anrechenbar (h/Tag)</label><input type="number" id="max_work_hours" name="max_work_hours" min="1" max="24" value="{{ w.max_work_hours }}"></div>
+    <div><label for="vacation_entitlement">Urlaubstage im Jahr</label><input type="number" id="vacation_entitlement" name="vacation_entitlement" min="0" max="366" value="{{ w.vacation_entitlement }}"></div>
+  </div>
+</section>
+
+<section class="karte">
+  <h2><i class="bi bi-cup-hot"></i> Pausen</h2>
+  <label class="haken"><input type="checkbox" name="auto_break" value="1" {{ 'checked' if w.auto_break }}> Pause automatisch nach den Regeln abziehen</label>
+  <table class="tabelle" data-zeilen="br">
+    <tr><th>ab Arbeitszeit über</th><th>Pause (min)</th></tr>
+    {% for r in w.break_rules %}
+    <tr><td><input type="time" name="br_nach" value="{{ '%02d:%02d' % (r.after // 60, r.after % 60) }}"></td><td><input type="number" name="br_pause" min="0" max="240" value="{{ r.break }}"></td></tr>
+    {% endfor %}
+    <tr><td><input type="time" name="br_nach" value=""></td><td><input type="number" name="br_pause" min="0" max="240" placeholder="neu"></td></tr>
+  </table>
+  <p class="leise klein">Gesetzlich (ArbZG): über 6 h 30 min, über 9 h 45 min. Zum Entfernen die Zeile leeren.</p>
+</section>
+
+<section class="karte">
+  <h2><i class="bi bi-flag"></i> Feiertage und Sondertage</h2>
+  <div class="raster2">
+    <div><label for="country">Land</label><select id="country" name="country" data-regionen="state">
+      {% for code, name in laender %}<option value="{{ code }}" {{ 'selected' if code == w.country }}>{{ name }}</option>{% endfor %}</select></div>
+    <div><label for="state">Bundesland / Region</label><select id="state" name="state">
+      <option value="">– ganzes Land –</option>
+      {% for code, name in regionen %}<option value="{{ code }}" {{ 'selected' if code == w.state }}>{{ name }}</option>{% endfor %}</select></div>
+  </div>
+  <label>Sondertage mit eigenem Soll (jedes Jahr)</label>
+  <table class="tabelle">
+    <tr><th>Tag</th><th>Monat</th><th>Soll</th></tr>
+    {% for sd in w.special_days %}
+    <tr><td><input type="number" name="sd_tag" min="1" max="31" value="{{ sd.day }}"></td><td><input type="number" name="sd_monat" min="1" max="12" value="{{ sd.month }}"></td><td><input type="time" name="sd_soll" value="{{ sd.target }}"></td></tr>
+    {% endfor %}
+    <tr><td><input type="number" name="sd_tag" min="1" max="31" placeholder="neu"></td><td><input type="number" name="sd_monat" min="1" max="12"></td><td><input type="time" name="sd_soll" value="04:00"></td></tr>
+  </table>
+</section>
+
+<section class="karte">
+  <h2><i class="bi bi-circle-half"></i> Darstellung</h2>
+  <select name="theme" aria-label="Darstellung">
+    {% for wert, name in [('auto', 'Wie das Gerät'), ('light', 'Hell'), ('dark', 'Dunkel')] %}<option value="{{ wert }}" {{ 'selected' if (w.theme or 'auto') == wert }}>{{ name }}</option>{% endfor %}
+  </select>
+</section>
+<button class="knopf breit" type="submit"><i class="bi bi-check2"></i> Speichern und neu berechnen</button>
+<p class="leise klein" style="text-align:center">Nach dem Speichern werden alle Tage mit den neuen Regeln neu berechnet – wie in der Desktop-App.</p>
+</form>
+{% endblock %}

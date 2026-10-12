@@ -82,6 +82,15 @@ Extract the `.zip` file and run `Überzeit-Rechner.exe`.
 
 ---
 
+## 🌐 Server Version (Browser & Phone App)
+
+Besides the desktop app there is a **server version** in [`web/`](web/README.md): the same calculation rules
+(`kern.py`), usable in any browser and installable as an app on your phone. Each person has their own data; the
+desktop database can be uploaded and exported again in desktop format. Runs with Docker Compose — see
+[`web/README.md`](web/README.md). The desktop app works exactly as before and does not need it.
+
+---
+
 ## 🚀 Running from Source
 
 ### Requirements

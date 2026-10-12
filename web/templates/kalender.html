@@ -1,0 +1,45 @@
+{% extends 'base.html' %}
+{% from '_teile.html' import betrag, block_zeile with context %}
+{% block titel %}Kalender{% endblock %}
+{% block inhalt %}
+<section class="karte">
+  <div class="kal-kopf">
+    <a class="symbolknopf" style="display:grid;place-items:center" href="{{ url_for('kalender', monat=vor) }}" aria-label="Vormonat"><i class="bi bi-chevron-left"></i></a>
+    <h2>{{ k.name }}</h2>
+    <a class="symbolknopf" style="display:grid;place-items:center" href="{{ url_for('kalender', monat=nach) }}" aria-label="Nächster Monat"><i class="bi bi-chevron-right"></i></a>
+  </div>
+  <div class="kal">
+    {% for w in wochentage %}<div class="wt">{{ w }}</div>{% endfor %}
+    {% for woche in k.wochen %}{% for t in woche %}
+      {% if t %}
+        {% set klasse = ['heute' if t.heute, 'gewaehlt' if t.datum == tag, 'frei' if (t.frei and not t.erfasst), 'plus-tag' if t.minuten > 0, 'minus-tag' if t.minuten < 0]|select|join(' ') %}
+        <a href="{{ url_for('kalender', monat=monat, tag=t.datum) }}#tag" class="{{ klasse }}" title="{{ t.feiertag or '' }}">
+          {% if t.feiertag %}<span class="feiertag-mark"><i class="bi bi-flag-fill"></i></span>{% endif %}
+          {% if t.typ %}<span class="punkt" style="background: {{ art_farbe[t.typ] }}"></span>{% endif %}
+          <span class="t">{{ t.tag }}</span>
+          {% if t.erfasst and t.minuten %}<span class="m {{ 'plus' if t.minuten > 0 else 'minus' }}">{{ zeit(t.minuten, true) }}</span>{% endif %}
+          {% if t.bereitschaft %}<span class="bereit"></span>{% endif %}
+        </a>
+      {% else %}<span class="leer-tag"></span>{% endif %}
+    {% endfor %}{% endfor %}
+  </div>
+  <div class="legende">
+    {% for wert, name in arten if wert != 'work' %}<span><i class="farbe" style="background: {{ art_farbe[wert] }}"></i>{{ name }}</span>{% endfor %}
+    <span><i class="farbe" style="background:#eab308;border-radius:2px;height:4px"></i>Bereitschaft</span>
+    <span><i class="bi bi-flag-fill" style="color:#a855f7"></i>Feiertag</span>
+  </div>
+  <p style="margin:12px 0 0;text-align:center">Monat: <b>{{ betrag(k.summe) }}</b> · Gesamt: {{ betrag(saldo) }}</p>
+</section>
+
+{% if tag_eintraege %}
+<section class="karte" id="tag">
+  <h2>{{ datum_lang(tag_eintraege.datum) }}</h2>
+  <p class="leise klein" style="margin-top:-4px">{% if tag_eintraege.feiertag %}{{ tag_eintraege.feiertag }} · {% endif %}Soll {{ zeit(tag_eintraege.soll) if tag_eintraege.soll else 'frei' }}
+    {% for b in tag_eintraege.bereitschaft %} · Bereitschaft{% if b.start %} {{ b.start }}–{{ b.end }}{% endif %}{% if b.note %} ({{ b.note }}){% endif %}{% endfor %}</p>
+  {% if tag_eintraege.eintraege %}
+  <ul class="liste">{% for e in tag_eintraege.eintraege %}{{ block_zeile({'eintraege': [e], 'erster': e, 'letzter': e, 'minuten': e.minutes, 'typ': e.entry_type, 'ids': e.id|string}, request.full_path) }}{% endfor %}</ul>
+  {% else %}<p class="leise">Kein Eintrag.</p>{% endif %}
+  <a class="knopf leise breit" href="{{ url_for('heute_seite', datum=tag_eintraege.datum) }}#eintragen" data-datum="{{ tag_eintraege.datum }}"><i class="bi bi-plus"></i> Für diesen Tag eintragen</a>
+</section>
+{% endif %}
+{% endblock %}

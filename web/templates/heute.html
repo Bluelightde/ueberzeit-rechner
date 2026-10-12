@@ -1,0 +1,75 @@
+{% extends 'base.html' %}
+{% from '_teile.html' import betrag, block_zeile with context %}
+{% from '_formular.html' import eintrag_formular with context %}
+{% block titel %}Heute{% endblock %}
+{% block inhalt %}
+<section class="karte held">
+  <div class="titel">Überstunden gesamt</div>
+  <div class="saldo zahl">{{ zeit(saldo, true) }}</div>
+  <div class="unter">
+    <span>Heute: <b>{{ zeit(tag_saldo, true) if heute_eintraege else ('frei' if soll == 0 else 'Soll ' ~ zeit(soll)) }}</b></span>
+    <span>Urlaub: <b>{{ urlaub.rest }}/{{ urlaub.anspruch }}</b> Tage übrig</span>
+  </div>
+</section>
+
+{% if leer %}
+<div class="hinweis" style="margin-bottom:14px"><i class="bi bi-info-circle"></i> Noch keine Einträge. Du kannst hier loslegen
+  oder unter <a href="{{ url_for('austausch_seite') }}">Mehr → Daten aus der Desktop-App</a> deine bisherige Datenbank einlesen.</div>
+{% endif %}
+
+<section class="karte">
+  {% if lauf %}
+  <div class="stempel" data-beginn="{{ lauf.beginn_ms }}" data-soll-ende="{{ lauf.ende_soll }}">
+    <div style="flex:1">
+      <div class="leise klein">Bei der Arbeit seit {{ lauf.start }}{% if lauf.datum != datum %} am {{ datum_kurz(lauf.datum) }}{% endif %}</div>
+      <div class="uhr zahl" data-laufzeit>{{ '%d:%02d' % (lauf.seit // 60, lauf.seit % 60) }}</div>
+      <div class="leise klein">Tagessoll erreicht um <b>{{ lauf.ende_soll }}</b></div>
+    </div>
+  </div>
+  <form method="post" action="{{ url_for('gehen') }}" style="margin-top:12px">
+    <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+    <div class="feld-mit-knopf"><input type="time" name="ende" aria-label="Ende (leer = jetzt)" data-jetzt-feld>
+      <button class="knopf gold" type="submit"><i class="bi bi-door-open"></i> Feierabend</button></div>
+  </form>
+  <form method="post" action="{{ url_for('verwerfen') }}" style="margin-top:6px" data-frage="Arbeitsbeginn verwerfen?">
+    <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+    <button class="knopf leise klein" type="submit">Verwerfen</button>
+  </form>
+  {% else %}
+  <form method="post" action="{{ url_for('kommen') }}" class="reihe">
+    <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+    <div style="flex:1;min-width:150px"><h2>Arbeit beginnen</h2><div class="leise klein">Beginn merken, abends nur noch „Feierabend“ tippen.</div></div>
+    <button class="knopf" type="submit"><i class="bi bi-play-fill"></i> Jetzt kommen</button>
+  </form>
+  {% endif %}
+</section>
+
+{% if ziel %}
+<a class="karte" href="{{ url_for('ziel_seite') }}" style="display:block;text-decoration:none;color:inherit">
+  <h2><i class="bi bi-flag"></i> Ziel <span class="rechts leise">{{ ziel.prozent }} %</span></h2>
+  <div class="fortschrittsbalken"><div style="width: {{ ziel.prozent }}%"></div></div>
+  <div class="leise klein" style="margin-top:6px">{{ zeit(ziel.stand) }} von {{ zeit(ziel.ziel) }}{% if ziel.pro_tag %} · täglich {{ ziel.pro_tag }} min länger{% endif %}</div>
+</a>
+{% endif %}
+
+<section class="karte" id="eintragen">
+  <h2><i class="bi bi-plus-circle"></i> Eintragen</h2>
+  {{ eintrag_formular(url_for('eintragen'), form_datum, start, ende, auto) }}
+</section>
+
+{% if heute_eintraege %}
+<section class="karte">
+  <h2>Heute <span class="rechts">{{ betrag(tag_saldo) }}</span></h2>
+  <ul class="liste">
+    {% for e in heute_eintraege %}{{ block_zeile({'eintraege': [e], 'erster': e, 'letzter': e, 'minuten': e.minutes, 'typ': e.entry_type, 'ids': e.id|string}, url_for('heute_seite')) }}{% endfor %}
+  </ul>
+</section>
+{% endif %}
+
+{% if bloecke %}
+<section class="karte">
+  <h2>Zuletzt <a class="rechts" href="{{ url_for('liste') }}">Alle Einträge</a></h2>
+  <ul class="liste">{% for b in bloecke %}{{ block_zeile(b, url_for('heute_seite')) }}{% endfor %}</ul>
+</section>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,22 @@
+{% extends 'base.html' %}
+{% from '_teile.html' import betrag, block_zeile with context %}
+{% block titel %}Einträge{% endblock %}
+{% block inhalt %}
+<form class="monatswahl" method="get" data-sofort>
+  <select name="monat" aria-label="Monat">
+    <option value="alle" {{ 'selected' if monat == 'alle' }}>Alle Monate</option>
+    {% if monat != 'alle' and monat not in monate %}<option value="{{ monat }}" selected>{{ monat_name(monat) }}</option>{% endif %}
+    {% for m in monate %}<option value="{{ m }}" {{ 'selected' if m == monat }}>{{ monat_name(m) }}</option>{% endfor %}
+  </select>
+  <a class="symbolknopf" style="display:grid;place-items:center" href="{{ url_for('export_csv', monat=monat) }}" title="Als CSV herunterladen" aria-label="Als CSV herunterladen"><i class="bi bi-download"></i></a>
+</form>
+<section class="karte">
+  <h2>{{ monat_name(monat) }} <span class="rechts">{{ betrag(summe) }}</span></h2>
+  {% if bloecke %}
+    <ul class="liste">{% for b in bloecke %}{{ block_zeile(b, request.full_path) }}{% endfor %}</ul>
+  {% else %}
+    <div class="leer"><i class="bi bi-inbox"></i>Keine Einträge in diesem Monat.</div>
+  {% endif %}
+</section>
+<p class="leise klein" style="text-align:center">Gesamtsaldo {{ betrag(saldo) }} · Antippen zum Bearbeiten oder Löschen</p>
+{% endblock %}

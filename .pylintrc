@@ -3,3 +3,7 @@
 # pylint cannot inspect their internals in most CI environments.
 disable=import-error,
         no-name-in-module
+
+[MAIN]
+# Die Server-Version (web/) folgt dem Stil der Homelab-Werkzeuge und hat eigene Tests (web/tests)
+ignore-paths=^web/.*$

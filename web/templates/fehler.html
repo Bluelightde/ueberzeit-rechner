@@ -1,0 +1,7 @@
+{% extends 'base.html' %}
+{% block titel %}Fehler {{ fehler.code }}{% endblock %}
+{% block inhalt %}
+<div class="karte" style="text-align:center"><h1 style="font-size:2.4rem">{{ fehler.code }}</h1>
+  <p class="leise">{{ fehler.description if fehler.code == 400 else ('Diese Seite gibt es nicht.' if fehler.code == 404 else 'Kein Zugang.') }}</p>
+  <a class="knopf" href="{{ url_for('heute_seite') }}">Zur Startseite</a></div>
+{% endblock %}

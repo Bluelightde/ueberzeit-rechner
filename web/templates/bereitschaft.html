@@ -1,0 +1,34 @@
+{% extends 'base.html' %}
+{% block titel %}Bereitschaft{% endblock %}
+{% block inhalt %}
+<section class="karte">
+  <h2><i class="bi bi-telephone"></i> Bereitschaft eintragen</h2>
+  <p class="leise klein" style="margin-top:-4px">Nur zur Übersicht im Kalender – Pausen und Überstunden ändert sie nicht.</p>
+  <form method="post">
+    <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+    <div class="raster2">
+      <div><label for="von">Von</label><input type="date" id="von" name="von" value="{{ heute }}" required></div>
+      <div><label for="bis">Bis (optional)</label><input type="date" id="bis" name="bis"></div>
+      <div><label for="start">Beginn (optional)</label><input type="time" id="start" name="start"></div>
+      <div><label for="ende">Ende (optional)</label><input type="time" id="ende" name="ende"></div>
+    </div>
+    <label for="notiz">Notiz</label><input type="text" id="notiz" name="notiz" maxlength="200">
+    <div style="margin-top:14px"><button class="knopf breit" type="submit"><i class="bi bi-plus"></i> Eintragen</button></div>
+  </form>
+</section>
+<section class="karte">
+  <h2>Eingetragen</h2>
+  {% if liste %}
+  <ul class="liste">
+    {% for b in liste %}
+    <li><span class="symbol" style="background:rgba(234,179,8,.18);color:#b58500"><i class="bi bi-telephone"></i></span>
+      <span class="mitte"><span class="oben">{{ datum_kurz(b.date) }}{% if b.end_date and b.end_date != b.date %} – {{ datum_kurz(b.end_date) }}{% endif %}</span><br>
+        <span class="unten">{% if b.start %}{{ b.start }}–{{ b.end }}{% else %}ganztägig{% endif %}{% if b.note %} · {{ b.note }}{% endif %}</span></span>
+      <form method="post" action="{{ url_for('bereitschaft_loeschen', b_id=b.id) }}" data-frage="Bereitschaft vom {{ datum_kurz(b.date) }} löschen?">
+        <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+        <button class="symbolknopf" type="submit" aria-label="Löschen"><i class="bi bi-trash"></i></button></form></li>
+    {% endfor %}
+  </ul>
+  {% else %}<div class="leer"><i class="bi bi-telephone"></i>Noch keine Bereitschaft eingetragen.</div>{% endif %}
+</section>
+{% endblock %}

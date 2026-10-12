@@ -1,0 +1,10 @@
+# Nur kern.py, models.py und web/ gehen ins Bild
+*
+!kern.py
+!models.py
+!web/
+web/daten/
+web/.env
+web/tests/
+web/werkzeuge/
+**/__pycache__/

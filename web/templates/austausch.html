@@ -1,0 +1,29 @@
+{% extends 'base.html' %}
+{% block titel %}Daten austauschen{% endblock %}
+{% block inhalt %}
+<section class="karte">
+  <h2><i class="bi bi-upload"></i> Aus der Desktop-App übernehmen</h2>
+  <p class="leise klein" style="margin-top:-4px">Die Desktop-App speichert neben dem Programm zwei Dateien:
+    <b>ueberstunden_daten.db</b> (Einträge) und <b>ueberstunden_settings.json</b> (Einstellungen). Beide hier hochladen, dann
+    stimmt jeder Saldo auf die Minute. Die Desktop-App bleibt dabei unverändert.</p>
+  <form method="post" enctype="multipart/form-data">
+    <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+    <label for="datenbank">Datenbank (ueberstunden_daten.db)</label>
+    <input type="file" id="datenbank" name="datenbank" accept=".db,.sqlite,.sqlite3,application/octet-stream,application/vnd.sqlite3">
+    <label for="einstellungen">Einstellungen (ueberstunden_settings.json, optional)</label>
+    <input type="file" id="einstellungen" name="einstellungen" accept=".json,application/json">
+    {% if anzahl %}
+    <label class="haken"><input type="checkbox" name="ersetzen" value="1"> Meine {{ anzahl }} Einträge{% if bereitschaften %} und {{ bereitschaften }} Bereitschaften{% endif %} hier ersetzen</label>
+    {% endif %}
+    <div style="margin-top:14px"><button class="knopf breit" type="submit"><i class="bi bi-upload"></i> Einlesen</button></div>
+  </form>
+</section>
+<section class="karte">
+  <h2><i class="bi bi-download"></i> Exportieren</h2>
+  <p class="leise klein" style="margin-top:-4px">Die Datenbank hat das Format der Desktop-App: dort unter <i>Einstellungen → Datenbank-Speicherort</i> auswählen.</p>
+  <div class="raster2">
+    <a class="knopf leise" href="{{ url_for('export_db') }}"><i class="bi bi-database"></i> Datenbank</a>
+    <a class="knopf leise" href="{{ url_for('export_csv') }}"><i class="bi bi-filetype-csv"></i> CSV</a>
+  </div>
+</section>
+{% endblock %}

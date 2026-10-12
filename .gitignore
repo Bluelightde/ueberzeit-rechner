@@ -178,3 +178,7 @@ ueberstunden_settings.json
 .mplconfig/
 .ui_icons/
 demo_daten.db
+
+# Server-Version (web/): Daten und Geheimnisse bleiben auf dem Server
+web/daten/
+web/.env

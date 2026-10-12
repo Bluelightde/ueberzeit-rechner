@@ -44,7 +44,8 @@ Dependencies: `PyQt6`, `matplotlib`, `pyinstaller`, `openpyxl`, `Pillow`, `holid
 The application is modularized into several components:
 
 - `main.py` — Entry point, initializes the application and main window (`UeberstundenApp`).
-- `logic.py` — Core business logic for work time calculations (net time, pauses, overtime).
+- `kern.py` — Qt-free calculation rules (holidays, daily target, ArbZG breaks, overtime, overlaps, midnight shifts). Shared by the desktop app and the server version — change rules here, never duplicate them.
+- `logic.py` — Re-exports the rules from `kern.py` plus Qt helpers (date/time formatting, OS login/session detection).
 - `database.py` — SQLite database management (`DBManager`).
 - `models.py` — Data structures (e.g., `WorkEntry`).
 - `config.py` — Global configuration, paths, and constants.
@@ -68,3 +69,9 @@ The application is modularized into several components:
 - In compiled mode (`sys.frozen`): always uses Fusion style; applies a full `QPalette` for dark/light.
 - In script mode on Linux: uses `Breeze` style; dark mode defers to the system palette.
 - The `theme` setting is `light`, `dark`, or `auto` (default). `apply_theme()` resolves it to an effective `dark_mode` bool — via `QStyleHints.colorScheme()` with a palette-lightness fallback — and stamps `settings['dark_mode']` (read by the calendar/stats tabs). In `auto` mode the app follows the OS scheme **live** via the `colorSchemeChanged` signal; manual changes apply immediately through `apply_theme()`. No restart needed.
+
+## Server Version (`web/`)
+
+Flask app in `web/` (browser + installable PWA, one data set per user, OIDC login). It imports `kern.py` and `models.py`
+from the repo root; Docker builds from the root (`compose.yml`, `web/Dockerfile`). Tests:
+`python -m unittest discover -s web/tests`. Details in `web/README.md`. The desktop app does not depend on `web/`.

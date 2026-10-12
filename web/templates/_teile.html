@@ -1,0 +1,27 @@
+{# Wiederverwendete Bausteine #}
+{% macro betrag(minuten, plus=true) -%}
+<span class="zahl {{ 'plus' if minuten > 0 else ('minus' if minuten < 0 else 'null') }}">{{ zeit(minuten, plus) }}</span>
+{%- endmacro %}
+
+{% macro block_zeile(b, weiter='') -%}
+{% set e = b.erster %}
+<li>
+  {% if b.eintraege|length > 1 %}
+    <a class="zeile" href="{{ url_for('abwesenheit', ids=b.ids, weiter=weiter) }}">
+  {% else %}
+    <a class="zeile" href="{{ url_for('bearbeiten', eintrag_id=e.id, weiter=weiter) }}">
+  {% endif %}
+    <span class="symbol" {% if b.typ != 'work' %}style="background: color-mix(in srgb, {{ art_farbe[b.typ] }} 18%, transparent); color: {{ art_farbe[b.typ] }}"{% endif %}>
+      <i class="bi {{ art_symbol[b.typ] if (b.typ != 'work' or e.start) else 'bi-pencil-square' }}"></i></span>
+    <span class="mitte">
+      <span class="oben">{% if b.eintraege|length > 1 %}{{ datum_kurz(e.date)[:6] }} – {{ datum_kurz(b.letzter.date) }}{% else %}{{ datum_lang(e.date) }}{% endif %}</span><br>
+      <span class="unten">
+        {%- if b.typ != 'work' -%}{{ art_name[b.typ] }}{% if b.eintraege|length > 1 %} · {{ b.eintraege|length }} Tage{% endif %}
+        {%- elif e.start -%}{{ e.start }}–{{ e.end }}{% if e.pause %} · {{ e.pause }} min Pause{% endif %}{% if e.reason %} · {{ e.reason }}{% endif %}
+        {%- else -%}Korrektur{% if e.reason %} · {{ e.reason }}{% endif %}{%- endif -%}
+      </span>
+    </span>
+  </a>
+  <span class="betrag">{{ betrag(b.minuten) }}</span>
+</li>
+{%- endmacro %}

@@ -1,0 +1,31 @@
+{% extends 'base.html' %}
+{% block titel %}Abwesenheit{% endblock %}
+{% block inhalt %}
+{% set erster, letzter = block[0], block[-1] %}
+<section class="karte">
+  <h2><i class="bi {{ art_symbol[erster.entry_type] }}"></i> {{ art_name[erster.entry_type] }}: {{ block|length }} Tage</h2>
+  <p class="leise klein">Ändert den ganzen Zeitraum. Wochenenden und Feiertage dazwischen werden wieder übersprungen.</p>
+  <form method="post">
+    <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+    <input type="hidden" name="ids" value="{{ ids }}">
+    <input type="hidden" name="weiter" value="{{ weiter }}">
+    <div class="arten" role="radiogroup" aria-label="Art">
+      {% for wert, name in arten if wert != 'work' %}
+        <label><input type="radio" name="art" value="{{ wert }}" {{ 'checked' if wert == erster.entry_type }}><span><i class="bi {{ art_symbol[wert] }}"></i>{{ name }}</span></label>
+      {% endfor %}
+    </div>
+    <div class="raster2">
+      <div><label for="von">Von</label><input type="date" id="von" name="von" value="{{ erster.date }}" required></div>
+      <div><label for="bis">Bis einschließlich</label><input type="date" id="bis" name="bis" value="{{ letzter.date }}" required></div>
+    </div>
+    <div style="margin-top:14px"><button class="knopf breit" type="submit"><i class="bi bi-check2"></i> Speichern</button></div>
+  </form>
+</section>
+<form method="post" action="{{ url_for('loeschen') }}" data-frage="{{ art_name[erster.entry_type] }} vom {{ datum_kurz(erster.date) }} bis {{ datum_kurz(letzter.date) }} ({{ block|length }} Tage) wirklich löschen?">
+  <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+  <input type="hidden" name="ids" value="{{ ids }}">
+  <input type="hidden" name="weiter" value="{{ weiter }}">
+  <button class="knopf gefahr breit" type="submit"><i class="bi bi-trash"></i> Alle {{ block|length }} Tage löschen</button>
+</form>
+<p style="text-align:center"><a href="{{ weiter or url_for('liste') }}">Zurück</a></p>
+{% endblock %}

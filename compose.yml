@@ -1,0 +1,29 @@
+# Überzeit (Server-Version) -- Betrieb mit Docker Compose. Einrichtung: web/README.md.
+# Die Desktop-App braucht diese Datei nicht.
+services:
+  app:
+    build:
+      context: .
+      dockerfile: web/Dockerfile
+    image: ueberzeit:latest
+    restart: unless-stopped
+    user: "${UZ_UID:-1001}:${UZ_GID:-1001}"
+    ports:
+      - "${UZ_PORT:-5026}:5026"
+    env_file: web/.env
+    environment:
+      DATENBANK: /daten/ueberzeit.db
+      TZ: Europe/Berlin
+    volumes:
+      - ./web/daten:/daten
+    healthcheck:
+      test: ["CMD", "python", "-c",
+             "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:5026/version', timeout=5).status==200 else 1)"]
+      interval: 30s
+      timeout: 10s
+      start_period: 15s
+      retries: 3
+    logging:
+      driver: journald
+      options:
+        tag: ueberzeit
