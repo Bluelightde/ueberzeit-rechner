@@ -3,12 +3,11 @@
 <head>
   <meta charset="utf-8">
   <meta name="color-scheme" content="light dark">
-  <style>html{background:#eef3fa}@media (prefers-color-scheme: dark){html:not([data-wahl=light]){background:#0b1220}}</style>
-  <link rel="preload" href="{{ url_for('static', filename='fonts/nunito-latin.woff2') }}?v=1" as="font" type="font/woff2" crossorigin>
+  <style>html{background:#eff0f1}@media (prefers-color-scheme: dark){html:not([data-wahl=light]){background:#232629}}</style>
   <link rel="preload" href="{{ url_for('static', filename='vendor/bootstrap-icons/fonts/bootstrap-icons.woff2') }}?e34853135f9e39acf64315236852cd5a" as="font" type="font/woff2" crossorigin>
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>{% block titel %}{% endblock %} · Überzeit</title>
-  <meta name="theme-color" content="#eef3fa">
+  <meta name="theme-color" content="#eff0f1">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-title" content="Überzeit">
@@ -21,22 +20,24 @@
 </head>
 <body data-csrf="{{ csrf_token() if benutzer else '' }}">
 {% set seite = request.endpoint %}
+{# Reiter wie in der Desktop-App (main.py); am Handy unten mit Kurznamen, Bereitschaft dort unter „Mehr“ #}
 {% set navi = [
-  ('heute_seite', 'Heute', 'bi-stopwatch', ('heute_seite',)),
-  ('liste', 'Einträge', 'bi-list-ul', ('liste', 'bearbeiten', 'abwesenheit')),
-  ('kalender', 'Kalender', 'bi-calendar3', ('kalender',)),
-  ('statistik', 'Statistik', 'bi-bar-chart', ('statistik',)),
-  ('mehr', 'Mehr', 'bi-three-dots', ('mehr', 'einstellungen', 'ziel_seite', 'bereitschaft', 'austausch_seite')),
+  ('heute_seite', 'Eingabe & Liste', 'Eingabe', 'bi-pencil-square', ('heute_seite', 'liste', 'bearbeiten', 'abwesenheit'), true),
+  ('ziel_seite', 'Ziele & Dashboard', 'Ziele', 'bi-flag', ('ziel_seite',), true),
+  ('kalender', 'Kalender-Heatmap', 'Kalender', 'bi-calendar3', ('kalender',), true),
+  ('bereitschaft', 'Bereitschaft', 'Bereitschaft', 'bi-telephone', ('bereitschaft',), false),
+  ('statistik', 'Diagramm & Statistik', 'Statistik', 'bi-bar-chart', ('statistik',), true),
+  ('mehr', 'Mehr', 'Mehr', 'bi-three-dots', ('mehr', 'einstellungen', 'austausch_seite'), true),
 ] %}
 {% if benutzer %}
 <header class="kopf">
-  <a class="marke" href="{{ url_for('heute_seite') }}"><img src="{{ url_for('static', filename='icons/icon.svg') }}?v={{ version }}" alt=""> Überzeit</a>
-  <nav class="kopf-nav" aria-label="Hauptmenü">
-    {% for ziel, name, symbol, gruppe in navi %}<a href="{{ url_for(ziel) }}" class="{{ 'aktiv' if seite in gruppe }}">{{ name }}</a>{% endfor %}
+  <a class="marke" href="{{ url_for('heute_seite') }}"><img src="{{ url_for('static', filename='icons/icon.svg') }}?v={{ version }}" alt=""> Überzeit Rechner</a>
+  <nav class="reiter" aria-label="Hauptmenü">
+    {% for ziel, name, kurz, symbol, gruppe, handy in navi %}<a href="{{ url_for(ziel) }}" class="{{ 'aktiv' if seite in gruppe }}">{{ name }}</a>{% endfor %}
   </nav>
 </header>
 {% endif %}
-<main class="seite">
+<main class="seite{{ ' rahmen' if benutzer }}">
   {% for art, text in get_flashed_messages(with_categories=true) %}
     <div class="meldung {{ art if art in ('ok', 'fehler') else 'ok' }}" role="status">{{ text }}</div>
   {% endfor %}
@@ -45,7 +46,7 @@
 <footer class="fuss">Überzeit {{ version }} · rechnet wie der <a href="https://github.com/Bluelightde/ueberzeit-rechner" rel="noopener" target="_blank">Überzeit-Rechner</a> am Desktop</footer>
 {% if benutzer %}
 <nav class="unten-nav" aria-label="Hauptmenü">
-  {% for ziel, name, symbol, gruppe in navi %}<a href="{{ url_for(ziel) }}" class="{{ 'aktiv' if seite in gruppe }}"><i class="bi {{ symbol }}"></i>{{ name }}</a>{% endfor %}
+  {% for ziel, name, kurz, symbol, gruppe, handy in navi if handy %}<a href="{{ url_for(ziel) }}" class="{{ 'aktiv' if seite in gruppe or (ziel == 'mehr' and seite == 'bereitschaft') }}"><i class="bi {{ symbol }}"></i>{{ kurz }}</a>{% endfor %}
 </nav>
 {% endif %}
 <script src="{{ url_for('static', filename='js/app.js') }}?v={{ version }}"></script>

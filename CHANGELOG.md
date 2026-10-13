@@ -16,6 +16,10 @@ All notable changes to Überzeit Rechner are documented here.
     und Bereitschaft, Statistik, Ziel (Überstunden ansparen), Bereitschaft, Einstellungen wie in der Desktop-App.
   - **Austausch mit der Desktop-App:** `ueberstunden_daten.db` und `ueberstunden_settings.json` hochladen; Export als
     Datenbank im Desktop-Format (dort als Datenbank-Speicherort wählbar) und als CSV.
+  - **Aussehen wie die Desktop-App** (Server 1.1.0): Breeze-Farben hell/dunkel, Reiter „Eingabe & Liste“, „Ziele &
+    Dashboard“, „Kalender-Heatmap“, „Bereitschaft“, „Diagramm & Statistik“; Gesamt-Saldo, Eingabe, Werkzeugleiste
+    (Filter, Import, Export, Einstellungen) und Eintragstabelle (Datum | Zeitraum | Überstunden | Anlass | Aktion) wie im
+    ersten Reiter; Kalender als Heatmap mit den Desktop-Farben. Am Handy Reiter unten und eine schmalere Tabelle.
 - **`kern.py`** — die Rechenregeln (Feiertage, Tagessoll, Pausen nach ArbZG, Überstunden, Mitternachtsschichten,
   Überschneidungen) ohne PyQt, gemeinsam für Desktop und Server.
 

@@ -1,23 +1,27 @@
 {% extends 'base.html' %}
-{% from '_teile.html' import betrag, block_zeile with context %}
+{% from '_teile.html' import eintrag_tabelle, werkzeugleiste with context %}
 {% from '_formular.html' import eintrag_formular with context %}
-{% block titel %}Heute{% endblock %}
+{% block titel %}Eingabe & Liste{% endblock %}
 {% block inhalt %}
-<section class="karte held">
-  <div class="titel">Überstunden gesamt</div>
-  <div class="saldo zahl">{{ zeit(saldo, true) }}</div>
-  <div class="unter">
+{# Aufbau wie der Desktop-Reiter „Eingabe & Liste“: Gesamt-Saldo, Eingabe, Werkzeugleiste, Tabelle.
+   Die Stempeluhr gibt es nur hier (am Desktop übernimmt das die Anmeldezeit des Rechners). #}
+<section class="saldo-kopf">
+  <div class="titel">Gesamt-Saldo:</div>
+  <div class="saldo zahl {{ 'plus' if saldo > 0 else ('minus' if saldo < 0 else '') }}">{{ zeit(saldo) }}</div>
+  <div class="unter leise">
     <span>Heute: <b>{{ zeit(tag_saldo, true) if heute_eintraege else ('frei' if soll == 0 else 'Soll ' ~ zeit(soll)) }}</b></span>
     <span>Urlaub: <b>{{ urlaub.rest }}/{{ urlaub.anspruch }}</b> Tage übrig</span>
+    {% if ziel %}<a href="{{ url_for('ziel_seite') }}">Ziel: <b>{{ ziel.prozent }} %</b></a>{% endif %}
   </div>
 </section>
 
 {% if leer %}
-<div class="hinweis" style="margin-bottom:14px"><i class="bi bi-info-circle"></i> Noch keine Einträge. Du kannst hier loslegen
+<div class="hinweis"><i class="bi bi-info-circle"></i> Noch keine Einträge. Du kannst hier loslegen
   oder unter <a href="{{ url_for('austausch_seite') }}">Mehr → Daten aus der Desktop-App</a> deine bisherige Datenbank einlesen.</div>
 {% endif %}
 
 <section class="karte">
+  <h2>Stempeluhr</h2>
   {% if lauf %}
   <div class="stempel" data-beginn="{{ lauf.beginn_ms }}" data-soll-ende="{{ lauf.ende_soll }}">
     <div style="flex:1">
@@ -26,50 +30,32 @@
       <div class="leise klein">{% if lauf.ende_soll == lauf.start %}Tagessoll ist heute schon erfüllt{% else %}Tagessoll erreicht um <b>{{ lauf.ende_soll }}</b>{% endif %}</div>
     </div>
   </div>
-  <form method="post" action="{{ url_for('gehen') }}" style="margin-top:12px">
+  <form method="post" action="{{ url_for('gehen') }}" style="margin-top:10px">
     <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
     <div class="feld-mit-knopf"><input type="time" name="ende" aria-label="Ende (leer = jetzt)" data-jetzt-feld>
-      <button class="knopf gold" type="submit"><i class="bi bi-door-open"></i> Feierabend</button></div>
+      <button class="knopf haupt" type="submit"><i class="bi bi-door-open"></i> Feierabend</button></div>
   </form>
   <form method="post" action="{{ url_for('verwerfen') }}" style="margin-top:6px" data-frage="Arbeitsbeginn verwerfen?">
     <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
-    <button class="knopf leise klein" type="submit">Verwerfen</button>
+    <button class="knopf klein" type="submit">Verwerfen</button>
   </form>
   {% else %}
   <form method="post" action="{{ url_for('kommen') }}" class="reihe">
     <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
-    <div style="flex:1;min-width:150px"><h2>Arbeit beginnen</h2><div class="leise klein">Beginn merken, abends nur noch „Feierabend“ tippen.</div></div>
+    <div style="flex:1;min-width:150px" class="leise klein">Beginn merken, abends nur noch „Feierabend“ tippen.</div>
     <button class="knopf" type="submit"><i class="bi bi-play-fill"></i> Jetzt kommen</button>
   </form>
   {% endif %}
 </section>
 
-{% if ziel %}
-<a class="karte" href="{{ url_for('ziel_seite') }}" style="display:block;text-decoration:none;color:inherit">
-  <h2><i class="bi bi-flag"></i> Ziel <span class="rechts leise">{{ ziel.prozent }} %</span></h2>
-  <div class="fortschrittsbalken"><div style="width: {{ ziel.prozent }}%"></div></div>
-  <div class="leise klein" style="margin-top:6px">{{ zeit(ziel.stand) }} von {{ zeit(ziel.ziel) }}{% if ziel.pro_tag %} · täglich {{ ziel.pro_tag }} min länger{% endif %}</div>
-</a>
-{% endif %}
-
 <section class="karte" id="eintragen">
-  <h2><i class="bi bi-plus-circle"></i> Eintragen</h2>
+  <h2>Eingabe</h2>
   {{ eintrag_formular(url_for('eintragen'), form_datum, start, ende, auto) }}
 </section>
 
-{% if heute_eintraege %}
-<section class="karte">
-  <h2>Heute <span class="rechts">{{ betrag(tag_saldo) }}</span></h2>
-  <ul class="liste">
-    {% for e in heute_eintraege %}{{ block_zeile({'eintraege': [e], 'erster': e, 'letzter': e, 'minuten': e.minutes, 'typ': e.entry_type, 'ids': e.id|string}, url_for('heute_seite')) }}{% endfor %}
-  </ul>
+<section class="liste-bereich">
+  {{ werkzeugleiste(monate, monat, monat_name, url_for('heute_seite')) }}
+  {% if bloecke %}{{ eintrag_tabelle(bloecke, request.full_path) }}
+  {% else %}<div class="leer"><i class="bi bi-inbox"></i>Keine Einträge {{ 'vorhanden' if monat == 'alle' else 'im ' ~ monat_name(monat) }}.</div>{% endif %}
 </section>
-{% endif %}
-
-{% if bloecke %}
-<section class="karte">
-  <h2>Zuletzt <a class="rechts" href="{{ url_for('liste') }}">Alle Einträge</a></h2>
-  <ul class="liste">{% for b in bloecke %}{{ block_zeile(b, url_for('heute_seite')) }}{% endfor %}</ul>
-</section>
-{% endif %}
 {% endblock %}

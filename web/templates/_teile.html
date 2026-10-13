@@ -25,3 +25,51 @@
   <span class="betrag">{{ betrag(b.minuten) }}</span>
 </li>
 {%- endmacro %}
+
+{# Datum wie am Desktop (13.10.2026); am Handy ohne Jahr, damit die Tabelle hineinpasst #}
+{% macro tag_monat(ds) -%}{{ ds[8:10] }}.{{ ds[5:7] }}.<span class="jahr">{{ ds[:4] }}</span>{%- endmacro %}
+
+{# Eintragstabelle wie im Desktop-Reiter „Eingabe & Liste“: Datum | Zeitraum | Überstunden | Anlass | Aktion #}
+{% macro eintrag_tabelle(bloecke, weiter='') -%}
+<div class="tabellen-rahmen">
+<table class="eintraege">
+  <thead><tr><th>Datum</th><th>Zeitraum</th><th class="r"><span class="lang">Überstunden</span><span class="kurz">Std.</span></th><th class="anlass">Anlass</th><th class="aktion">Aktion</th></tr></thead>
+  <tbody>
+  {% for b in bloecke %}{% set e = b.erster %}{% set mehrere = b.eintraege|length > 1 %}
+    <tr>
+      <td class="m">{{ tag_monat(e.date) }}{% if mehrere %} – {{ tag_monat(b.letzter.date) }}{% endif %}</td>
+      <td class="m">
+        {%- if b.typ != 'work' -%}<span style="color: {{ art_farbe[b.typ] }}"><i class="bi {{ art_symbol[b.typ] }}"></i></span> {{ art_name[b.typ] }}{% if mehrere %} ({{ b.eintraege|length }} Tage){% endif %}
+        {%- elif e.start -%}{{ e.start }} - {{ e.end }}{% if e.pause %} (-{{ e.pause }}m){% endif %}
+        {%- else -%}-{%- endif -%}
+        {% if e.reason %}<span class="anlass-klein">{{ e.reason }}</span>{% endif %}</td>
+      <td class="r">{{ betrag(b.minuten) }}</td>
+      <td class="anlass">{{ e.reason }}</td>
+      <td class="aktion">
+        <a class="knopf klein" href="{{ url_for('abwesenheit', ids=b.ids, weiter=weiter) if mehrere else url_for('bearbeiten', eintrag_id=e.id, weiter=weiter) }}" aria-label="Bearbeiten"><i class="bi bi-pencil"></i><span class="txt">Bearbeiten</span></a>
+        <form method="post" action="{{ url_for('loeschen') }}" data-frage="{{ ('Eintrag vom ' ~ datum_kurz(e.date)) if not mehrere else (art_name[b.typ] ~ ' vom ' ~ datum_kurz(e.date) ~ ' bis ' ~ datum_kurz(b.letzter.date) ~ ' (' ~ b.eintraege|length ~ ' Tage)') }} wirklich löschen?">
+          <input type="hidden" name="_csrf" value="{{ csrf_token() }}"><input type="hidden" name="ids" value="{{ b.ids }}"><input type="hidden" name="weiter" value="{{ weiter }}">
+          <button class="knopf klein" type="submit" aria-label="Löschen"><i class="bi bi-trash"></i><span class="txt">Löschen</span></button></form>
+      </td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>
+{%- endmacro %}
+
+{# Werkzeugleiste über der Tabelle: Filter links, Export und Einstellungen rechts #}
+{% macro werkzeugleiste(monate, monat, monat_name, ziel) -%}
+<form class="werkzeugleiste" method="get" action="{{ ziel }}" data-sofort>
+  <label for="monat">Filter:</label>
+  <select id="monat" name="monat">
+    <option value="alle" {{ 'selected' if monat == 'alle' }}>Alle</option>
+    {% if monat != 'alle' and monat not in monate %}<option value="{{ monat }}" selected>{{ monat[5:7] }}/{{ monat[:4] }}</option>{% endif %}
+    {% for m in monate %}<option value="{{ m }}" {{ 'selected' if m == monat }}>{{ m[5:7] }}/{{ m[:4] }}</option>{% endfor %}
+  </select>
+  <span class="dehnen"></span>
+  <a class="knopf" href="{{ url_for('austausch_seite') }}"><i class="bi bi-upload"></i><span class="txt">Import</span></a>
+  <a class="knopf" href="{{ url_for('export_csv', monat=monat) }}"><i class="bi bi-download"></i><span class="txt">Export</span></a>
+  <a class="knopf" href="{{ url_for('einstellungen') }}"><i class="bi bi-gear"></i><span class="txt">Einstellungen</span></a>
+</form>
+{%- endmacro %}

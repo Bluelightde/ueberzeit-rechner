@@ -7,12 +7,14 @@ braucht die Server-Version nicht.
 
 ## Was sie kann
 
-- **Heute:** Gesamtsaldo, Urlaubskonto, **Kommen / Feierabend** mit laufender Uhr und der Uhrzeit, zu der das Tagessoll
+- **Aussehen wie die Desktop-App:** gleiche Reiter, Breeze-Farben (hell/dunkel), Eintragstabelle mit „Bearbeiten“ und
+  „Löschen“, Kalender-Heatmap. Am Handy stehen die Reiter unten.
+- **Eingabe & Liste:** Gesamtsaldo, Urlaubskonto, **Kommen / Feierabend** mit laufender Uhr und der Uhrzeit, zu der das Tagessoll
   erreicht ist. Eintragen mit **Live-Vorschau**: Pause, Tag-Saldo, Ende fürs Tagessoll, Warnungen bei Überschneidung,
   Ruhezeit unter 11 h und Höchstarbeitszeit.
 - **Arten:** Arbeit (mit Uhrzeiten oder als Korrektur in Minuten), Urlaub, Krank, Gleitzeitabbau, Feiertag, Elternzeit –
   über mehrere Tage, Wochenenden und Feiertage werden übersprungen. Eigenes Tagessoll je Eintrag.
-- **Einträge** je Monat (mehrtägige Abwesenheiten als ein Block), **Kalender** mit Tagessaldo, Feiertagen,
+- **Eintragstabelle** je Monat (mehrtägige Abwesenheiten als ein Block), **Kalender-Heatmap** mit Tagessaldo, Feiertagen,
   Abwesenheiten und Bereitschaft, **Statistik** (Monatssaldo, Ø je Wochentag, Serien), **Ziel** (Überstunden für eine
   freie Zeit ansparen), **Bereitschaft**, **Einstellungen** wie in der Desktop-App, hell/dunkel.
 - **Austausch mit der Desktop-App** (Mehr → Daten aus der Desktop-App): `ueberstunden_daten.db` und

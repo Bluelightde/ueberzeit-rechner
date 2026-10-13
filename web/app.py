@@ -35,7 +35,7 @@ import speicher  # noqa: E402
 from models import BereitschaftEntry, WorkEntry  # noqa: E402
 from speicher import db  # noqa: E402
 
-VERSION = '1.0.0'
+VERSION = '1.1.0'
 log = logging.getLogger('ueberzeit')
 
 ARTEN = [(kern.TYPE_WORK, 'Arbeit'), (kern.TYPE_VACATION, 'Urlaub'), (kern.TYPE_SICK, 'Krank'),
@@ -373,6 +373,15 @@ def _neu_laden():
     return alle()
 
 
+def _monatswahl():
+    """Monatsfilter der Eintragstabelle: (vorhandene Monate, gewählter Monat oder 'alle')."""
+    monate = sorted({e.date[:7] for e in alle() if len(e.date) >= 7}, reverse=True)
+    monat = request.args.get('monat') or (monate[0] if monate else heute().isoformat()[:7])
+    if monat != 'alle' and not re.fullmatch(r'\d{4}-\d{2}', monat):
+        monat = heute().isoformat()[:7]
+    return monate, monat
+
+
 def _start_vorschlag(datum):
     """Beginn fürs Formular: Ende des letzten Eintrags an dem Tag, sonst die gewohnte Startzeit."""
     tag = [e for e in alle() if e.date == datum and e.end]
@@ -518,13 +527,15 @@ def _routen(app):  # noqa: C901
             lauf = {'datum': laufend['datum'], 'start': laufend['start'], 'ende_soll': vorschlag,
                     'seit': int((jetzt() - beginn).total_seconds() // 60), 'beginn_ms': int(beginn.timestamp() * 1000)}
         heute_eintraege = sorted([e for e in alle() if e.date == datum], key=lambda e: e.start or '')
+        monate, monat = _monatswahl()   # Tabelle darunter wie im Desktop-Reiter „Eingabe & Liste“
         return render_template(
             'heute.html', datum=datum, form_datum=form_datum, start=start,
             ende=aw.ende_vorschlag(alle(), werte(), form_datum, start),
             saldo=aw.saldo(alle()), urlaub=aw.urlaub(alle(), werte(), h.year), ziel=aw.ziel(alle(), werte(), h),
             soll=kern.get_target_minutes_for_date(datum, alle(), werte()), auto=werte().get('auto_break', True),
             heute_eintraege=heute_eintraege, tag_saldo=sum(e.minutes for e in heute_eintraege), lauf=lauf,
-            bloecke=aw.bloecke(alle(), werte())[:6], leer=not alle())
+            bloecke=aw.bloecke(alle(), werte(), None if monat == 'alle' else monat), monate=monate, monat=monat,
+            monat_name=_monat_name, leer=not alle())
 
     @app.post('/api/vorschau')
     @anmeldung_noetig
@@ -674,10 +685,7 @@ def _routen(app):  # noqa: C901
     @app.get('/eintraege')
     @anmeldung_noetig
     def liste():
-        monate = sorted({e.date[:7] for e in alle() if len(e.date) >= 7}, reverse=True)
-        monat = request.args.get('monat') or (monate[0] if monate else heute().isoformat()[:7])
-        if monat != 'alle' and not re.fullmatch(r'\d{4}-\d{2}', monat):
-            monat = heute().isoformat()[:7]
+        monate, monat = _monatswahl()
         bl = aw.bloecke(alle(), werte(), None if monat == 'alle' else monat)
         return render_template('liste.html', bloecke=bl, monate=monate, monat=monat, saldo=aw.saldo(alle()),
                                summe=sum(b['minuten'] for b in bl), monat_name=_monat_name)

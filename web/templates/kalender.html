@@ -12,12 +12,18 @@
     {% for w in wochentage %}<div class="wt">{{ w }}</div>{% endfor %}
     {% for woche in k.wochen %}{% for t in woche %}
       {% if t %}
-        {% set klasse = ['heute' if t.heute, 'gewaehlt' if t.datum == tag, 'frei' if (t.frei and not t.erfasst), 'plus-tag' if t.minuten > 0, 'minus-tag' if t.minuten < 0]|select|join(' ') %}
-        <a href="{{ url_for('kalender', monat=monat, tag=t.datum) }}#tag" class="{{ klasse }}" title="{{ t.feiertag or '' }}">
-          {% if t.feiertag %}<span class="feiertag-mark"><i class="bi bi-flag-fill"></i></span>{% endif %}
-          {% if t.typ %}<span class="punkt" style="background: {{ art_farbe[t.typ] }}"></span>{% endif %}
+        {# Farben wie die Desktop-Heatmap (tabs/calendar_tab.py): Feiertag blau, freier Tag grau,
+           Abwesenheit in der Farbe der Art, sonst Grün/Rot – je mehr Minuten, desto kräftiger #}
+        {% set klasse = ['heute' if t.heute, 'gewaehlt' if t.datum == tag, 'feiertag' if t.feiertag,
+                         'frei' if (not t.feiertag and not t.minuten and t.frei)]|select|join(' ') %}
+        {% if t.feiertag %}{% set farbe = '' %}
+        {% elif t.minuten %}{% set farbe = ('rgba(16,185,129,' if t.minuten > 0 else 'rgba(239,68,68,') ~ ([255, 60 + (t.minuten|abs) * 2]|min / 255)|round(2) ~ ')' %}
+        {% elif t.typ and t.typ != 'work' %}{% set farbe = art_farbe[t.typ] %}
+        {% else %}{% set farbe = '' %}{% endif %}
+        <a href="{{ url_for('kalender', monat=monat, tag=t.datum) }}#tag" class="{{ klasse }}" title="{{ t.feiertag or (art_name[t.typ] if t.typ and t.typ != 'work' else '') }}"{% if farbe %} style="background: {{ farbe }}"{% endif %}>
           <span class="t">{{ t.tag }}</span>
-          {% if t.erfasst and t.minuten %}<span class="m {{ 'plus' if t.minuten > 0 else 'minus' }}">{{ zeit(t.minuten, true) }}</span>{% endif %}
+          {% if t.feiertag %}<span class="fname">{{ t.feiertag }}</span>{% endif %}
+          {% if t.erfasst and t.minuten %}<span class="m">({{ zeit(t.minuten, true) }})</span>{% endif %}
           {% if t.bereitschaft %}<span class="bereit"></span>{% endif %}
         </a>
       {% else %}<span class="leer-tag"></span>{% endif %}
@@ -26,9 +32,11 @@
   <div class="legende">
     {% for wert, name in arten if wert != 'work' %}<span><i class="farbe" style="background: {{ art_farbe[wert] }}"></i>{{ name }}</span>{% endfor %}
     <span><i class="farbe" style="background:#eab308;border-radius:2px;height:4px"></i>Bereitschaft</span>
-    <span><i class="bi bi-flag-fill" style="color:#a855f7"></i>Feiertag</span>
+    <span><i class="farbe feiertag-farbe"></i>Feiertag</span>
+    <span><i class="farbe" style="background:#10b981"></i>Überstunden</span>
+    <span><i class="farbe" style="background:#ef4444"></i>Minusstunden</span>
   </div>
-  <p style="margin:12px 0 0;text-align:center">Monat: <b>{{ betrag(k.summe) }}</b> · Gesamt: {{ betrag(saldo) }}</p>
+  <p style="margin:12px 0 0;text-align:center">Monatssaldo: <b>{{ betrag(k.summe) }}</b> · Gesamt: {{ betrag(saldo) }}</p>
 </section>
 
 {% if tag_eintraege %}

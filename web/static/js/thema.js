@@ -7,7 +7,7 @@
     var dunkel = wahl === 'dark' || (wahl === 'auto' && m.matches);
     h.setAttribute('data-thema', dunkel ? 'dark' : 'light');
     var farbe = document.querySelector('meta[name="theme-color"]');
-    if (farbe) farbe.setAttribute('content', dunkel ? '#0b1220' : '#eef3fa');
+    if (farbe) farbe.setAttribute('content', dunkel ? '#232629' : '#eff0f1');
   };
   setze();
   m.addEventListener('change', setze);
