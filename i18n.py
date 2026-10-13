@@ -389,6 +389,31 @@ _EN: dict[str, str] = {
     "Datenbank konnte nicht verschoben werden:\n{e}": (
         "Database could not be moved:\n{e}"
     ),
+    # --- Server-Version (Anwesenheit melden) ---
+    "Server-Version": "Server version",
+    (
+        "Die Server-Version (Browser/Handy) kann die Anmeldezeit dieses Rechners nicht selbst lesen. "
+        "Ist das Senden eingeschaltet, schickt die App beim Start und alle 30 Minuten die Login- und "
+        "Logout-Zeiten der letzten Wochen (Tab „Anwesenheit“) an den Server. Dort erscheinen sie unter "
+        "„Anwesenheit“ und als Startzeit-Vorschlag. Andere Daten werden nicht übertragen."
+    ): (
+        "The server version (browser/phone) cannot read this computer's login time itself. "
+        "If sending is enabled, the app sends the login and logout times of the last weeks "
+        "(tab \"Attendance\") to the server at startup and every 30 minutes. They appear there under "
+        "\"Anwesenheit\" and as suggested start time. No other data is transmitted."
+    ),
+    "Anmeldezeiten an die Server-Version senden": "Send login times to the server version",
+    "Adresse:": "Address:",
+    "Gerätezugang:": "Device token:",
+    (
+        "In der Server-Version unter „Anwesenheit → Desktop-App verbinden“ anlegen und hier einfügen.\n"
+        "Der Zugang darf nur Anmeldezeiten melden."
+    ): (
+        "Create it in the server version under \"Anwesenheit → Desktop-App verbinden\" and paste it here.\n"
+        "The token can only report login times."
+    ),
+    "Verbindung testen": "Test connection",
+    "Zuletzt gemeldet: {n} Tage": "Last report: {n} days",
 }
 
 TRANSLATIONS: dict[str, dict[str, str]] = {"en": _EN}

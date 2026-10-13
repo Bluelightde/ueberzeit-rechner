@@ -29,7 +29,7 @@ def _spalten(verbindung, tabelle):
 
 
 def desktop_db_lesen(inhalt):
-    """Bytes einer ueberstunden_daten.db -> (eintraege, bereitschaften). Wirft AustauschFehler."""
+    """Bytes einer ueberstunden_daten.db -> (eintraege, bereitschaften, anwesenheit). Wirft AustauschFehler."""
     if not inhalt.startswith(SQLITE_KOPF):
         raise AustauschFehler('Das ist keine Datenbank der Desktop-App (ueberstunden_daten.db).')
     fd, pfad = tempfile.mkstemp(suffix='.db')
@@ -62,13 +62,30 @@ def desktop_db_lesen(inhalt):
                     if kern.parse_date(z[0] or '') is not None:
                         bereitschaften.append(BereitschaftEntry(None, z[0], z[1] or '', z[2] or '', z[3] or '',
                                                                 z[4] or ''))
-            return eintraege, bereitschaften
+            anwesenheit = []
+            if {'date', 'start_time'} <= _spalten(v, 'device_login'):
+                bis = 'end_time' if 'end_time' in _spalten(v, 'device_login') else "''"
+                for z in v.execute(f'SELECT date, start_time, {bis} FROM device_login ORDER BY date'):
+                    tag = anwesenheit_pruefen(z[0], z[1], z[2])
+                    if tag:
+                        anwesenheit.append(tag)
+            return eintraege, bereitschaften, anwesenheit
         except sqlite3.DatabaseError as e:
             raise AustauschFehler(f'Die Datei lässt sich nicht lesen: {e}') from e
         finally:
             v.close()
     finally:
         os.unlink(pfad)
+
+
+def anwesenheit_pruefen(datum, login, logout):
+    """Ein Tag Anwesenheit (Desktop-Datenbank oder Meldung der Desktop-App) -> (datum, login, logout) oder None."""
+    datum = datum.strip() if isinstance(datum, str) else ''
+    if kern.parse_date(datum) is None:
+        return None
+    login = login if isinstance(login, str) and kern.parse_hhmm(login) is not None else ''
+    logout = logout if isinstance(logout, str) and kern.parse_hhmm(logout) is not None else ''
+    return (datum, login, logout) if login or logout else None
 
 
 def desktop_einstellungen_lesen(inhalt, erlaubt):
@@ -93,7 +110,7 @@ def pruefen(werte):
         sauber['country'] = werte['country'].upper()
     if 'state' in werte:
         sauber['state'] = werte['state'] if isinstance(werte['state'], str) and len(werte['state']) <= 3 else None
-    for k in ('auto_break', 'goal_active'):
+    for k in ('auto_break', 'goal_active', 'use_login_time'):
         if k in werte:
             sauber[k] = bool(werte[k])
     for k, unten, oben in (('max_work_hours', 1, 24), ('vacation_entitlement', 0, 366), ('goal_hours', 0, 100000)):
@@ -135,7 +152,7 @@ def pruefen(werte):
     return sauber
 
 
-def desktop_db_schreiben(eintraege, bereitschaften):
+def desktop_db_schreiben(eintraege, bereitschaften, anwesenheit=()):
     """Datenbank im Format der Desktop-App (Schema 3) als Bytes -- dort unter
     Einstellungen -> Datenbank-Speicherort auswählen oder als Sicherung einspielen."""
     fd, pfad = tempfile.mkstemp(suffix='.db')
@@ -157,6 +174,8 @@ def desktop_db_schreiben(eintraege, bereitschaften):
         v.executemany('INSERT INTO bereitschaft_entries (date, start, end, note, end_date) VALUES (?, ?, ?, ?, ?)',
                       [(b.date, b.start, b.end, b.note, b.end_date) for b in sorted(bereitschaften,
                                                                                    key=lambda b: b.date)])
+        v.executemany('INSERT INTO device_login (date, start_time, end_time) VALUES (?, ?, ?)',
+                      [(a['date'], a['start'], a['end']) for a in anwesenheit])
         v.execute(f'PRAGMA user_version = {DESKTOP_SCHEMA_VERSION}')
         v.commit()
         v.close()

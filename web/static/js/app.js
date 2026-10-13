@@ -141,3 +141,8 @@
     navigator.serviceWorker.register('/sw.js').catch(function () { /* ohne Offline-Fähigkeit weiter */ });
   }
 })();
+
+// Gerätezugang (Anwesenheit): beim Antippen ganz markieren, damit er sich leicht kopieren lässt
+document.querySelectorAll('[data-markieren]').forEach(function (f) {
+  f.addEventListener('focus', function () { f.select(); });
+});

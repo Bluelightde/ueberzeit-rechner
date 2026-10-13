@@ -26,6 +26,7 @@
   ('ziel_seite', 'Ziele & Dashboard', 'Ziele', 'bi-flag', ('ziel_seite',), true),
   ('kalender', 'Kalender-Heatmap', 'Kalender', 'bi-calendar3', ('kalender',), true),
   ('bereitschaft', 'Bereitschaft', 'Bereitschaft', 'bi-telephone', ('bereitschaft',), false),
+  ('anwesenheit', 'Anwesenheit', 'Anwesenheit', 'bi-pc-display', ('anwesenheit',), false),
   ('statistik', 'Diagramm & Statistik', 'Statistik', 'bi-bar-chart', ('statistik',), true),
   ('mehr', 'Mehr', 'Mehr', 'bi-three-dots', ('mehr', 'einstellungen', 'austausch_seite'), true),
 ] %}
@@ -46,7 +47,7 @@
 <footer class="fuss">Überzeit {{ version }} · rechnet wie der <a href="https://github.com/Bluelightde/ueberzeit-rechner" rel="noopener" target="_blank">Überzeit-Rechner</a> am Desktop</footer>
 {% if benutzer %}
 <nav class="unten-nav" aria-label="Hauptmenü">
-  {% for ziel, name, kurz, symbol, gruppe, handy in navi if handy %}<a href="{{ url_for(ziel) }}" class="{{ 'aktiv' if seite in gruppe or (ziel == 'mehr' and seite == 'bereitschaft') }}"><i class="bi {{ symbol }}"></i>{{ kurz }}</a>{% endfor %}
+  {% for ziel, name, kurz, symbol, gruppe, handy in navi if handy %}<a href="{{ url_for(ziel) }}" class="{{ 'aktiv' if seite in gruppe or (ziel == 'mehr' and seite in ('bereitschaft', 'anwesenheit')) }}"><i class="bi {{ symbol }}"></i>{{ kurz }}</a>{% endfor %}
 </nav>
 {% endif %}
 <script src="{{ url_for('static', filename='js/app.js') }}?v={{ version }}"></script>

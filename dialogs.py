@@ -8,7 +8,7 @@ import platform
 from PyQt6.QtCore import QDate, QLocale, QTime, Qt, PYQT_VERSION_STR, QT_VERSION_STR
 from PyQt6.QtGui import QColor, QFont, QPixmap
 from PyQt6.QtWidgets import (
-    QCheckBox, QColorDialog, QComboBox, QDateEdit, QDialog, QGridLayout,
+    QApplication, QCheckBox, QColorDialog, QComboBox, QDateEdit, QDialog, QGridLayout,
     QFileDialog, QFrame, QHBoxLayout, QHeaderView, QLabel, QMessageBox,
     QLineEdit, QPushButton, QSpinBox,
     QTableWidget, QTabWidget, QTimeEdit, QVBoxLayout, QWidget
@@ -17,9 +17,10 @@ from ui_components import COLOR_BEREITSCHAFT
 from config import APP_VERSION, DB_FILE, ICON_PATH, get_country_list, get_subdivisions
 from i18n import available_languages, get_locale, tr
 from models import WorkEntry
+import server_sync
 from logic import calculate_timed_entries, is_midnight_shift, \
     TYPE_WORK, TYPE_VACATION, TYPE_SICK, TYPE_HOLIDAY, TYPE_FLEXTIME, TYPE_PARENTAL, \
-    ABSENCE_TYPES
+    ABSENCE_TYPES, COLOR_POSITIVE, COLOR_NEGATIVE
 
 class AboutDialog(QDialog):
     """Kleines Info-Fenster mit Programmname, Version und rechtlichen Hinweisen."""
@@ -87,7 +88,7 @@ class SettingsDialog(QDialog):
     Dialog zum Verwalten der Benutzereinstellungen wie Standardarbeitszeiten,
     Bundesland und Sonderarbeitstage.
     """
-    def __init__(self, current_settings, parent=None, backup_cb=None, restore_cb=None):
+    def __init__(self, current_settings, parent=None, backup_cb=None, restore_cb=None, server_status=""):
         """
         Initialisiert den Einstellungsdialog mit den aktuellen Werten.
         """
@@ -178,6 +179,13 @@ class SettingsDialog(QDialog):
         layout_system.addLayout(backup_layout)
         layout_system.addStretch()
         self.tabs.addTab(tab_system, tr("System && Design"))
+
+        # Tab: Server-Version (Anwesenheit melden)
+        tab_server = QWidget()
+        layout_server = QVBoxLayout(tab_server)
+        self._setup_server_ui(layout_server, current_settings, server_status)
+        layout_server.addStretch()
+        self.tabs.addTab(tab_server, tr("Server-Version"))
 
         self.btn_save = QPushButton(tr("Speichern"))
         self.btn_save.clicked.connect(self.accept)
@@ -496,6 +504,63 @@ class SettingsDialog(QDialog):
     def _type_colors_dict(self):
         return dict(self._type_colors)
 
+    def _setup_server_ui(self, layout, current_settings, server_status):
+        """Anwesenheit an die Server-Version senden: Adresse, Gerätezugang, Verbindung testen."""
+        info = QLabel(tr(
+            "Die Server-Version (Browser/Handy) kann die Anmeldezeit dieses Rechners nicht selbst lesen. "
+            "Ist das Senden eingeschaltet, schickt die App beim Start und alle 30 Minuten die Login- und "
+            "Logout-Zeiten der letzten Wochen (Tab „Anwesenheit“) an den Server. Dort erscheinen sie unter "
+            "„Anwesenheit“ und als Startzeit-Vorschlag. Andere Daten werden nicht übertragen."
+        ))
+        info.setWordWrap(True)
+        info.setStyleSheet("color: gray;")
+        layout.addWidget(info)
+        layout.addSpacing(6)
+
+        self.server_sync_cb = QCheckBox(tr("Anmeldezeiten an die Server-Version senden"))
+        self.server_sync_cb.setChecked(current_settings.get("server_sync", False))
+        layout.addWidget(self.server_sync_cb)
+
+        form = QGridLayout()
+        form.addWidget(QLabel(tr("Adresse:")), 0, 0)
+        self.server_url_edit = QLineEdit(current_settings.get("server_url", ""))
+        self.server_url_edit.setPlaceholderText("https://ueberzeit.example.de")
+        form.addWidget(self.server_url_edit, 0, 1)
+        form.addWidget(QLabel(tr("Gerätezugang:")), 1, 0)
+        self.server_token_edit = QLineEdit(current_settings.get("server_token", ""))
+        self.server_token_edit.setEchoMode(QLineEdit.EchoMode.Password)
+        self.server_token_edit.setPlaceholderText("uz_…")
+        self.server_token_edit.setToolTip(tr(
+            "In der Server-Version unter „Anwesenheit → Desktop-App verbinden“ anlegen und hier einfügen.\n"
+            "Der Zugang darf nur Anmeldezeiten melden."
+        ))
+        form.addWidget(self.server_token_edit, 1, 1)
+        layout.addLayout(form)
+
+        test_layout = QHBoxLayout()
+        btn_test = QPushButton(tr("Verbindung testen"))
+        btn_test.clicked.connect(self._test_server)
+        test_layout.addWidget(btn_test)
+        test_layout.addStretch()
+        layout.addLayout(test_layout)
+        self.server_status_lbl = QLabel(server_status)
+        self.server_status_lbl.setWordWrap(True)
+        self.server_status_lbl.setStyleSheet("color: gray;")
+        layout.addWidget(self.server_status_lbl)
+
+    def _test_server(self):
+        """Prüft Adresse und Gerätezugang (höchstens 5 Sekunden)."""
+        QApplication.setOverrideCursor(Qt.CursorShape.WaitCursor)
+        try:
+            text = server_sync.verbindung_testen(self.server_url_edit.text(), self.server_token_edit.text())
+            self.server_status_lbl.setStyleSheet(f"color: {COLOR_POSITIVE};")
+        except server_sync.ServerFehler as exc:
+            text = str(exc)
+            self.server_status_lbl.setStyleSheet(f"color: {COLOR_NEGATIVE};")
+        finally:
+            QApplication.restoreOverrideCursor()
+        self.server_status_lbl.setText(text)
+
     def _setup_db_path_ui(self, layout, current_settings):
         layout.addSpacing(10)
         layout.addWidget(QLabel(f"<b>{tr('Speicherort der Datenbank:')}</b>"))
@@ -659,7 +724,10 @@ class SettingsDialog(QDialog):
             "break_rules": break_rules,
             "bereitschaft_color": self.bereitschaft_color,
             "type_colors": self._type_colors_dict(),
-            "db_path": self.db_path_edit.text()
+            "db_path": self.db_path_edit.text(),
+            "server_sync": self.server_sync_cb.isChecked(),
+            "server_url": self.server_url_edit.text().strip().rstrip("/"),
+            "server_token": self.server_token_edit.text().strip(),
         }
 
 

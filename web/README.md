@@ -23,8 +23,26 @@ braucht die Server-Version nicht.
 - **Als App installierbar** (Web-App-Manifest, Service Worker): eigenes Symbol, startet ohne Browserleiste, zeigt ohne
   Verbindung den zuletzt geladenen Stand.
 
-Nicht in der Server-Version: die Anmeldezeit des Rechners als Startzeit und der Tab „Anwesenheit“ (beides liest das
-Betriebssystem des Desktop-Rechners) sowie Excel/PDF-Export.
+- **Anwesenheit** (Anmeldezeiten des Rechners) wie im Desktop-Tab: Der Server kann sie nicht selbst lesen, die
+  **Desktop-App meldet sie** (siehe unten). Sie erscheinen als Tabelle, im Kalender, als Startzeit-Vorschlag und als
+  „Kommen um 07:12“.
+
+Nicht in der Server-Version: Excel/PDF-Export.
+
+## Anmeldezeiten von der Desktop-App
+
+1. Server: **Anwesenheit → Desktop-App verbinden**, Namen des Rechners eingeben, „Zugang anlegen“. Der Gerätezugang
+   (`uz_…`) wird **nur einmal** angezeigt; gespeichert wird nur sein SHA-256.
+2. Desktop-App: **Einstellungen → Server-Version**: Haken „Anmeldezeiten an die Server-Version senden“, Adresse
+   (z. B. `https://ueberzeit.example.de`) und Gerätezugang eintragen, „Verbindung testen“.
+3. Die App meldet beim Start und alle 30 Minuten im Hintergrund die Login-/Logout-Zeiten der letzten 62 Tage
+   (`server_sync.py`). Der Server führt zusammen wie der Desktop: frühester Login, spätester Logout je Tag (auch über
+   mehrere Rechner).
+
+Schnittstelle: `POST /api/geraet/anwesenheit` mit `Authorization: Bearer uz_…` und
+`{"tage": [{"date": "2026-10-13", "login": "07:12", "logout": "16:03"}]}` (höchstens 400 Tage),
+`GET /api/geraet/pruefen` zum Testen. Ein Gerätezugang darf nur melden, nichts lesen; falsche Zugänge zählen zur
+Anmeldesperre. Entfernen unter Anwesenheit sperrt ihn sofort.
 
 ## Schnellstart (Docker Compose)
 
@@ -65,7 +83,7 @@ Alle Sitzungen einer Person beenden: `docker compose exec app python app.py abme
 ```bash
 python -m venv venv && venv/bin/pip install -r web/requirements.txt
 SECRET_KEY=dev venv/bin/python web/app.py                      # http://127.0.0.1:5026
-SECRET_KEY=x venv/bin/python -m unittest discover -s web/tests  # 20 Prüfungen
+SECRET_KEY=x venv/bin/python -m unittest discover -s web/tests  # 23 Prüfungen
 ```
 
 Symbole neu erzeugen (aus der Geometrie von `create_icon.py`): `python web/werkzeuge/symbol.py`.

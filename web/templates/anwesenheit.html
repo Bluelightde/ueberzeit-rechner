@@ -1,0 +1,59 @@
+{% extends 'base.html' %}
+{% block titel %}Anwesenheit{% endblock %}
+{% block inhalt %}
+{# Wie der Desktop-Reiter „Anwesenheit“ (tabs/session_tab.py). Der Server kann die Anmeldezeiten des Rechners nicht
+   selbst lesen -- die Desktop-App liest sie aus den System-Protokollen und meldet sie hierher. #}
+<p class="leise klein">Hier stehen die Login- und Logout-Zeiten deines Rechners. Die Desktop-App liest sie aus den
+  System-Protokollen und schickt sie hierher. Sie dienen als Gedächtnisstütze, ein Arbeitseintrag entsteht nicht.
+  Ist „Anmeldezeit als Startzeit“ eingeschaltet (Einstellungen), schlägt „Eingabe & Liste“ sie als Start vor.</p>
+
+<form class="werkzeugleiste" method="get" data-sofort>
+  <label for="monat">Filter:</label>
+  <select id="monat" name="monat">
+    <option value="alle" {{ 'selected' if monat == 'alle' }}>Alle</option>
+    {% for m in monate %}<option value="{{ m }}" {{ 'selected' if m == monat }}>{{ m[5:7] }}/{{ m[:4] }}</option>{% endfor %}
+  </select>
+</form>
+{% if tage %}
+<div class="tabellen-rahmen">
+<table class="eintraege">
+  <thead><tr><th>Datum</th><th>Login</th><th>Logout</th><th style="width:100%">Anwesend</th></tr></thead>
+  <tbody>{% for t in tage %}
+    <tr><td class="m">{{ datum_kurz(t.date) }}</td><td class="m">{{ t.start or '—' }}</td><td class="m">{{ t.end or '—' }}</td>
+      <td style="width:100%">{{ t.dauer }}</td></tr>
+  {% endfor %}</tbody>
+</table>
+</div>
+{% else %}
+<div class="leer"><i class="bi bi-pc-display"></i>Noch keine Anmeldezeiten. Verbinde unten die Desktop-App.</div>
+{% endif %}
+
+<section class="karte" id="geraete">
+  <h2>Desktop-App verbinden</h2>
+  {% if neues_token %}
+  <div class="hinweis"><b>Neuer Gerätezugang – jetzt kopieren, er wird nur dieses eine Mal angezeigt:</b>
+    <input type="text" readonly value="{{ neues_token }}" aria-label="Gerätezugang" data-markieren style="margin-top:6px;font-family:monospace">
+    In der Desktop-App unter <i>Einstellungen → System &amp; Design → Server-Version</i> eintragen,
+    Adresse <b>{{ adresse }}</b>, dann „Verbindung testen“.</div>
+  {% endif %}
+  {% if geraete %}
+  <table class="tabelle">
+    <tr><th>Gerät</th><th>Angelegt</th><th>Zuletzt gemeldet</th><th></th></tr>
+    {% for d in geraete %}
+    <tr><td>{{ d.name }}</td><td>{{ d.erstellt[:16] }}</td><td>{{ d.zuletzt[:16] if d.zuletzt else 'noch nie' }}</td>
+      <td style="text-align:right"><form method="post" data-frage="Gerätezugang „{{ d.name }}“ entfernen? Die Desktop-App kann dann nichts mehr melden.">
+        <input type="hidden" name="_csrf" value="{{ csrf_token() }}"><input type="hidden" name="aktion" value="entfernen">
+        <input type="hidden" name="id" value="{{ d.id }}">
+        <button class="knopf klein gefahr" type="submit"><i class="bi bi-trash"></i> Entfernen</button></form></td></tr>
+    {% endfor %}
+  </table>
+  {% endif %}
+  <form method="post" class="feld-mit-knopf" style="margin-top:8px">
+    <input type="hidden" name="_csrf" value="{{ csrf_token() }}"><input type="hidden" name="aktion" value="neu">
+    <input type="text" name="name" maxlength="80" placeholder="Name des Rechners, z. B. Büro-PC" aria-label="Name des Rechners">
+    <button class="knopf" type="submit"><i class="bi bi-key"></i> Zugang anlegen</button>
+  </form>
+  <p class="leise klein">Jeder Rechner bekommt einen eigenen Zugang. Er darf nur Anmeldezeiten melden – lesen oder ändern
+    kann er nichts. Entfernen sperrt ihn sofort.</p>
+</section>
+{% endblock %}

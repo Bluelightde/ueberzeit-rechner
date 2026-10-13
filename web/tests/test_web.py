@@ -300,5 +300,72 @@ class AustauschTest(Grundlage):
             austausch.desktop_einstellungen_lesen(b'[1, 2]', speicher.UEBERNEHMEN)
 
 
+class AnwesenheitTest(Grundlage):
+    """Die Desktop-App meldet Anmeldezeiten des Rechners mit einem Gerätezugang (Bearer, ohne Cookie)."""
+
+    def setUp(self):
+        super().setUp()
+        self.anmelden()
+        r = self.post('/anwesenheit', aktion='neu', name='Büro-PC')
+        self.token = re.search(r'value="(uz_[^"]+)"', r.text).group(1)
+        self.geraet = self.app.test_client()          # eigener Client: keine Sitzung, kein CSRF
+
+    def melden(self, tage, token=None):
+        return self.geraet.post('/api/geraet/anwesenheit', json={'tage': tage},
+                                headers={'Authorization': f'Bearer {token or self.token}'})
+
+    def test_zugang_pruefen_und_entfernen(self):
+        r = self.geraet.get('/api/geraet/pruefen', headers={'Authorization': f'Bearer {self.token}'})
+        self.assertEqual((r.status_code, r.json['benutzer'], r.json['geraet']), (200, 'admin', 'Büro-PC'))
+        self.assertEqual(self.melden([], token='uz_falsch').status_code, 401)
+        self.assertEqual(self.geraet.post('/api/geraet/anwesenheit', json={'tage': []}).status_code, 401)
+        with self.app.app_context():
+            self.assertNotIn(self.token, str([tuple(z) for z in speicher.db().execute('SELECT * FROM geraete')]))
+            gid = speicher.geraete(1)[0]['id']
+        self.assertIn('Büro-PC', self.c.get('/anwesenheit').text)
+        self.post('/anwesenheit', aktion='entfernen', id=str(gid))
+        self.assertEqual(self.melden([]).status_code, 401)
+
+    def test_melden_zusammenfuehren_und_nutzen(self):
+        r = self.melden([{'date': '2026-10-12', 'login': '07:12', 'logout': '12:00'},
+                         {'date': '2026-10-09', 'login': '08:00', 'logout': ''},
+                         {'date': 'kaputt', 'login': '07:00'}, {'date': '2026-10-08', 'login': '7:00'}, 'Unsinn'])
+        self.assertEqual(r.json['tage'], 2)
+        # zweiter Rechner: späterer Login ändert nichts, späterer Logout gewinnt
+        self.melden([{'date': '2026-10-12', 'login': '07:40', 'logout': '16:03'}])
+        with self.app.app_context():
+            self.assertEqual(speicher.anwesenheit_tag(1, '2026-10-12'), {'date': '2026-10-12', 'start': '07:12',
+                                                                          'end': '16:03'})
+        seite = self.c.get('/anwesenheit').text
+        self.assertIn('8h 51m', seite)
+        heute = self.c.get('/').text
+        self.assertIn('Kommen um 07:12', heute)
+        self.assertIn('name="start" value="07:12"', heute)          # Startvorschlag im Formular
+        self.post('/einstellungen', default_start='06:30', max_work_hours='10', vacation_entitlement='30',
+                  country='DE', state='TH', theme='auto', tag_0='1', soll_0='08:00')
+        self.assertNotIn('Kommen um', self.c.get('/').text)          # Haken aus -> wie am Desktop die Startzeit
+        self.assertIn('name="start" value="06:30"', self.c.get('/').text)
+        self.assertEqual(self.melden([{}] * 401).status_code, 400)
+
+    def test_austausch_mit_desktop(self):
+        pfad = os.path.join(self.tmp.name, 'd.db')
+        v = sqlite3.connect(pfad)
+        v.executescript("""CREATE TABLE entries (id INTEGER PRIMARY KEY, date TEXT, start TEXT, end TEXT, pause INTEGER,
+            minutes INTEGER, reason TEXT); CREATE TABLE device_login (date TEXT PRIMARY KEY, start_time TEXT NOT NULL,
+            end_time TEXT); INSERT INTO device_login VALUES ('2026-10-01', '06:58', '15:30'), ('2026-10-02', '', '');""")
+        v.commit()
+        v.close()
+        with open(pfad, 'rb') as f:
+            self.c.post('/austausch', data={'datenbank': (io.BytesIO(f.read()), 'd.db'), '_csrf': self.tok},
+                        content_type='multipart/form-data')
+        self.assertIn('1 Tage Anwesenheit', self.meldungen()[0][1])
+        roh = self.c.get('/export/datenbank').data
+        with open(pfad, 'wb') as f:
+            f.write(roh)
+        v = sqlite3.connect(pfad)
+        self.assertEqual(v.execute('SELECT * FROM device_login').fetchall(), [('2026-10-01', '06:58', '15:30')])
+        v.close()
+
+
 if __name__ == '__main__':
     unittest.main()

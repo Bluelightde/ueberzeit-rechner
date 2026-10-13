@@ -6,7 +6,9 @@ Gerechnet wird ausschließlich mit kern.py, genau wie auf dem Desktop.
 """
 
 import copy
+import hashlib
 import json
+import secrets
 import sqlite3
 
 from flask import current_app, g
@@ -14,7 +16,7 @@ from flask import current_app, g
 import kern
 from models import BereitschaftEntry, WorkEntry
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 
 # Voreinstellungen wie in der Desktop-App (main.py), ohne die rein lokalen Schalter
 # (Anmeldezeit des Rechners, Datenbankpfad, Sprache).
@@ -35,6 +37,7 @@ STANDARD = {
     "goal_start_date": "",
     "goal_end_date": "",
     "goal_hours": 0,
+    "use_login_time": True,     # Anmeldezeit des Rechners (von der Desktop-App gemeldet) als Startvorschlag
 }
 
 # Diese Schlüssel einer Desktop-Einstellungsdatei werden übernommen (Rest ist gerätebezogen).
@@ -104,6 +107,25 @@ def schema_anlegen():
                 end_date TEXT
             );
             CREATE INDEX IF NOT EXISTS bereitschaft_benutzer ON bereitschaft_entries (benutzer_id, date);
+        ''')
+    if version < 2:
+        # Anwesenheit wie device_login der Desktop-App, je Person; Geräte = Zugänge der Desktop-App (nur Hash)
+        d.executescript('''
+            CREATE TABLE IF NOT EXISTS anwesenheit (
+                benutzer_id INTEGER NOT NULL REFERENCES benutzer(id) ON DELETE CASCADE,
+                date TEXT NOT NULL,
+                start_time TEXT NOT NULL DEFAULT '',
+                end_time TEXT NOT NULL DEFAULT '',
+                PRIMARY KEY (benutzer_id, date)
+            );
+            CREATE TABLE IF NOT EXISTS geraete (
+                id INTEGER PRIMARY KEY,
+                benutzer_id INTEGER NOT NULL REFERENCES benutzer(id) ON DELETE CASCADE,
+                name TEXT NOT NULL,
+                token_hash TEXT NOT NULL UNIQUE,
+                erstellt TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
+                zuletzt TEXT
+            );
         ''')
     d.execute(f'PRAGMA user_version = {SCHEMA_VERSION}')
     d.commit()
@@ -206,3 +228,64 @@ def bereitschaft_anlegen(benutzer_id, b):
 
 def bereitschaft_loeschen(benutzer_id, b_id):
     db().execute('DELETE FROM bereitschaft_entries WHERE id = ? AND benutzer_id = ?', (b_id, benutzer_id))
+
+
+# --- Anwesenheit (Anmeldezeiten des Rechners, von der Desktop-App gemeldet) -------------------------
+
+def anwesenheit(benutzer_id):
+    """Alle Tage, neueste zuerst: [{'date', 'start', 'end'}] wie DBManager.load_all_device_logins."""
+    zeilen = db().execute('SELECT date, start_time, end_time FROM anwesenheit WHERE benutzer_id = ? '
+                          'ORDER BY date DESC', (benutzer_id,)).fetchall()
+    return [{'date': z[0], 'start': z[1], 'end': z[2]} for z in zeilen]
+
+
+def anwesenheit_tag(benutzer_id, datum):
+    z = db().execute('SELECT start_time, end_time FROM anwesenheit WHERE benutzer_id = ? AND date = ?',
+                     (benutzer_id, datum)).fetchone()
+    return {'date': datum, 'start': z[0], 'end': z[1]} if z else None
+
+
+def anwesenheit_melden(benutzer_id, datum, login, logout):
+    """Zusammenführen wie in der Desktop-App: frühester Login und spätester Logout des Tages gewinnen
+    (auch über mehrere Rechner). Leere Werte ändern nichts. HH:MM-Texte lassen sich direkt vergleichen."""
+    db().execute(
+        "INSERT INTO anwesenheit (benutzer_id, date, start_time, end_time) VALUES (?, ?, ?, ?) "
+        "ON CONFLICT(benutzer_id, date) DO UPDATE SET "
+        "start_time = CASE WHEN excluded.start_time = '' THEN start_time WHEN start_time = '' "
+        "  OR excluded.start_time < start_time THEN excluded.start_time ELSE start_time END, "
+        "end_time = CASE WHEN excluded.end_time = '' THEN end_time WHEN end_time = '' "
+        "  OR excluded.end_time > end_time THEN excluded.end_time ELSE end_time END",
+        (benutzer_id, datum, login or '', logout or ''))
+
+
+# --- Geräte: Zugang der Desktop-App (Token nur einmal angezeigt, gespeichert wird der SHA-256) -----
+
+def _hash(token):
+    return hashlib.sha256(token.encode('utf-8')).hexdigest()
+
+
+def geraet_anlegen(benutzer_id, name):
+    token = 'uz_' + secrets.token_urlsafe(32)
+    db().execute('INSERT INTO geraete (benutzer_id, name, token_hash) VALUES (?, ?, ?)',
+                 (benutzer_id, name, _hash(token)))
+    return token
+
+
+def geraete(benutzer_id):
+    return [dict(z) for z in db().execute('SELECT id, name, erstellt, zuletzt FROM geraete WHERE benutzer_id = ? '
+                                          'ORDER BY id', (benutzer_id,))]
+
+
+def geraet_loeschen(benutzer_id, geraet_id):
+    db().execute('DELETE FROM geraete WHERE id = ? AND benutzer_id = ?', (geraet_id, benutzer_id))
+
+
+def geraet_pruefen(token):
+    """Token -> Zeile (id, benutzer_id, name, benutzer) oder None; merkt sich den letzten Kontakt."""
+    if not token or len(token) > 200:
+        return None
+    z = db().execute('SELECT g.id, g.benutzer_id, g.name, b.name AS benutzer FROM geraete g '
+                     'JOIN benutzer b ON b.id = g.benutzer_id WHERE g.token_hash = ?', (_hash(token),)).fetchone()
+    if z:
+        db().execute("UPDATE geraete SET zuletzt = datetime('now', 'localtime') WHERE id = ?", (z['id'],))
+    return z

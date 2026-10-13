@@ -35,7 +35,7 @@ import speicher  # noqa: E402
 from models import BereitschaftEntry, WorkEntry  # noqa: E402
 from speicher import db  # noqa: E402
 
-VERSION = '1.1.0'
+VERSION = '1.2.0'
 log = logging.getLogger('ueberzeit')
 
 ARTEN = [(kern.TYPE_WORK, 'Arbeit'), (kern.TYPE_VACATION, 'Urlaub'), (kern.TYPE_SICK, 'Krank'),
@@ -248,6 +248,23 @@ def oidc_benutzer(info):
     return benutzer_id
 
 
+def geraet_noetig(funktion):
+    """Für die Desktop-App: Kopfzeile „Authorization: Bearer uz_…“. Falsche Zugänge zählen wie falsche Passwörter."""
+    @wraps(funktion)
+    def huelle(*args, **kwargs):
+        if anmeldung_gesperrt():
+            return jsonify(fehler='Zu viele Fehlversuche, bitte später noch einmal.'), 429
+        art, _, token = request.headers.get('Authorization', '').partition(' ')
+        geraet = speicher.geraet_pruefen(token.strip()) if art.lower() == 'bearer' else None
+        if geraet is None:
+            db().execute('INSERT INTO anmeldeversuche VALUES (?, ?)', (_client_adresse(), time.time()))
+            db().commit()
+            return jsonify(fehler='Gerätezugang unbekannt oder entfernt.'), 401
+        g.geraet = geraet
+        return funktion(*args, **kwargs)
+    return huelle
+
+
 def anmeldung_gesperrt():
     from flask import current_app
     grenze, fenster = current_app.config['ANMELDE_SPERRE']
@@ -265,8 +282,9 @@ def _csrf_token():
 
 
 def _csrf_pruefen():
-    """Formulare schicken das Feld _csrf, die Live-Rechnung (JSON) die Kopfzeile X-CSRF."""
-    if request.method == 'POST':
+    """Formulare schicken das Feld _csrf, die Live-Rechnung (JSON) die Kopfzeile X-CSRF.
+    Ausnahme /api/geraet/: Die Desktop-App meldet sich mit ihrem Gerätezugang (Bearer), ohne Cookie."""
+    if request.method == 'POST' and not request.path.startswith('/api/geraet/'):
         erwartet = session.get('_csrf')
         gesendet = request.headers.get('X-CSRF') or request.form.get('_csrf', '')
         if not erwartet or not secrets.compare_digest(erwartet, gesendet):
@@ -382,12 +400,21 @@ def _monatswahl():
     return monate, monat
 
 
+def _anmeldezeit(datum):
+    """Anmeldezeit des Rechners an dem Tag (von der Desktop-App gemeldet), wenn sie genutzt werden soll."""
+    if not werte().get('use_login_time', True):
+        return None
+    tag = speicher.anwesenheit_tag(bid(), datum)
+    return tag['start'] if tag and tag['start'] else None
+
+
 def _start_vorschlag(datum):
-    """Beginn fürs Formular: Ende des letzten Eintrags an dem Tag, sonst die gewohnte Startzeit."""
+    """Beginn fürs Formular: Ende des letzten Eintrags an dem Tag, sonst die Anmeldezeit des Rechners
+    (wie „Login-Zeit als Startzeit verwenden“ am Desktop), sonst die gewohnte Startzeit."""
     tag = [e for e in alle() if e.date == datum and e.end]
     if tag:
         return max(e.end for e in tag)
-    return werte().get('default_start', '07:00')
+    return _anmeldezeit(datum) or werte().get('default_start', '07:00')
 
 
 # --- Routen ----------------------------------------------------------------------------
@@ -535,6 +562,7 @@ def _routen(app):  # noqa: C901
             soll=kern.get_target_minutes_for_date(datum, alle(), werte()), auto=werte().get('auto_break', True),
             heute_eintraege=heute_eintraege, tag_saldo=sum(e.minutes for e in heute_eintraege), lauf=lauf,
             bloecke=aw.bloecke(alle(), werte(), None if monat == 'alle' else monat), monate=monate, monat=monat,
+            angemeldet=_anmeldezeit(datum),
             monat_name=_monat_name, leer=not alle())
 
     @app.post('/api/vorschau')
@@ -800,7 +828,7 @@ def _routen(app):  # noqa: C901
         bereit = [b for b in speicher.bereitschaften(bid()) if b.date <= ds <= (b.effective_end_date or b.date)]
         return {'datum': ds, 'eintraege': sorted([e for e in alle() if e.date == ds], key=lambda e: e.start or ''),
                 'soll': kern.get_target_minutes_for_date(ds, alle(), werte()), 'feiertag': feiertag,
-                'bereitschaft': bereit}
+                'bereitschaft': bereit, 'anwesenheit': speicher.anwesenheit_tag(bid(), ds)}
 
     @app.get('/statistik')
     @anmeldung_noetig
@@ -870,6 +898,59 @@ def _routen(app):  # noqa: C901
     def mehr():
         return render_template('mehr.html', anzahl=len(alle()), per_oidc=session.get('per_oidc'))
 
+    # --- Anwesenheit: Anmeldezeiten des Rechners, gemeldet von der Desktop-App ---
+
+    @app.route('/anwesenheit', methods=['GET', 'POST'])
+    @anmeldung_noetig
+    def anwesenheit():
+        neues_token = None
+        if request.method == 'POST':
+            f = request.form
+            if f.get('aktion') == 'neu':
+                name = (f.get('name') or '').strip()[:80] or 'Desktop'
+                neues_token = speicher.geraet_anlegen(bid(), name)
+                db().commit()
+                log.info('Gerätezugang „%s“ für Benutzer %s angelegt', name, bid())
+            elif f.get('aktion') == 'entfernen':
+                speicher.geraet_loeschen(bid(), _ganzzahl(f.get('id'), 0))
+                db().commit()
+                return _gespeichert('Gerätezugang entfernt.', url_for('anwesenheit'))
+        tage = speicher.anwesenheit(bid())
+        monate = sorted({t['date'][:7] for t in tage}, reverse=True)
+        monat = request.args.get('monat') or 'alle'
+        if monat != 'alle' and not re.fullmatch(r'\d{4}-\d{2}', monat):
+            monat = 'alle'
+        for t in tage:
+            t['dauer'] = aw.anwesend(t['start'], t['end'])
+        return render_template('anwesenheit.html', tage=[t for t in tage if monat == 'alle' or t['date'].startswith(monat)],
+                               monate=monate, monat=monat, geraete=speicher.geraete(bid()), neues_token=neues_token,
+                               adresse=request.host_url.rstrip('/'))
+
+    @app.get('/api/geraet/pruefen')
+    @geraet_noetig
+    def geraet_pruefen():
+        """„Verbindung testen“ in der Desktop-App."""
+        db().commit()
+        return jsonify(ok=True, benutzer=g.geraet['benutzer'], geraet=g.geraet['name'], version=VERSION)
+
+    @app.post('/api/geraet/anwesenheit')
+    @geraet_noetig
+    def geraet_anwesenheit():
+        """Die Desktop-App meldet {"tage": [{"date": "2026-10-13", "login": "07:12", "logout": "16:03"}, …]}."""
+        daten = request.get_json(silent=True)
+        tage = daten.get('tage') if isinstance(daten, dict) else None
+        if not isinstance(tage, list) or len(tage) > 400:
+            return jsonify(fehler='Erwartet {"tage": [...]} mit höchstens 400 Tagen.'), 400
+        gemeldet = 0
+        for t in tage:
+            tag = austausch.anwesenheit_pruefen(t.get('date'), t.get('login'), t.get('logout')) \
+                if isinstance(t, dict) else None
+            if tag:
+                speicher.anwesenheit_melden(g.geraet['benutzer_id'], *tag)
+                gemeldet += 1
+        db().commit()
+        return jsonify(ok=True, tage=gemeldet)
+
     @app.route('/einstellungen', methods=['GET', 'POST'])
     @anmeldung_noetig
     def einstellungen():
@@ -880,6 +961,7 @@ def _routen(app):  # noqa: C901
                 'default_start': _uhrzeit(f.get('default_start')), 'auto_break': bool(f.get('auto_break')),
                 'max_work_hours': f.get('max_work_hours'), 'vacation_entitlement': f.get('vacation_entitlement'),
                 'country': f.get('country'), 'state': f.get('state') or None, 'theme': f.get('theme'),
+                'use_login_time': bool(f.get('use_login_time')),
                 'weekday_targets': [(_uhrzeit(f.get(f'soll_{i}')) or '') if f.get(f'tag_{i}') else ''
                                     for i in range(7)],
                 'special_days': [{'day': _ganzzahl(t, 0), 'month': _ganzzahl(m, 0), 'target': _uhrzeit(z) or ''}
@@ -893,10 +975,11 @@ def _routen(app):  # noqa: C901
             sollwerte = [t for t in roh['weekday_targets'] if t]
             if sollwerte:
                 roh['target_work_time'] = max(set(sollwerte), key=sollwerte.count)
-            vorher = json.dumps({k: w.get(k) for k in speicher.STANDARD}, sort_keys=True)
+            regeln = [k for k in speicher.STANDARD if k != 'use_login_time']   # nur Rechenregeln lösen Neuberechnung aus
+            vorher = json.dumps({k: w.get(k) for k in regeln}, sort_keys=True)
             w.update(austausch.pruefen(roh))
             speicher.einstellungen_speichern(bid(), w)
-            if json.dumps({k: w.get(k) for k in speicher.STANDARD}, sort_keys=True) != vorher:
+            if json.dumps({k: w.get(k) for k in regeln}, sort_keys=True) != vorher:
                 speicher.alles_neu_berechnen(bid())
             db().commit()
             return _gespeichert('Einstellungen gespeichert, alle Tage neu berechnet.', url_for('einstellungen'))
@@ -939,14 +1022,17 @@ def _routen(app):  # noqa: C901
             speicher.einstellungen_speichern(bid(), w)
             teile.append('Einstellungen übernommen')
         if daten is not None:
-            eintraege, bereitschaften = daten
+            eintraege, bereitschaften, anwesenheit = daten
+            for tag in anwesenheit:   # zusammenführen statt ersetzen: der Server bekommt sie auch direkt gemeldet
+                speicher.anwesenheit_melden(bid(), *tag)
             db().execute('DELETE FROM entries WHERE benutzer_id = ?', (bid(),))
             db().execute('DELETE FROM bereitschaft_entries WHERE benutzer_id = ?', (bid(),))
             for e in eintraege:
                 speicher.eintrag_anlegen(bid(), e)
             for b in bereitschaften:
                 speicher.bereitschaft_anlegen(bid(), b)
-            teile.append(f'{len(eintraege)} Einträge und {len(bereitschaften)} Bereitschaften eingelesen')
+            teile.append(f'{len(eintraege)} Einträge, {len(bereitschaften)} Bereitschaften und '
+                         f'{len(anwesenheit)} Tage Anwesenheit eingelesen')
         if neue_werte is not None and daten is None:
             speicher.alles_neu_berechnen(bid())
             teile.append('alle Tage neu berechnet')
@@ -957,7 +1043,7 @@ def _routen(app):  # noqa: C901
     @app.get('/export/datenbank')
     @anmeldung_noetig
     def export_db():
-        inhalt = austausch.desktop_db_schreiben(alle(), speicher.bereitschaften(bid()))
+        inhalt = austausch.desktop_db_schreiben(alle(), speicher.bereitschaften(bid()), speicher.anwesenheit(bid()))
         return Response(inhalt, mimetype='application/vnd.sqlite3', headers={
             'Content-Disposition': f'attachment; filename="ueberstunden_daten-{heute().isoformat()}.db"',
             'Cache-Control': 'no-store'})

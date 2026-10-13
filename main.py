@@ -8,8 +8,9 @@ import os
 import shutil
 import sqlite3
 import sys
+import threading
 
-from PyQt6.QtCore import QDate, QLibraryInfo, Qt, QTranslator
+from PyQt6.QtCore import QDate, QLibraryInfo, Qt, QTimer, QTranslator
 from PyQt6.QtGui import QColor, QIcon, QPalette
 from PyQt6.QtWidgets import (
     QApplication, QMainWindow, QTabWidget, QMessageBox, QFileDialog
@@ -22,6 +23,7 @@ from database import DBManager
 from dialogs import SettingsDialog, WelcomeDialog
 
 from i18n import current_language, setup_i18n, tr
+import server_sync
 from tabs.main_tab import MainTab
 from tabs.goals_tab import GoalsTab
 from tabs.calendar_tab import CalendarTab
@@ -123,6 +125,48 @@ class UeberstundenApp(QMainWindow):
         # Erstmalige Befüllung aller Tabs
         self._on_data_changed()
         self._sync_system_sessions()
+
+        # Anwesenheit an die Server-Version melden: jetzt und alle 30 Minuten (neue Logins/Logouts)
+        self.server_status = ""
+        self._anwesenheit_melden()
+        self._melde_timer = QTimer(self)
+        self._melde_timer.timeout.connect(self._sync_und_melden)
+        self._melde_timer.start(30 * 60 * 1000)
+
+    def _sync_und_melden(self):
+        self._sync_system_sessions()
+        self._anwesenheit_melden()
+
+    def _anwesenheit_melden(self):
+        """Schickt die Anwesenheit (device_login) an die Server-Version, falls eingerichtet.
+
+        Gelesen wird hier im GUI-Thread (SQLite-Verbindung), gesendet im Hintergrund – ein langsamer
+        oder fehlender Server hält die App nie auf. Fehler landen nur im Protokoll und im Status."""
+        if not self.settings.get("server_sync"):
+            return
+        adresse = self.settings.get("server_url", "")
+        token = self.settings.get("server_token", "")
+        try:
+            from logic import get_login_time
+            heute = QDate.currentDate().toString("yyyy-MM-dd")
+            login = get_login_time()
+            tage = server_sync.tage_auswaehlen(
+                self.db.load_all_device_logins(), heute,
+                login.toString("HH:mm") if login and login.isValid() else None)
+        except Exception as exc:  # pylint: disable=broad-except
+            logger.warning("Anwesenheit konnte nicht gelesen werden: %s", exc)
+            return
+
+        def senden():
+            try:
+                anzahl = server_sync.anwesenheit_senden(adresse, token, tage)
+                self.server_status = tr("Zuletzt gemeldet: {n} Tage").format(n=anzahl)
+                logger.info("Anwesenheit an die Server-Version gemeldet: %s Tage", anzahl)
+            except server_sync.ServerFehler as exc:
+                self.server_status = str(exc)
+                logger.warning("Anwesenheit nicht gemeldet: %s", exc)
+
+        threading.Thread(target=senden, name="anwesenheit-melden", daemon=True).start()
 
     def _sync_system_sessions(self):
         """Liest Login/Logout-Sessions aus den System-Protokollen und
@@ -875,7 +919,8 @@ class UeberstundenApp(QMainWindow):
         old_db_path = self.settings.get("db_path", DB_FILE)
         dialog = SettingsDialog(self.settings, self,
                                 backup_cb=self.create_manual_backup,
-                                restore_cb=self.restore_backup)
+                                restore_cb=self.restore_backup,
+                                server_status=self.server_status)
         if dialog.exec():
             new_settings = dialog.get_settings()
             new_db_path = new_settings.get("db_path", DB_FILE)
@@ -910,6 +955,7 @@ class UeberstundenApp(QMainWindow):
             self.settings.update(new_settings)
             self.save_settings()
             self.apply_theme()
+            self._anwesenheit_melden()
 
             # Alle Tage neu berechnen, da sich das Soll geändert haben könnte
             self.tab_main.entries = self.db.load_all()

@@ -255,6 +255,15 @@ def statistik(alle, jahr=None):
             'jahre': sorted({e.date[:4] for e in alle if e.date}, reverse=True)}
 
 
+def anwesend(start, ende):
+    """Anwesenheitsdauer wie SessionTab._compute_duration: '8h 51m', Logout am Folgetag +24 h, sonst '—'."""
+    von, bis = kern.parse_hhmm(start or ''), kern.parse_hhmm(ende or '')
+    if von is None or bis is None:
+        return '—'
+    diff = (bis - von) % (24 * 60)
+    return f'{diff // 60}h {diff % 60}m'
+
+
 def datum_kurz(ds):
     d = kern.parse_date(ds)
     return d.strftime('%d.%m.%Y') if d else ds

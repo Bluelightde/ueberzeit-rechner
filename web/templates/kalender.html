@@ -43,6 +43,7 @@
 <section class="karte" id="tag">
   <h2>{{ datum_lang(tag_eintraege.datum) }}</h2>
   <p class="leise klein" style="margin-top:-4px">{% if tag_eintraege.feiertag %}{{ tag_eintraege.feiertag }} · {% endif %}Soll {{ zeit(tag_eintraege.soll) if tag_eintraege.soll else 'frei' }}
+    {% if tag_eintraege.anwesenheit %} · Am Rechner {{ tag_eintraege.anwesenheit.start or '—' }}–{{ tag_eintraege.anwesenheit.end or '—' }}{% endif %}
     {% for b in tag_eintraege.bereitschaft %} · Bereitschaft{% if b.start %} {{ b.start }}–{{ b.end }}{% endif %}{% if b.note %} ({{ b.note }}){% endif %}{% endfor %}</p>
   {% if tag_eintraege.eintraege %}
   <ul class="liste">{% for e in tag_eintraege.eintraege %}{{ block_zeile({'eintraege': [e], 'erster': e, 'letzter': e, 'minuten': e.minutes, 'typ': e.entry_type, 'ids': e.id|string}, request.full_path) }}{% endfor %}</ul>

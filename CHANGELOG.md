@@ -20,6 +20,11 @@ All notable changes to Überzeit Rechner are documented here.
     Dashboard“, „Kalender-Heatmap“, „Bereitschaft“, „Diagramm & Statistik“; Gesamt-Saldo, Eingabe, Werkzeugleiste
     (Filter, Import, Export, Einstellungen) und Eintragstabelle (Datum | Zeitraum | Überstunden | Anlass | Aktion) wie im
     ersten Reiter; Kalender als Heatmap mit den Desktop-Farben. Am Handy Reiter unten und eine schmalere Tabelle.
+  - **Anwesenheit von der Desktop-App** (Server 1.2.0): Die Desktop-App meldet die Login-/Logout-Zeiten
+    (`server_sync.py`, Einstellungen → Server-Version, Gerätezugang aus der Server-Version) beim Start und alle
+    30 Minuten im Hintergrund. Der Server zeigt sie im Reiter „Anwesenheit“ und im Kalender, schlägt die Anmeldezeit als
+    Start vor („Login-Zeit als Startzeit verwenden“) und bietet „Kommen um 07:12“. Austausch/Export nehmen
+    `device_login` mit.
 - **`kern.py`** — die Rechenregeln (Feiertage, Tagessoll, Pausen nach ArbZG, Überstunden, Mitternachtsschichten,
   Überschneidungen) ohne PyQt, gemeinsam für Desktop und Server.
 
@@ -28,7 +33,8 @@ All notable changes to Überzeit Rechner are documented here.
   bisherigen Qt-Fassung identisch, Desktop-Tests unverändert grün). Feiertage werden je Jahr/Land/Region zwischengespeichert.
 
 ### Tests
-- `tests/test_kern.py` (Rechenregeln ohne Qt), `web/tests/test_web.py` (20 Prüfungen der Server-Version). Gegenprobe:
+- `tests/test_kern.py` (Rechenregeln ohne Qt), `tests/test_server_sync.py` (Melden, Rundweg gegen die echte
+  Server-Version), `web/tests/test_web.py` (23 Prüfungen der Server-Version). Gegenprobe:
   263 Zufallseinträge, von `MainTab.recalculate_all_days` und der Server-Version gerechnet, auf die Minute gleich.
 
 ## [1.8.1] – 2026-07-11

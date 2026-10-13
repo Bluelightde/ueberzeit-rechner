@@ -42,7 +42,9 @@
   {% else %}
   <form method="post" action="{{ url_for('kommen') }}" class="reihe">
     <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
-    <div style="flex:1;min-width:150px" class="leise klein">Beginn merken, abends nur noch „Feierabend“ tippen.</div>
+    <div style="flex:1;min-width:150px" class="leise klein">{% if angemeldet %}Am Rechner angemeldet seit <b>{{ angemeldet }}</b>.
+      {% else %}Beginn merken, abends nur noch „Feierabend“ tippen.{% endif %}</div>
+    {% if angemeldet %}<button class="knopf haupt" type="submit" name="start" value="{{ angemeldet }}"><i class="bi bi-pc-display"></i> Kommen um {{ angemeldet }}</button>{% endif %}
     <button class="knopf" type="submit"><i class="bi bi-play-fill"></i> Jetzt kommen</button>
   </form>
   {% endif %}

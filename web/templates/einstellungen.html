@@ -11,6 +11,8 @@
         <td style="width:9em"><input type="time" name="soll_{{ loop.index0 }}" value="{{ soll or w.target_work_time }}" aria-label="Soll {{ name }}"></td></tr>
     {% endfor %}
   </table>
+  <label class="haken"><input type="checkbox" name="use_login_time" value="1" {{ 'checked' if w.use_login_time }}> Anmeldezeit des Rechners als Startzeit verwenden
+    <span class="leise klein">(meldet die Desktop-App, siehe <a href="{{ url_for('anwesenheit') }}">Anwesenheit</a>)</span></label>
   <div class="raster2">
     <div><label for="default_start">Üblicher Arbeitsbeginn</label><input type="time" id="default_start" name="default_start" value="{{ w.default_start }}"></div>
     <div><label for="max_work_hours">Höchstens anrechenbar (h/Tag)</label><input type="number" id="max_work_hours" name="max_work_hours" min="1" max="24" value="{{ w.max_work_hours }}"></div>
