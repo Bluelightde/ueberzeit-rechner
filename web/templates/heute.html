@@ -32,12 +32,13 @@
   </div>
   <form method="post" action="{{ url_for('gehen') }}" style="margin-top:10px">
     <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
-    <div class="feld-mit-knopf"><input type="time" name="ende" aria-label="Ende (leer = jetzt)" data-jetzt-feld>
+    <div class="feld-mit-knopf"><input type="time" name="ende" aria-label="Feierabend um (leer = jetzt)" data-ohne>
       <button class="knopf haupt" type="submit"><i class="bi bi-door-open"></i> Feierabend</button></div>
+    <div class="leise klein" style="margin-top:4px">Ohne Uhrzeit gilt „jetzt“. Für eine frühere Zeit links antippen.</div>
   </form>
   <form method="post" action="{{ url_for('verwerfen') }}" style="margin-top:6px" data-frage="Arbeitsbeginn verwerfen?">
     <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
-    <button class="knopf klein" type="submit">Verwerfen</button>
+    <button class="knopf klein" type="submit"><i class="bi bi-x"></i> Arbeitsbeginn verwerfen</button>
   </form>
   {% else %}
   <form method="post" action="{{ url_for('kommen') }}" class="reihe">

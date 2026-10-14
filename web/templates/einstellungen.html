@@ -5,10 +5,11 @@
 <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
 <section class="karte">
   <h2><i class="bi bi-calendar-week"></i> Arbeitstage und Tagessoll</h2>
+  <p class="leise klein" style="margin-top:0">Haken = Arbeitstag, daneben das Tagessoll.</p>
   <table class="tabelle">
     {% for name in wochentage %}{% set soll = w.weekday_targets[loop.index0] if w.weekday_targets else '' %}
     <tr><td><label class="haken" style="margin:0"><input type="checkbox" name="tag_{{ loop.index0 }}" value="1" {{ 'checked' if soll }}> {{ name }}</label></td>
-        <td style="width:9em"><input type="time" name="soll_{{ loop.index0 }}" value="{{ soll or w.target_work_time }}" aria-label="Soll {{ name }}"></td></tr>
+        <td style="width:9em"><input type="time" name="soll_{{ loop.index0 }}" value="{{ soll or w.target_work_time }}" aria-label="Tagessoll {{ name }}"></td></tr>
     {% endfor %}
   </table>
   <label class="haken"><input type="checkbox" name="use_login_time" value="1" {{ 'checked' if w.use_login_time }}> Anmeldezeit des Rechners als Startzeit verwenden
@@ -26,11 +27,12 @@
   <table class="tabelle" data-zeilen="br">
     <tr><th>ab Arbeitszeit über</th><th>Pause (min)</th></tr>
     {% for r in w.break_rules %}
-    <tr><td><input type="time" name="br_nach" value="{{ '%02d:%02d' % (r.after // 60, r.after % 60) }}"></td><td><input type="number" name="br_pause" min="0" max="240" value="{{ r.break }}"></td></tr>
+    <tr><td><input type="time" name="br_nach" value="{{ '%02d:%02d' % (r.after // 60, r.after % 60) }}" data-ohne aria-label="Ab Arbeitszeit über"></td><td><input type="number" name="br_pause" min="0" max="240" value="{{ r.break }}" aria-label="Pause in Minuten"></td></tr>
     {% endfor %}
-    <tr><td><input type="time" name="br_nach" value=""></td><td><input type="number" name="br_pause" min="0" max="240" placeholder="neu"></td></tr>
+    <tr><td><input type="time" name="br_nach" value="" data-ohne aria-label="Neue Regel: ab Arbeitszeit über"></td><td><input type="number" name="br_pause" min="0" max="240" placeholder="neu" aria-label="Neue Regel: Pause in Minuten"></td></tr>
   </table>
-  <p class="leise klein">Gesetzlich (ArbZG): über 6 h 30 min, über 9 h 45 min. Zum Entfernen die Zeile leeren.</p>
+  <p class="leise klein">Gesetzlich (ArbZG): über 6 h 30 min, über 9 h 45 min. Neue Regel in der letzten Zeile eintragen;
+    zum Entfernen die Uhrzeit antippen und „Ohne“ wählen.</p>
 </section>
 
 <section class="karte">
@@ -46,10 +48,11 @@
   <table class="tabelle">
     <tr><th>Tag</th><th>Monat</th><th>Soll</th></tr>
     {% for sd in w.special_days %}
-    <tr><td><input type="number" name="sd_tag" min="1" max="31" value="{{ sd.day }}"></td><td><input type="number" name="sd_monat" min="1" max="12" value="{{ sd.month }}"></td><td><input type="time" name="sd_soll" value="{{ sd.target }}"></td></tr>
+    <tr><td><input type="number" name="sd_tag" min="1" max="31" value="{{ sd.day }}" aria-label="Tag"></td><td><input type="number" name="sd_monat" min="1" max="12" value="{{ sd.month }}" aria-label="Monat"></td><td><input type="time" name="sd_soll" value="{{ sd.target }}" aria-label="Soll an diesem Tag"></td></tr>
     {% endfor %}
-    <tr><td><input type="number" name="sd_tag" min="1" max="31" placeholder="neu"></td><td><input type="number" name="sd_monat" min="1" max="12"></td><td><input type="time" name="sd_soll" value="04:00"></td></tr>
+    <tr><td><input type="number" name="sd_tag" min="1" max="31" placeholder="neu" aria-label="Neuer Sondertag: Tag"></td><td><input type="number" name="sd_monat" min="1" max="12" aria-label="Neuer Sondertag: Monat"></td><td><input type="time" name="sd_soll" value="04:00" aria-label="Neuer Sondertag: Soll"></td></tr>
   </table>
+  <p class="leise klein">Zum Beispiel 24.12. und 31.12. mit 4 Stunden. Zum Entfernen den Tag leeren.</p>
 </section>
 
 <section class="karte">

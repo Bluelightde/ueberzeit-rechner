@@ -6,9 +6,17 @@ All notable changes to Überzeit Rechner are documented here.
 
 ## [1.9.0] – 2026-10-14
 
-Desktop 1.9.0, Server-Version 1.4.0.
+Desktop 1.9.0, Server-Version 1.4.0 und 1.5.0.
 
 ### Added
+- **Server-Version 1.5.0: eigene Uhr statt Android-Systemuhr und gründlichere Oberfläche** — Uhrzeitfelder öffnen die
+  gemeinsame Uhr der Homelab-Apps (`web/static/js/uhr.js`, `css/uhr.css`, gepflegt mit `gemeinsam.py` zusammen mit
+  Notizen/Vorratsliste/Wohnungssuche): Zifferblatt wie bei Android, Zahlen tippen, „Ohne“ für optionale Zeiten, passt
+  aufs Handy. Das gestreckte Häkchen beim Tagessoll (bis 234 px breit) ist ein normales Häkchen „Eigenes Tagessoll für
+  diesen Tag“, das Zeitfeld erscheint erst dann. Klarere Beschriftungen (Beginn/Ende, Pause in Minuten, Korrektur,
+  Anlass optional, „Arbeitsbeginn verwerfen“, Hinweis „ohne Uhrzeit = jetzt“ beim Feierabend), Beschriftungen für die
+  Tabellenfelder der Einstellungen, größere Schrift in Kalender, Statistik und Leiste, Hinweis zum Abgleich auf der
+  Austausch-Seite. Neue Browser-Tests (`web/tests/test_browser.py`, Playwright, `web/requirements-dev.txt`).
 - **Abgleich der Einträge mit der Server-Version in beide Richtungen** (Desktop 1.9.0, Server 1.4.0) — mit dem
   Gerätezugang gleicht die Desktop-App alle Einträge und Bereitschaften mit der Server-Version ab: beim Start, alle
   5 Minuten und 20 Sekunden nach jeder Änderung. Was am Desktop oder im Browser (Web-App) eingetragen, geändert oder

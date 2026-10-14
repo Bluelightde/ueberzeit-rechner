@@ -3,14 +3,15 @@
 {% block inhalt %}
 <section class="karte">
   <h2><i class="bi bi-telephone"></i> Bereitschaft eintragen</h2>
-  <p class="leise klein" style="margin-top:-4px">Nur zur Übersicht im Kalender – Pausen und Überstunden ändert sie nicht.</p>
+  <p class="leise klein" style="margin-top:-4px">Nur zur Übersicht im Kalender – Pausen und Überstunden ändert sie nicht.
+    Ohne Uhrzeiten gilt sie ganztägig.</p>
   <form method="post">
     <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
     <div class="raster2">
       <div><label for="von">Von</label><input type="date" id="von" name="von" value="{{ heute }}" required></div>
-      <div><label for="bis">Bis (optional)</label><input type="date" id="bis" name="bis"></div>
-      <div><label for="start">Beginn (optional)</label><input type="time" id="start" name="start"></div>
-      <div><label for="ende">Ende (optional)</label><input type="time" id="ende" name="ende"></div>
+      <div><label for="bis">Bis einschließlich (optional)</label><input type="date" id="bis" name="bis"></div>
+      <div><label for="start">Beginn (optional)</label><input type="time" id="start" name="start" data-ohne></div>
+      <div><label for="ende">Ende (optional)</label><input type="time" id="ende" name="ende" data-ohne></div>
     </div>
     <label for="notiz">Notiz</label><input type="text" id="notiz" name="notiz" maxlength="200">
     <div style="margin-top:14px"><button class="knopf breit" type="submit"><i class="bi bi-plus"></i> Eintragen</button></div>

@@ -12,6 +12,14 @@
   }
   function klasse(min) { return min > 0 ? 'plus' : (min < 0 ? 'minus' : 'null'); }
   function text(el, t) { el.textContent = t; return el; }
+  // Uhrzeitfelder sind Knöpfe der eigenen Uhr (uhr.js); das Feld selbst ist versteckt. Wer den Wert per Skript setzt,
+  // muss die Anzeige des Knopfs mitziehen.
+  function uhrKnopf(f) { return f.id ? document.getElementById(f.id + '-knopf') : (f.nextElementSibling && f.nextElementSibling.classList.contains('uhr-feld') ? f.nextElementSibling : null); }
+  function zeitSetzen(f, wert) {
+    f.value = wert;
+    var k = uhrKnopf(f);
+    if (k) { k.textContent = wert ? wert.slice(0, 5) : '--:--'; k.classList.toggle('ohne-zeit', !wert); }
+  }
   function neu(tag, cls, t) { var e = document.createElement(tag); if (cls) e.className = cls; if (t != null) e.textContent = t; return e; }
 
   // --- Rückfragen vor dem Absenden (Löschen, Abmelden überall) ---
@@ -40,7 +48,10 @@
                  (nur === 'zeiten' && arbeit && !korrektur) || (nur === 'korrektur' && korrektur);
         el.classList.toggle('versteckt', !an);
       });
-      feld('soll').disabled = !feld('eigenes_soll').checked;
+      var eigen = feld('eigenes_soll').checked;
+      feld('soll').disabled = !eigen;
+      var sollFeld = form.querySelector('[data-soll]');
+      if (sollFeld) sollFeld.classList.toggle('versteckt', !eigen);
     }
 
     function zeigen(d) {
@@ -52,7 +63,7 @@
         vorschau.textContent = '⚠️ Überschneidung mit ' + d.ueberschneidung;
         return;
       }
-      if (d.ende_vorschlag && !endeVonHand) feld('ende').value = d.ende_vorschlag;
+      if (d.ende_vorschlag && !endeVonHand) zeitSetzen(feld('ende'), d.ende_vorschlag);
       if (auto && d.pause != null) feld('pause').value = d.pause;
       var zeile = neu('div');
       zeile.appendChild(document.createTextNode('Tag-Saldo '));
@@ -92,14 +103,17 @@
       if (bis && (!bis.value || bis.value < feld('datum').value)) bis.value = feld('datum').value;
       spaeter(true);
     });
-    feld('start').addEventListener('input', function () { spaeter(true); });
-    feld('soll').addEventListener('input', function () { spaeter(true); });
-    feld('ende').addEventListener('input', function () { endeVonHand = !!feld('ende').value; spaeter(false); });
+    // 'change' meldet die eigene Uhr, 'input' ein normales Zeitfeld (falls uhr.js fehlt)
+    ['input', 'change'].forEach(function (ereignis) {
+      feld('start').addEventListener(ereignis, function () { spaeter(true); });
+      feld('soll').addEventListener(ereignis, function () { spaeter(true); });
+      feld('ende').addEventListener(ereignis, function () { endeVonHand = !!feld('ende').value; spaeter(false); });
+    });
     feld('pause').addEventListener('input', function () { spaeter(false); });
     form.querySelectorAll('[data-jetzt]').forEach(function (k) {
       k.addEventListener('click', function () {
         var n = k.getAttribute('data-jetzt');
-        feld(n).value = jetztHHMM();
+        zeitSetzen(feld(n), jetztHHMM());
         if (n === 'ende') endeVonHand = true;
         spaeter(n === 'start');
       });

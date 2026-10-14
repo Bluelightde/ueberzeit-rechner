@@ -1,0 +1,63 @@
+/* Eigene Uhr (uhr.js) -- dieselbe Datei in Notizen, Vorratsliste und Wohnungssuche (gemeinsam.py).
+   Bringt ihr ganzes Aussehen mit; eine App setzt höchstens die Farben --uhr-* (z. B. --uhr-akzent) auf :root. */
+:root {
+  --uhr-u-flaeche: var(--uhr-flaeche, #fffcf6); --uhr-u-scheibe: var(--uhr-scheibe, #f3efe6);
+  --uhr-u-text: var(--uhr-text, #28231c); --uhr-u-leise: var(--uhr-leise, #877e70); --uhr-u-linie: var(--uhr-linie, #e4dccd);
+  --uhr-u-akzent: var(--uhr-akzent, #1f6f6a); --uhr-u-akzent-text: var(--uhr-akzent-text, #ffffff);
+  --uhr-u-weich: var(--uhr-weich, rgba(31, 111, 106, .12)); --uhr-u-gefahr: var(--uhr-gefahr, #c23f2c);
+}
+[data-bs-theme="dark"] {
+  --uhr-u-flaeche: var(--uhr-flaeche, #1f2426); --uhr-u-scheibe: var(--uhr-scheibe, #2a3033);
+  --uhr-u-text: var(--uhr-text, #ece6da); --uhr-u-leise: var(--uhr-leise, #9d968a); --uhr-u-linie: var(--uhr-linie, #3a4245);
+  --uhr-u-akzent: var(--uhr-akzent, #5cb8ad); --uhr-u-akzent-text: var(--uhr-akzent-text, #0f2523);
+  --uhr-u-weich: var(--uhr-weich, rgba(92, 184, 173, .16)); --uhr-u-gefahr: var(--uhr-gefahr, #e07a68);
+}
+
+/* Knopf an Stelle von <input type="time"> (übernimmt die Klassen des Feldes, z. B. form-control) */
+.uhr-feld { font: inherit; color: var(--uhr-u-text); background: var(--uhr-u-flaeche); border: 1px solid var(--uhr-u-linie);
+            border-radius: 10px; padding: 7px 12px; min-height: 40px; min-width: 6.5em; text-align: center; cursor: pointer;
+            font-variant-numeric: tabular-nums; }
+.uhr-feld.form-control { text-align: left; }
+.uhr-feld.ohne-zeit { color: var(--uhr-u-leise); }
+
+.uhr-blatt { width: min(360px, 94vw); max-width: none; padding: 0; border: 1px solid var(--uhr-u-linie); border-radius: 18px;
+             background: var(--uhr-u-flaeche); color: var(--uhr-u-text); box-shadow: 0 18px 40px -12px rgba(0, 0, 0, .35); }
+.uhr-blatt::backdrop { background: rgba(20, 18, 14, .4); }
+.uhr-blatt form { padding: 18px 16px 14px; margin: 0; }
+.uhr-blatt button { font: inherit; }
+.uhr-kopf { display: flex; justify-content: center; align-items: center; gap: 4px; font-size: 2.8rem; font-weight: 600;
+            line-height: 1.1; margin-bottom: 16px; font-variant-numeric: tabular-nums; }
+.uhr-teil { font: inherit !important; border: 0; border-radius: 12px; padding: 2px 10px; background: var(--uhr-u-scheibe);
+            color: var(--uhr-u-leise); cursor: pointer; }
+.uhr-teil.aktiv { background: var(--uhr-u-weich); color: var(--uhr-u-akzent); }
+.uhr-scheibe { position: relative; width: min(260px, 70vw); aspect-ratio: 1; margin: 0 auto; border-radius: 50%;
+               background: var(--uhr-u-scheibe); border: 1px solid var(--uhr-u-linie); touch-action: none; user-select: none;
+               -webkit-user-select: none; cursor: pointer; outline-offset: 4px; }
+.uhr-scheibe[hidden], .uhr-tasten[hidden], .uhr-blatt [hidden] { display: none !important; }
+.uhr-scheibe::after { content: ""; position: absolute; left: 50%; top: 50%; width: 8px; height: 8px; border-radius: 50%;
+                      background: var(--uhr-u-akzent); transform: translate(-50%, -50%); }
+.uhr-zeiger { position: absolute; left: 50%; top: 50%; width: 2px; height: var(--laenge, 40%); background: var(--uhr-u-akzent);
+              transform-origin: top center; transform: translateX(-50%) rotate(calc(var(--winkel, 0deg) + 180deg)); }
+.uhr-punkt { position: absolute; width: 38px; height: 38px; border-radius: 50%; background: var(--uhr-u-akzent); transform: translate(-50%, -50%); }
+.uhr-punkt.zwischen { width: 14px; height: 14px; }
+.uhr-ziffer { position: absolute; width: 34px; height: 34px; display: flex; align-items: center; justify-content: center;
+              transform: translate(-50%, -50%); font-size: .95rem; font-weight: 600; pointer-events: none; z-index: 1;
+              font-variant-numeric: tabular-nums; line-height: 1; }
+.uhr-ziffer.innen { font-size: .78rem; font-weight: 500; color: var(--uhr-u-leise); }
+.uhr-scheibe[data-teil=std] .uhr-ziffer.min, .uhr-scheibe[data-teil=min] .uhr-ziffer.std { display: none; }
+.uhr-ziffer.gewaehlt { color: var(--uhr-u-akzent-text); }
+.uhr-tasten { display: flex; align-items: center; justify-content: center; gap: 6px; font-size: 2rem; font-weight: 700; margin: 8px 0; }
+.uhr-tasten input { width: 2.6em; font: inherit; text-align: center; color: var(--uhr-u-text); background: var(--uhr-u-scheibe);
+                    border: 1px solid var(--uhr-u-linie); border-radius: 12px; padding: 6px 4px; }
+.uhr-tasten input:invalid { border-color: var(--uhr-u-gefahr); }
+.uhr-knoepfe { display: flex; align-items: center; gap: 8px; margin-top: 16px; flex-wrap: wrap; }
+.uhr-rechts { margin-left: auto; display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+.uhr-knopf { border: 0; border-radius: 12px; padding: 9px 16px; font-weight: 700; cursor: pointer;
+             background: var(--uhr-u-akzent); color: var(--uhr-u-akzent-text); }
+.uhr-knopf.zweit { background: transparent; color: var(--uhr-u-text); border: 1px solid var(--uhr-u-linie); font-weight: 600; }
+.uhr-symbol { border: 0; background: none; color: var(--uhr-u-akzent); font-size: 1.35rem; width: 44px; height: 44px;
+              border-radius: 50%; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; }
+.uhr-symbol:hover { background: var(--uhr-u-weich); }
+/* Datum + Uhrzeit (aus <input type="datetime-local">) nebeneinander */
+.uhr-datum-zeit { display: flex; gap: 8px; align-items: stretch; }
+.uhr-datum-zeit > input[type=date] { flex: 1; min-width: 0; }

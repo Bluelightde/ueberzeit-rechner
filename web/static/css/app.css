@@ -13,6 +13,10 @@
   --radius: 12px; --radius-klein: 10px;
   --nav-hoehe: 60px;
   color-scheme: light;
+  /* Farben der eigenen Uhr (uhr.css, geteilt mit Notizen/Vorratsliste) */
+  --uhr-flaeche: var(--panel); --uhr-scheibe: var(--chip); --uhr-text: var(--fg); --uhr-leise: var(--dim);
+  --uhr-linie: var(--line); --uhr-akzent: var(--accent); --uhr-akzent-text: #fff; --uhr-weich: var(--accent-hell);
+  --uhr-gefahr: var(--minus);
 }
 [data-thema="dark"] {
   --bg: #0e1116; --panel: #161b22; --line: #262d36; --line2: #1e242c; --chip: #1f262f;
@@ -22,6 +26,7 @@
   --plus: #3fb950; --minus: #f85149; --plus-hell: rgba(63, 185, 80, .12); --minus-hell: rgba(248, 81, 73, .12);
   --warn: #e0913f;
   --frei: #1f262f; --feiertag: #1e3a8a; --feiertag-text: #ffffff; --zelle: #161b22;
+  --uhr-akzent-text: #0e1116;
   color-scheme: dark;
 }
 
@@ -58,7 +63,7 @@ h2 { font-size: 1rem; font-weight: 600; }
   background: var(--panel); border-top: 1px solid var(--line);
 }
 .unten-nav a { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; flex: 1;
-  color: var(--faint); font-size: .7rem; font-weight: 600; text-decoration: none; }
+  color: var(--faint); font-size: .75rem; font-weight: 600; text-decoration: none; }
 .unten-nav a i { font-size: 1.3rem; line-height: 1; }
 .unten-nav a.aktiv { color: var(--accent); }
 
@@ -113,6 +118,11 @@ input[type=text], input[type=date], input[type=time], input[type=number], input[
 select { padding-right: 32px; background-repeat: no-repeat; background-position: right 10px center; background-size: 12px;
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath fill='none' stroke='%2398a1ac' stroke-width='2' d='m3 6 5 5 5-5'/%3E%3C/svg%3E"); }
 input:focus, select:focus { outline: 2px solid var(--accent); outline-offset: -1px; border-color: transparent; }
+/* Knopf der eigenen Uhr an Stelle von <input type="time">: sieht aus wie die übrigen Felder */
+.uhr-feld { width: 100%; min-width: 0; min-height: 42px; padding: 8px 10px; text-align: left; font-size: 16px;
+  border-radius: var(--radius-klein); }
+.uhr-feld:focus-visible { outline: 2px solid var(--accent); outline-offset: -1px; border-color: transparent; }
+.uhr-feld:disabled { background: var(--chip); color: var(--faint); cursor: default; }
 input:disabled, input[readonly], select:disabled { background: var(--chip); color: var(--dim); }
 input[type=file] { padding: 8px; }
 input[type=time]::-webkit-calendar-picker-indicator, input[type=date]::-webkit-calendar-picker-indicator { opacity: .55; }
@@ -125,6 +135,7 @@ input[type=time]::-webkit-calendar-picker-indicator, input[type=date]::-webkit-c
   input[type=text], input[type=date], input[type=time], input[type=number], input[type=password], select, input[type=file] {
     font-size: 15px; min-height: 36px; padding: 5px 9px; }
   select { padding-right: 30px; }
+  .uhr-feld { font-size: 15px; min-height: 36px; padding: 5px 9px; }
 }
 
 /* --- Knöpfe wie der Themen-Knopf im Dashboard; Hauptknopf blau gefüllt --- */
@@ -146,7 +157,7 @@ input[type=time]::-webkit-calendar-picker-indicator, input[type=date]::-webkit-c
 .knopf:disabled { color: var(--faint); border-color: var(--line); cursor: default; transform: none; }
 .absenden { margin-top: 14px; display: flex; justify-content: flex-end; }
 .absenden .knopf { min-width: 140px; }
-@media (max-width: 899px) { .absenden .knopf { width: 100%; } }
+@media (max-width: 899px) { .absenden .knopf { width: 100%; } .knopf.klein { min-height: 36px; } }
 @media (min-width: 900px) { .knopf, .symbolknopf { min-height: 36px; } .symbolknopf { min-width: 36px; } }
 
 /* Typ: Chips; gewählt = blau */
@@ -240,14 +251,14 @@ input[type=time]::-webkit-calendar-picker-indicator, input[type=date]::-webkit-c
 .kal a:hover { border-color: var(--accent); }
 .kal span.leer-tag { background: transparent; border-color: transparent; }
 .kal a .t { font-size: .95rem; font-weight: 600; }
-.kal a .m { font-size: .74rem; }
-.kal a .fname { font-size: .66rem; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.kal a .m { font-size: .78rem; }
+.kal a .fname { font-size: .72rem; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .kal a.frei { background: var(--frei); }
 .kal a.feiertag { background: var(--feiertag); color: var(--feiertag-text); }
 .kal a.heute { box-shadow: inset 0 0 0 2px var(--accent); }
 .kal a.gewaehlt { box-shadow: inset 0 0 0 2px var(--fg); }
 .kal a .bereit { position: absolute; bottom: 4px; left: 15%; width: 70%; height: 4px; border-radius: 2px; background: #eab308; }
-@media (max-width: 499px) { .kal { gap: 2px; } .kal a { min-height: 52px; border-radius: 6px; } .kal a .fname { display: none; } .kal a .m { font-size: .62rem; } }
+@media (max-width: 499px) { .kal { gap: 2px; } .kal a { min-height: 52px; border-radius: 6px; } .kal a .fname { display: none; } .kal a .m { font-size: .72rem; letter-spacing: -.02em; } }
 .legende { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: .8rem; color: var(--dim); margin-top: 10px; }
 .legende span { display: inline-flex; align-items: center; gap: 5px; }
 .legende i.farbe { width: 12px; height: 12px; border-radius: 3px; display: inline-block; }
@@ -263,7 +274,7 @@ input[type=time]::-webkit-calendar-picker-indicator, input[type=date]::-webkit-c
 .balken .b { width: 70%; max-width: 30px; min-height: 2px; }
 .balken .o .b { background: var(--plus); border-radius: 4px 4px 0 0; }
 .balken .u .b { background: var(--minus); border-radius: 0 0 4px 4px; }
-.balken-namen { display: grid; grid-template-columns: repeat(var(--anzahl, 12), 1fr); gap: 4px; font-size: .68rem;
+.balken-namen { display: grid; grid-template-columns: repeat(var(--anzahl, 12), 1fr); gap: 4px; font-size: .75rem;
   text-align: center; color: var(--dim); margin-top: 4px; }
 
 /* Fortschritt */
@@ -291,7 +302,7 @@ input[type=time]::-webkit-calendar-picker-indicator, input[type=date]::-webkit-c
 .tabelle { width: 100%; border-collapse: collapse; }
 .tabelle td, .tabelle th { padding: 4px; text-align: left; }
 .tabelle th { font-size: 11.5px; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; color: var(--faint); }
-.tabelle input, .tabelle select { min-height: 36px; }
+.tabelle input:not([type=checkbox]), .tabelle select, .tabelle .uhr-feld { min-height: 36px; }
 
 .fuss { max-width: 1080px; margin: 24px auto 0; padding: 16px 16px 14px; border-top: 1px solid var(--line2);
   color: var(--faint); font-size: 12.5px; text-align: center; }

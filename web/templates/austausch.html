@@ -6,6 +6,10 @@
   <p class="leise klein" style="margin-top:-4px">Die Desktop-App speichert neben dem Programm zwei Dateien:
     <b>ueberstunden_daten.db</b> (Einträge) und <b>ueberstunden_settings.json</b> (Einstellungen). Beide hier hochladen, dann
     stimmt jeder Saldo auf die Minute. Die Desktop-App bleibt dabei unverändert.</p>
+  <div class="hinweis"><i class="bi bi-arrow-repeat"></i> Ist die Desktop-App mit einem Gerätezugang verbunden
+    (<a href="{{ url_for('anwesenheit') }}#geraete">Anwesenheit</a>), gleichen sich Einträge und Bereitschaften von selbst
+    ab – dann ist hier nichts hochzuladen. Achtung: Was du hier einliest, übernimmt die verbundene Desktop-App beim nächsten
+    Abgleich ebenfalls.</div>
   <form method="post" enctype="multipart/form-data">
     <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
     <label for="datenbank">Datenbank (ueberstunden_daten.db)</label>

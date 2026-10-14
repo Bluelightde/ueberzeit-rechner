@@ -12,31 +12,33 @@
   </div>
 
   <div class="raster2">
-    <div><label for="datum">Datum:</label><input type="date" id="datum" name="datum" value="{{ datum }}" required></div>
-    {% if not e %}<div data-nur="abwesend"><label for="bis">bis:</label><input type="date" id="bis" name="bis" value="{{ datum }}"></div>{% endif %}
+    <div><label for="datum">Datum</label><input type="date" id="datum" name="datum" value="{{ datum }}" required></div>
+    {% if not e %}<div data-nur="abwesend"><label for="bis">bis einschließlich</label><input type="date" id="bis" name="bis" value="{{ datum }}"></div>{% endif %}
   </div>
 
   <div data-nur="arbeit">
     <label class="haken"><input type="checkbox" name="korrektur" value="1" {{ 'checked' if korrektur }}> Ohne Uhrzeit (Korrektur in Minuten)</label>
     <div data-nur="zeiten">
       <div class="raster2">
-        <div><label for="start">Start:</label>
+        <div><label for="start">Beginn</label>
           <div class="feld-mit-knopf"><input type="time" id="start" name="start" value="{{ start }}"><button type="button" class="symbolknopf" data-jetzt="start" title="Aktuelle Uhrzeit als Startzeit setzen" aria-label="Start jetzt">Jetzt</button></div></div>
-        <div><label for="ende">Ende:</label>
+        <div><label for="ende">Ende</label>
           <div class="feld-mit-knopf"><input type="time" id="ende" name="ende" value="{{ ende }}"><button type="button" class="symbolknopf" data-jetzt="ende" title="Aktuelle Uhrzeit als Endzeit setzen" aria-label="Ende jetzt">Jetzt</button></div></div>
       </div>
       <div class="raster2">
-        <div><label for="pause">Pause (Min){% if auto %} · automatisch{% endif %}:</label>
-          <input type="number" id="pause" name="pause" min="0" max="600" value="{{ e.pause if e else 0 }}" {{ 'readonly' if auto }}></div>
-        <div><label for="soll">Indiv. Tagessoll:</label>
-          <div class="feld-mit-knopf"><input type="checkbox" name="eigenes_soll" value="1" aria-label="Eigenes Tagessoll verwenden" style="width:22px;accent-color:var(--blau)" {{ 'checked' if soll_text }}>
-          <input type="time" id="soll" name="soll" value="{{ soll_text or '04:00' }}"></div></div>
+        <div><label for="pause">Pause in Minuten{% if auto %} (automatisch){% endif %}</label>
+          <input type="number" id="pause" name="pause" min="0" max="600" value="{{ e.pause if e else 0 }}" {{ 'readonly' if auto }}
+            {% if auto %}title="Wird nach den Pausenregeln (Einstellungen) berechnet"{% endif %}></div>
+        <div data-soll><label for="soll">Tagessoll an diesem Tag</label>
+          <input type="time" id="soll" name="soll" value="{{ soll_text or '04:00' }}"></div>
       </div>
+      <label class="haken"><input type="checkbox" name="eigenes_soll" value="1" {{ 'checked' if soll_text }}> Eigenes Tagessoll für diesen Tag
+        <span class="leise klein">(sonst gilt das Soll aus den Einstellungen)</span></label>
     </div>
-    <div data-nur="korrektur"><label for="minuten">Minuten (+ oder −, auch 1:30)</label>
-      <input type="text" id="minuten" name="minuten" inputmode="text" placeholder="z. B. -0:30 oder 45" value="{{ e.minutes if korrektur else '' }}"></div>
-    <label for="anlass">Anlass:</label>
-    <input type="text" id="anlass" name="anlass" maxlength="200" value="{{ e.reason if e else '' }}" placeholder="z. B. Regulär">
+    <div data-nur="korrektur"><label for="minuten">Korrektur in Minuten (plus oder minus)</label>
+      <input type="text" id="minuten" name="minuten" inputmode="text" placeholder="z. B. 45, -30 oder 1:30" value="{{ e.minutes if korrektur else '' }}"></div>
+    <label for="anlass">Anlass (optional)</label>
+    <input type="text" id="anlass" name="anlass" maxlength="200" value="{{ e.reason if e else '' }}" placeholder="z. B. Projekt, Fortbildung, Dienstreise">
     <div class="vorschau" aria-live="polite" data-nur="zeiten"><span class="leise">Berechne …</span></div>
   </div>
   <p class="leise klein" data-nur="abwesend">Urlaub, Krank, Feiertag und Elternzeit lassen den Saldo unverändert; Gleitzeitabbau zieht das Tagessoll ab.{% if not e %} Über mehrere Tage werden Wochenenden und Feiertage übersprungen.{% endif %}</p>
