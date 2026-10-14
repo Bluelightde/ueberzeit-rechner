@@ -12,7 +12,7 @@ from PyQt6.QtWidgets import (
 from i18n import get_locale, tr
 
 from logic import COLOR_NEGATIVE, COLOR_POSITIVE, fmt_date, format_time, get_holidays, \
-    TYPE_WORK, ABSENCE_TYPES, TYPE_FLEXTIME, TYPE_LABELS
+    TYPE_WORK, TYPE_LABELS
 from ui_components import HeatmapDelegate, overtime_qcolor, set_overtime_color
 
 

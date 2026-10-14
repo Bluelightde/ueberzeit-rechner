@@ -26,9 +26,9 @@ from logic import (
     calculate_timed_entries, get_login_time,
     format_time, fmt_date, fmt_time_hhmm,
     get_target_minutes, get_max_minutes, get_target_minutes_for_date,
-    COLOR_POSITIVE, COLOR_NEGATIVE, COLOR_INFO,
+    COLOR_POSITIVE, COLOR_NEGATIVE,
     is_midnight_shift, split_midnight_shift,
-    TYPE_WORK, TYPE_VACATION, TYPE_SICK, TYPE_HOLIDAY, TYPE_FLEXTIME, TYPE_PARENTAL,
+    TYPE_WORK, TYPE_VACATION, TYPE_SICK, TYPE_FLEXTIME, TYPE_PARENTAL,
     ABSENCE_TYPES, get_absence_minutes, TYPE_LABELS,
 )
 from models import WorkEntry
@@ -219,11 +219,11 @@ class MainTab(QWidget):  # pylint: disable=too-many-public-methods
         export_menu.addAction(tr("PDF  (.pdf)"),
                               lambda: export_pdf(self, self._get_export_entries(),
                                                self._get_export_title()))
+        month_sel = self.month_filter.currentData()
         export_menu.addAction(tr("Monats-PDF (.pdf)"),
                               lambda: export_monthly_pdf(self, self._get_export_entries(),
                                                          self.settings,
-                                                         self.month_filter.currentData()
-                                                         if self.month_filter.currentData() != "ALL" else None))
+                                                         month_sel if month_sel != "ALL" else None))
         btn_export.setMenu(export_menu)
         toolbar_layout.addWidget(btn_export)
 
@@ -729,8 +729,7 @@ class MainTab(QWidget):  # pylint: disable=too-many-public-methods
             # Abwesenheit / Gleitzeitabbau: ein Eintrag pro Tag im Bereich
             start_date = self.date_edit.date()
             end_date = self.date_end_edit.date()
-            if end_date < start_date:
-                end_date = start_date
+            end_date = max(end_date, start_date)
             is_range = end_date != start_date
             affected_dates = []
             d = start_date
@@ -798,8 +797,7 @@ class MainTab(QWidget):  # pylint: disable=too-many-public-methods
         if not dialog.exec():
             return
         new_type, start_date, end_date = dialog.get_values()
-        if end_date < start_date:
-            end_date = start_date
+        end_date = max(end_date, start_date)
         old_dates = [e.date for e in block]
         for e in block:
             self.db.delete(e.id)

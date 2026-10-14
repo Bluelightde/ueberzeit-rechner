@@ -18,9 +18,9 @@ from config import APP_VERSION, DB_FILE, ICON_PATH, get_country_list, get_subdiv
 from i18n import available_languages, get_locale, tr
 from models import WorkEntry
 from logic import calculate_timed_entries, is_midnight_shift, \
-    TYPE_WORK, TYPE_VACATION, TYPE_SICK, TYPE_HOLIDAY, TYPE_FLEXTIME, TYPE_PARENTAL, \
-    ABSENCE_TYPES
+    TYPE_WORK, TYPE_VACATION, TYPE_SICK, TYPE_FLEXTIME, TYPE_PARENTAL
 
+# pylint: disable=too-few-public-methods
 class AboutDialog(QDialog):
     """Kleines Info-Fenster mit Programmname, Version und rechtlichen Hinweisen."""
 
@@ -537,7 +537,8 @@ class SettingsDialog(QDialog):
 
         time_edit = QTimeEdit()
         time_edit.setDisplayFormat("HH:mm")
-        time_edit.setTime(QTime.fromString(data.get("target", "04:00") if data else "04:00", "HH:mm"))
+        target = data.get("target", "04:00") if data else "04:00"
+        time_edit.setTime(QTime.fromString(target, "HH:mm"))
         self.special_days_table.setCellWidget(row, 2, time_edit)
 
     def remove_special_day_row(self):
@@ -902,7 +903,7 @@ class EditDialog(QDialog):
         super().accept()
 
     def accept(self):
-        # Validation entry point for the Save button; keyboard Enter still routes here.
+        """Validierungseinstieg für den Speichern-Button; Enter läuft hier zusammen."""
         self.validate_and_accept()
 
     def apply_to_entry(self):
@@ -1061,7 +1062,7 @@ class WelcomeDialog(QDialog):
 class AbsenceEditDialog(QDialog):
     """Bearbeiten einer (mehrtägigen) Abwesenheit: Typ und Datum von/bis."""
 
-    def __init__(self, block, settings, parent=None):
+    def __init__(self, block, settings, parent=None):  # pylint: disable=unused-argument
         super().__init__(parent)
         self.setWindowTitle(tr("Abwesenheit bearbeiten"))
         self.setMinimumWidth(340)
