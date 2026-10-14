@@ -85,6 +85,7 @@ class Browser(unittest.TestCase):
 
     def test_keine_systemuhr_und_live_rechnung(self):
         s = self.seite
+        self.assertTrue(s.evaluate('window.Uhr.aktiv'), 'Handy (Touch) muss die eigene Uhr bekommen')
         self.assertEqual(s.locator('input[type=time]').count(), 0, 'noch ein natives Uhrzeitfeld')
         self.assertTrue(s.locator('#start-knopf').is_visible())
         self.uhr_tippen('#start-knopf', '08', '15')
@@ -148,6 +149,36 @@ class Browser(unittest.TestCase):
         s.wait_for_function("() => document.querySelector('#start-knopf').textContent === '--:--'")
         self.assertEqual(s.input_value('#start'), '')
         self.assertEqual(s.inner_text('#start-knopf'), '--:--')
+
+    def test_kein_rahmen_bleibt_nach_dem_antippen(self):
+        """Häkchen und Datum zeigen nach dem Antippen keinen Fokus-Rahmen (Wunsch Micha 14.10.2026)."""
+        s = self.seite
+        s.locator('input[name=eigenes_soll]').tap()
+        self.assertEqual(s.evaluate("getComputedStyle(document.querySelector('input[name=eigenes_soll]')).outlineStyle"),
+                         'none')
+        s.locator('#datum').fill('2026-10-13')
+        self.assertEqual(s.evaluate('document.activeElement.id'), '', 'Datum behält den Fokus')
+
+    def test_desktop_normales_feld_zum_eintippen(self):
+        """Mit Maus und Tastatur (kein Touch) keine Uhr, sondern das normale Uhrzeitfeld (Wunsch Micha 14.10.2026)."""
+        ctx = self.browser.new_context(viewport={'width': 1280, 'height': 900})
+        try:
+            s = ctx.new_page()
+            s.goto(self.url + '/anmelden')
+            s.fill('#name', 'admin')
+            s.fill('#passwort', 'geheim123')
+            s.click('button[type=submit]')
+            s.wait_for_url(re.compile(r'.*/$'))
+            self.assertFalse(s.evaluate('window.Uhr.aktiv'))
+            self.assertEqual(s.locator('.uhr-feld').count(), 0)
+            self.assertGreaterEqual(s.locator('input[type=time]').count(), 3)
+            s.fill('#start', '08:15')          # Tippen ins Feld; die Live-Rechnung schlägt das Ende vor
+            s.wait_for_function("() => document.querySelector('.vorschau').innerText.includes('Tag-Saldo')")
+            self.assertRegex(s.input_value('#ende'), r'^1[5-7]:\d\d$')
+            s.click('button[data-jetzt=start]')
+            self.assertRegex(s.input_value('#start'), r'^\d\d:\d\d$')
+        finally:
+            ctx.close()
 
 
 if __name__ == '__main__':

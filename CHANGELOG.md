@@ -9,6 +9,10 @@ All notable changes to Überzeit Rechner are documented here.
 Desktop 1.9.0, Server-Version 1.4.0 und 1.5.0.
 
 ### Added
+- **Server-Version 1.5.2: Uhr nur am Handy, keine hängenden Rahmen** — am Desktop (Maus/Touchpad als Hauptzeiger)
+  bleibt das normale Uhrzeitfeld zum Eintippen, die eigene Uhr gibt es nur bei Touch (`uhr.js`, geteilt). Nach dem
+  Antippen von Häkchen, Datum oder Auswahllisten bleibt kein Fokus-Rahmen mehr stehen; Tippfelder zeigen beim Schreiben
+  nur einen farbigen Rand.
 - **Server-Version 1.5.1: Uhr öffnet mit Animation, kein weißer Kasten beim Antippen** — die Uhr blendet beim Öffnen
   und Schließen ein bzw. aus und wächst dabei leicht (wie die Android-Dialoge, `@starting-style`), der Hintergrund
   blendet mit. Die Antipp-Markierung von Chrome auf Android (grauer/weißer Kasten) ist in der ganzen App abgeschaltet;

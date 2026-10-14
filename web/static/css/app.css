@@ -120,7 +120,14 @@ input[type=text], input[type=date], input[type=time], input[type=number], input[
 }
 select { padding-right: 32px; background-repeat: no-repeat; background-position: right 10px center; background-size: 12px;
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath fill='none' stroke='%2398a1ac' stroke-width='2' d='m3 6 5 5 5-5'/%3E%3C/svg%3E"); }
-input:focus, select:focus { outline: 2px solid var(--accent); outline-offset: -1px; border-color: transparent; }
+/* Fokus-Rahmen (14.10.2026, Wunsch Micha: Rahmen um Häkchen und Datum blieben nach dem Antippen stehen):
+   Tippfelder zeigen beim Schreiben nur einen farbigen Rand; alles andere einen Rahmen nur bei Tastaturbedienung. */
+input:focus, select:focus { outline: none; }
+input:is([type=text], [type=number], [type=password], [type=search], [type=email]):focus { border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent); }
+input:is([type=date], [type=time], [type=file]):focus-visible, select:focus-visible { outline: 2px solid var(--accent);
+  outline-offset: -1px; border-color: transparent; }
+input:is([type=checkbox], [type=radio]):focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 /* Knopf der eigenen Uhr an Stelle von <input type="time">: sieht aus wie die übrigen Felder */
 .uhr-feld { width: 100%; min-width: 0; min-height: 42px; padding: 8px 10px; text-align: left; font-size: 16px;
   border-radius: var(--radius-klein); }

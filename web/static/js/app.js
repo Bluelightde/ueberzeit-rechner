@@ -22,6 +22,15 @@
   }
   function neu(tag, cls, t) { var e = document.createElement(tag); if (cls) e.className = cls; if (t != null) e.textContent = t; return e; }
 
+  // --- Am Handy: Datum, Uhrzeit und Auswahllisten geben den Fokus nach der Auswahl wieder ab, sonst bliebe ihr Rahmen
+  // stehen, bis man woanders hintippt (Wunsch Micha 14.10.2026). Tippfelder behalten ihn, solange die Tastatur offen ist.
+  if (window.matchMedia && window.matchMedia('(pointer: coarse)').matches) {
+    document.addEventListener('change', function (ev) {
+      var el = ev.target;
+      if (el.matches && el.matches('input[type=date], input[type=time], input[type=checkbox], input[type=radio], select')) el.blur();
+    });
+  }
+
   // --- Rückfragen vor dem Absenden (Löschen, Abmelden überall) ---
   document.querySelectorAll('form[data-frage]').forEach(function (f) {
     f.addEventListener('submit', function (ev) { if (!window.confirm(f.getAttribute('data-frage'))) ev.preventDefault(); });

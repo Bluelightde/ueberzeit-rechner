@@ -5,7 +5,7 @@
 // weiter zur Minute (jede Minute). Oben Stunde/Minute einzeln antippbar, ⌨ zum Tippen, Pfeiltasten am Zifferblatt.
 //
 //   Uhr.waehlen('14:00', {ohne: true}, function (wert) { ... })   wert 'HH:MM' oder '' (Ohne); Abbrechen ruft nicht
-//   <input type="time"> auf jeder Seite wird automatisch zu einem Knopf mit dieser Uhr (Formulare schicken weiter
+//   <input type="time"> wird auf Touch-Geräten automatisch zu einem Knopf mit dieser Uhr (Formulare schicken weiter
 //   denselben Namen und Wert). Mit data-ohne bietet die Uhr auch "Ohne" an.
 //   <input type="datetime-local"> wird zu Datumsfeld + Uhr-Knopf, der Wert "JJJJ-MM-TTTHH:MM" bleibt.
 (function () {
@@ -213,8 +213,13 @@
     });
   }
 
-  window.Uhr = { waehlen: waehlen };
+  // Nur wo der Finger die Hauptbedienung ist (14.10.2026, Wunsch Micha): mit Maus und Tastatur ist das normale Feld zum
+  // Eintippen schneller als ein Zifferblatt, und am Desktop öffnet der Browser kein störendes Systemfenster. Laptops mit
+  // Touchscreen zählen als Desktop (Hauptzeiger Maus/Touchpad). Uhr.waehlen() bleibt für Apps nutzbar, die es selbst aufrufen.
+  var FINGER = !!(window.matchMedia && window.matchMedia('(pointer: coarse)').matches);
+  window.Uhr = { waehlen: waehlen, aktiv: FINGER };
   function los() {
+    if (!FINGER) return;
     document.querySelectorAll('input[type=time]').forEach(ersetzen);
     document.querySelectorAll('input[type=datetime-local]').forEach(ersetzenDatumZeit);
   }
