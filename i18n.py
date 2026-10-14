@@ -391,26 +391,35 @@ _EN: dict[str, str] = {
     # --- Server-Version (Anwesenheit melden) ---
     "Server-Version": "Server version",
     (
-        "Die Server-Version (Browser/Handy) kann die Anmeldezeit dieses Rechners nicht selbst "
-        "lesen. Ist das Senden eingeschaltet, schickt die App beim Start und alle 30 Minuten die "
-        "Login- und Logout-Zeiten der letzten Wochen (Tab „Anwesenheit“) an den Server. Dort "
-        "erscheinen sie unter „Anwesenheit“ und als Startzeit-Vorschlag. Andere Daten werden nicht "
-        "übertragen."
+        "Verbindet diese App mit der Server-Version (Browser/Web-App). Gesendet werden die "
+        "Login- und Logout-Zeiten dieses Rechners (Tab „Anwesenheit“). Mit dem Abgleich "
+        "kommen alle Einträge und Bereitschaften in beide Richtungen dazu: Was hier oder im "
+        "Browser eingetragen, geändert oder gelöscht wird, steht nach wenigen Minuten auch auf "
+        "der anderen Seite. Wurde derselbe Tag auf beiden Seiten geändert, gilt die neuere "
+        "Änderung. Einstellungen werden nicht übertragen."
     ): (
-        "The server version (browser/phone) cannot read this computer's login time itself. "
-        "If sending is enabled, the app sends the login and logout times of the last weeks "
-        "(tab \"Attendance\") to the server at startup and every 30 minutes. They appear there "
-        "under \"Anwesenheit\" and as suggested start time. No other data is transmitted."
+        "Connects this app to the server version (browser/web app). It sends this computer's "
+        "login and logout times (tab \"Attendance\"). With syncing, all entries and on-call "
+        "periods are synced in both directions: whatever is added, changed or deleted here or in "
+        "the browser shows up on the other side within a few minutes. If the same day was changed "
+        "on both sides, the newer change wins. Settings are not transferred."
     ),
-    "Anmeldezeiten an die Server-Version senden": "Send login times to the server version",
+    "Mit der Server-Version verbinden (Anmeldezeiten senden)":
+        "Connect to the server version (send login times)",
+    "Einträge in beide Richtungen abgleichen": "Sync entries in both directions",
+    "Abgeglichen um {u} – Tage geholt: {g}, gesendet: {s}.":
+        "Synced at {u} – days fetched: {g}, sent: {s}.",
+    "{k} Tage waren auf beiden Seiten geändert, die neuere Änderung gilt.":
+        "{k} days were changed on both sides, the newer change wins.",
+    "{a} Tage nahm der Server nicht an (siehe Protokoll).": "{a} days were rejected by the server (see log).",
     "Adresse:": "Address:",
     "Gerätezugang:": "Device token:",
     (
         "In der Server-Version unter „Anwesenheit → Desktop-App verbinden“ anlegen und hier "
-        "einfügen.\nDer Zugang darf nur Anmeldezeiten melden."
+        "einfügen.\nDer Zugang meldet Anmeldezeiten und gleicht deine Einträge ab."
     ): (
         "Create it in the server version under \"Anwesenheit → Desktop-App verbinden\" and paste "
-        "it here.\nThe token can only report login times."
+        "it here.\nThe token reports login times and syncs your entries."
     ),
     "Verbindung testen": "Test connection",
     "Zuletzt gemeldet: {n} Tage": "Last report: {n} days",

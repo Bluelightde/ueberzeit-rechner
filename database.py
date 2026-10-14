@@ -7,12 +7,13 @@ import os
 import sqlite3
 from datetime import datetime
 
+import kern
 from models import WorkEntry, BereitschaftEntry
 
-SCHEMA_VERSION = 3
+SCHEMA_VERSION = 4
 BACKUP_KEEP = 10
 
-class DBManager:
+class DBManager:  # pylint: disable=too-many-public-methods
     """
     Verwaltet die SQLite-Datenbankverbindung und Operationen für Arbeits- und
     Bereitschafts-Einträge.
@@ -80,6 +81,15 @@ class DBManager:
         if version < 3:
             # v2 -> v3: Logout-Zeit (end_time) für Anwesenheits-Übersicht
             self._ensure_column(cursor, "device_login", "end_time", "TEXT")
+        if version < 4:
+            # v3 -> v4: Abgleich mit der Server-Version (abgleich.py). tag_geaendert: wann ein Tag
+            # hier zuletzt geändert wurde (UTC, per Trigger -- egal über welchen Weg).
+            # abgleich_stand: Fingerabdruck je Tag beim letzten erfolgreichen Abgleich.
+            cursor.executescript("""
+                CREATE TABLE IF NOT EXISTS tag_geaendert (date TEXT PRIMARY KEY, zeit TEXT NOT NULL);
+                CREATE TABLE IF NOT EXISTS abgleich_stand (date TEXT PRIMARY KEY, hash TEXT NOT NULL);
+            """ + _trigger("entries", "start, end, pause, minutes, reason, target_minutes, type")
+                + _trigger("bereitschaft_entries", "start, end, note, end_date"))
         cursor.execute(f"PRAGMA user_version = {SCHEMA_VERSION}")
 
     @staticmethod
@@ -276,6 +286,75 @@ class DBManager:
             for row in cursor.fetchall()
         ]
 
+    # --- Abgleich mit der Server-Version (abgleich.py) ---
+
+    def tage_lokal(self):
+        """{datum: {"inhalt", "hash", "geaendert"}}: Tage mit Inhalt oder bekannter Änderung."""
+        inhalte = kern.tage_gruppieren(self.load_all(), self.load_all_bereitschaft())
+        zeiten = dict(self.conn.execute("SELECT date, zeit FROM tag_geaendert"))
+        leer = kern.tag_inhalt()
+        return {d: {"inhalt": inhalte.get(d, leer), "hash": kern.tag_hash(inhalte.get(d, leer)),
+                    "geaendert": zeiten.get(d, "")}
+                for d in set(inhalte) | set(zeiten)}
+
+    def tag_hash(self, datum):
+        """Aktueller Fingerabdruck eines Tages (für die Prüfung kurz vor dem Übernehmen)."""
+        e = [WorkEntry(*z) for z in
+             self.conn.execute("SELECT * FROM entries WHERE date = ?", (datum,))]
+        b = [BereitschaftEntry(*z) for z in self.conn.execute(
+            "SELECT id, date, start, end, note, end_date FROM bereitschaft_entries "
+            "WHERE date = ?", (datum,))]
+        return kern.tag_hash(kern.tag_inhalt(e, b))
+
+    def abgleich_stand(self):
+        """{datum: hash} beim letzten Abgleich."""
+        return dict(self.conn.execute("SELECT date, hash FROM abgleich_stand"))
+
+    def abgleich_stand_setzen(self, staende):
+        """{datum: hash}; ein leerer Hash (Tag leer auf beiden Seiten) entfernt den Eintrag."""
+        with self.conn:
+            for datum, h in staende.items():
+                if h:
+                    self.conn.execute("INSERT OR REPLACE INTO abgleich_stand VALUES (?, ?)",
+                                      (datum, h))
+                else:
+                    self.conn.execute("DELETE FROM abgleich_stand WHERE date = ?", (datum,))
+                    self.conn.execute("DELETE FROM tag_geaendert WHERE date = ? AND NOT EXISTS "
+                                      "(SELECT 1 FROM entries WHERE date = ?)", (datum, datum))
+
+    def tag_ersetzen(self, datum, inhalt, geaendert):
+        """Ersetzt alle Einträge/Bereitschaften eines Tages durch `inhalt` (vom Server, geprüft).
+
+        Ohne neu zu rechnen, in einer Transaktion. Der Tag gilt danach als zum Zeitpunkt
+        `geaendert` geändert."""
+        with self.conn:
+            self.conn.execute("DELETE FROM entries WHERE date = ?", (datum,))
+            self.conn.execute("DELETE FROM bereitschaft_entries WHERE date = ?", (datum,))
+            self.conn.executemany(
+                "INSERT INTO entries (date, start, end, pause, minutes, reason, target_minutes, "
+                "type) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                [(datum, e["start"], e["end"], e["pause"], e["minutes"], e["reason"],
+                  e["target_minutes"], e["type"]) for e in inhalt["eintraege"]])
+            self.conn.executemany(
+                "INSERT INTO bereitschaft_entries (date, start, end, note, end_date) "
+                "VALUES (?, ?, ?, ?, ?)",
+                [(datum, b["start"], b["end"], b["note"], b["end_date"])
+                 for b in inhalt["bereitschaft"]])
+            self.conn.execute("INSERT OR REPLACE INTO tag_geaendert VALUES (?, ?)",
+                              (datum, geaendert or ""))
+
+    def abgleich_neu_beginnen(self):
+        """Nach dem Wiederherstellen eines Backups: Der hiesige Stand soll gewinnen.
+
+        Gemeinsamen Stand vergessen und jeden Tag mit Inhalt als gerade geändert markieren
+        (gelöschte Tage auch)."""
+        with self.conn:
+            self.conn.execute("DELETE FROM abgleich_stand")
+            self.conn.execute(f"UPDATE tag_geaendert SET zeit = {_JETZT_SQL}")
+            self.conn.execute(
+                f"INSERT OR IGNORE INTO tag_geaendert SELECT DISTINCT date, {_JETZT_SQL} "
+                f"FROM entries UNION SELECT DISTINCT date, {_JETZT_SQL} FROM bereitschaft_entries")
+
     # --- Backup / Wiederherstellung ---
 
     def backup_to(self, dest_path):
@@ -324,3 +403,23 @@ class DBManager:
         Schließt die Datenbankverbindung.
         """
         self.conn.close()
+
+
+_JETZT_SQL = "strftime('%Y-%m-%dT%H:%M:%fZ', 'now')"
+
+
+def _trigger(tabelle, spalten):
+    """Trigger, die bei jeder echten Änderung an `tabelle` den Tag in tag_geaendert vermerken
+    (gleiche Regel wie in der Server-Version, web/speicher.py)."""
+    markieren = ("INSERT OR REPLACE INTO tag_geaendert (date, zeit) "
+                 f"VALUES ({{z}}.date, {_JETZT_SQL});")
+    anders = " OR ".join(f"OLD.{sp.strip()} IS NOT NEW.{sp.strip()}"
+                         for sp in ("date, " + spalten).split(","))
+    return f"""
+        CREATE TRIGGER IF NOT EXISTS {tabelle}_neu AFTER INSERT ON {tabelle}
+        BEGIN {markieren.format(z="NEW")} END;
+        CREATE TRIGGER IF NOT EXISTS {tabelle}_weg AFTER DELETE ON {tabelle}
+        BEGIN {markieren.format(z="OLD")} END;
+        CREATE TRIGGER IF NOT EXISTS {tabelle}_anders AFTER UPDATE ON {tabelle} WHEN {anders}
+        BEGIN {markieren.format(z="OLD")} {markieren.format(z="NEW")} END;
+    """

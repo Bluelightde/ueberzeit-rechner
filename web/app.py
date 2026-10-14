@@ -35,7 +35,9 @@ import speicher  # noqa: E402
 from models import BereitschaftEntry, WorkEntry  # noqa: E402
 from speicher import db  # noqa: E402
 
-VERSION = '1.3.0'
+VERSION = '1.4.0'
+ABGLEICH_MAX_TAGE = 1000
+ZEITSTEMPEL = re.compile(r'\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{1,6})?Z')
 log = logging.getLogger('ueberzeit')
 
 ARTEN = [(kern.TYPE_WORK, 'Arbeit'), (kern.TYPE_VACATION, 'Urlaub'), (kern.TYPE_SICK, 'Krank'),
@@ -950,6 +952,62 @@ def _routen(app):  # noqa: C901
                 gemeldet += 1
         db().commit()
         return jsonify(ok=True, tage=gemeldet)
+
+    # --- Abgleich der Einträge mit der Desktop-App (je Tag; Ablauf in abgleich.py der Desktop-App) ---------
+
+    @app.get('/api/geraet/tage')
+    @geraet_noetig
+    def geraet_tage():
+        """Fingerabdruck und Änderungszeit je Tag: {"tage": {"2026-10-13": {"hash": "…", "geaendert": "…"}}}."""
+        stand = speicher.tage_stand(g.geraet['benutzer_id'])
+        db().commit()
+        return jsonify(tage=stand)
+
+    @app.post('/api/geraet/tage/holen')
+    @geraet_noetig
+    def geraet_tage_holen():
+        """{"daten": ["2026-10-13", …]} -> {"tage": {datum: {"inhalt", "hash", "geaendert"}}}."""
+        daten = (request.get_json(silent=True) or {}).get('daten')
+        if not isinstance(daten, list) or len(daten) > ABGLEICH_MAX_TAGE \
+                or not all(isinstance(d, str) and kern.parse_date(d) for d in daten):
+            return jsonify(fehler=f'Erwartet {{"daten": [...]}} mit höchstens {ABGLEICH_MAX_TAGE} Tagen.'), 400
+        tage = speicher.tage_inhalt(g.geraet['benutzer_id'], daten)
+        db().commit()
+        return jsonify(tage=tage)
+
+    @app.post('/api/geraet/tage/schreiben')
+    @geraet_noetig
+    def geraet_tage_schreiben():
+        """{"tage": {datum: {"inhalt", "geaendert", "erwartet"}}}: ersetzt jeden Tag, dessen Server-Stand noch
+        `erwartet` ist (sonst hat sich hier inzwischen etwas geändert -> abgelehnt, nächster Abgleich klärt es)."""
+        tage = (request.get_json(silent=True) or {}).get('tage')
+        if not isinstance(tage, dict) or len(tage) > ABGLEICH_MAX_TAGE:
+            return jsonify(fehler=f'Erwartet {{"tage": {{...}}}} mit höchstens {ABGLEICH_MAX_TAGE} Tagen.'), 400
+        bid_ = g.geraet['benutzer_id']
+        stand = speicher.tage_stand(bid_)
+        geschrieben, abgelehnt = {}, {}
+        for datum, tag in tage.items():
+            if kern.parse_date(datum) is None or not isinstance(tag, dict):
+                abgelehnt[datum] = 'ungültig'
+                continue
+            if stand.get(datum, {}).get('hash', '') != tag.get('erwartet', ''):
+                abgelehnt[datum] = 'geändert'
+                continue
+            try:
+                inhalt = kern.tag_inhalt_pruefen(tag.get('inhalt'))
+            except ValueError as e:
+                abgelehnt[datum] = f'ungültig: {e}'
+                continue
+            geaendert = tag.get('geaendert')
+            if not (isinstance(geaendert, str) and ZEITSTEMPEL.fullmatch(geaendert)):
+                geaendert = dt.datetime.now(dt.timezone.utc).strftime('%Y-%m-%dT%H:%M:%S.000Z')
+            speicher.tag_ersetzen(bid_, datum, inhalt, geaendert)
+            geschrieben[datum] = kern.tag_hash(inhalt)
+        db().commit()
+        if abgelehnt:
+            log.info('Abgleich %s: %d Tage abgelehnt (%s)', g.geraet['name'], len(abgelehnt),
+                     ', '.join(f'{d}: {g_}' for d, g_ in sorted(abgelehnt.items())[:5]))
+        return jsonify(geschrieben=geschrieben, abgelehnt=abgelehnt)
 
     @app.route('/einstellungen', methods=['GET', 'POST'])
     @anmeldung_noetig

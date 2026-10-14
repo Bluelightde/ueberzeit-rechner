@@ -4,9 +4,20 @@ All notable changes to Überzeit Rechner are documented here.
 
 ---
 
-## [Unreleased]
+## [1.9.0] – 2026-10-14
+
+Desktop 1.9.0, Server-Version 1.4.0.
 
 ### Added
+- **Abgleich der Einträge mit der Server-Version in beide Richtungen** (Desktop 1.9.0, Server 1.4.0) — mit dem
+  Gerätezugang gleicht die Desktop-App alle Einträge und Bereitschaften mit der Server-Version ab: beim Start, alle
+  5 Minuten und 20 Sekunden nach jeder Änderung. Was am Desktop oder im Browser (Web-App) eingetragen, geändert oder
+  gelöscht wird, steht danach auch auf der anderen Seite; der Gesamtsaldo stimmt überall. Abgeglichen wird je Tag
+  (`abgleich.py`, `kern.tag_inhalt`/`tag_hash`); wurde derselbe Tag auf beiden Seiten geändert, gilt die neuere
+  Änderung. Nach „Aus Backup wiederherstellen“ gewinnt der wiederhergestellte Stand. Schalter unter Einstellungen →
+  Server-Version („Einträge in beide Richtungen abgleichen“). Einstellungen werden nicht übertragen.
+  Datenbank: Desktop-Schema 4 (`tag_geaendert`, `abgleich_stand`, Trigger), Server-Schema 3 (`tag_stand`, Trigger);
+  Schnittstellen `GET /api/geraet/tage`, `POST /api/geraet/tage/holen`, `POST /api/geraet/tage/schreiben`.
 - **Server-Version `web/`** — Überzeit läuft zusätzlich im Browser und als installierbare App (PWA) auf dem Handy, z. B. im
   eigenen Homelab mit Docker Compose (`compose.yml` in der Repo-Wurzel, Anleitung `web/README.md`). Jede Person hat eigene
   Daten; Anmeldung über OpenID Connect (Authentik) mit Gruppenprüfung, Notzugang per Passwort nur direkt im LAN.

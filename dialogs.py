@@ -90,7 +90,7 @@ class SettingsDialog(QDialog):
     Bundesland und Sonderarbeitstage.
     """
     def __init__(self, current_settings, parent=None, *, backup_cb=None, restore_cb=None,
-                 server_status="", update_status="", update_cb=None):
+                 server_status="", abgleich_status="", update_status="", update_cb=None):
         """
         Initialisiert den Einstellungsdialog mit den aktuellen Werten.
         """
@@ -188,7 +188,7 @@ class SettingsDialog(QDialog):
         # Tab: Server-Version (Anwesenheit melden)
         tab_server = QWidget()
         layout_server = QVBoxLayout(tab_server)
-        self._setup_server_ui(layout_server, current_settings, server_status)
+        self._setup_server_ui(layout_server, current_settings, server_status, abgleich_status)
         layout_server.addStretch()
         self.tabs.addTab(tab_server, tr("Server-Version"))
 
@@ -509,23 +509,30 @@ class SettingsDialog(QDialog):
     def _type_colors_dict(self):
         return dict(self._type_colors)
 
-    def _setup_server_ui(self, layout, current_settings, server_status):
-        """Anwesenheit an die Server-Version senden: Adresse, Gerätezugang, Verbindung testen."""
+    def _setup_server_ui(self, layout, current_settings, server_status, abgleich_status=""):
+        """Verbindung zur Server-Version: Anmeldezeiten, Abgleich, Adresse, Gerätezugang."""
         info = QLabel(tr(
-            "Die Server-Version (Browser/Handy) kann die Anmeldezeit dieses Rechners nicht "
-            "selbst lesen. Ist das Senden eingeschaltet, schickt die App beim Start und alle "
-            "30 Minuten die Login- und Logout-Zeiten der letzten Wochen (Tab „Anwesenheit“) an "
-            "den Server. Dort erscheinen sie unter „Anwesenheit“ und als Startzeit-Vorschlag. "
-            "Andere Daten werden nicht übertragen."
+            "Verbindet diese App mit der Server-Version (Browser/Web-App). Gesendet werden die "
+            "Login- und Logout-Zeiten dieses Rechners (Tab „Anwesenheit“). Mit dem Abgleich "
+            "kommen alle Einträge und Bereitschaften in beide Richtungen dazu: Was hier oder im "
+            "Browser eingetragen, geändert oder gelöscht wird, steht nach wenigen Minuten auch auf "
+            "der anderen Seite. Wurde derselbe Tag auf beiden Seiten geändert, gilt die neuere "
+            "Änderung. Einstellungen werden nicht übertragen."
         ))
         info.setWordWrap(True)
         info.setStyleSheet("color: gray;")
         layout.addWidget(info)
         layout.addSpacing(6)
 
-        self.server_sync_cb = QCheckBox(tr("Anmeldezeiten an die Server-Version senden"))
+        self.server_sync_cb = QCheckBox(
+            tr("Mit der Server-Version verbinden (Anmeldezeiten senden)"))
         self.server_sync_cb.setChecked(current_settings.get("server_sync", False))
         layout.addWidget(self.server_sync_cb)
+        self.server_abgleich_cb = QCheckBox(tr("Einträge in beide Richtungen abgleichen"))
+        self.server_abgleich_cb.setChecked(current_settings.get("server_abgleich", True))
+        self.server_abgleich_cb.setEnabled(self.server_sync_cb.isChecked())
+        self.server_sync_cb.toggled.connect(self.server_abgleich_cb.setEnabled)
+        layout.addWidget(self.server_abgleich_cb)
 
         form = QGridLayout()
         form.addWidget(QLabel(tr("Adresse:")), 0, 0)
@@ -538,7 +545,7 @@ class SettingsDialog(QDialog):
         self.server_token_edit.setPlaceholderText("uz_…")
         self.server_token_edit.setToolTip(tr(
             "In der Server-Version unter „Anwesenheit → Desktop-App verbinden“ anlegen und hier "
-            "einfügen.\nDer Zugang darf nur Anmeldezeiten melden."
+            "einfügen.\nDer Zugang meldet Anmeldezeiten und gleicht deine Einträge ab."
         ))
         form.addWidget(self.server_token_edit, 1, 1)
         layout.addLayout(form)
@@ -553,6 +560,10 @@ class SettingsDialog(QDialog):
         self.server_status_lbl.setWordWrap(True)
         self.server_status_lbl.setStyleSheet("color: gray;")
         layout.addWidget(self.server_status_lbl)
+        self.abgleich_status_lbl = QLabel(abgleich_status)
+        self.abgleich_status_lbl.setWordWrap(True)
+        self.abgleich_status_lbl.setStyleSheet("color: gray;")
+        layout.addWidget(self.abgleich_status_lbl)
 
     def _test_server(self):
         """Prüft Adresse und Gerätezugang (höchstens 5 Sekunden)."""
@@ -763,6 +774,7 @@ class SettingsDialog(QDialog):
             "server_sync": self.server_sync_cb.isChecked(),
             "server_url": self.server_url_edit.text().strip().rstrip("/"),
             "server_token": self.server_token_edit.text().strip(),
+            "server_abgleich": self.server_abgleich_cb.isChecked(),
             "update_auto": self.update_auto_cb.isChecked(),
         }
 

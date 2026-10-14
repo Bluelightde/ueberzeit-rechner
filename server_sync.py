@@ -31,7 +31,8 @@ class ServerFehler(Exception):
     """Verständliche Fehlermeldung für Protokoll und Einstellungsdialog."""
 
 
-def _anfrage(adresse, token, pfad, daten=None, wartezeit=WARTEZEIT):
+def anfrage(adresse, token, pfad, daten=None, wartezeit=WARTEZEIT):
+    """GET (ohne daten) bzw. POST mit JSON an die Server-Version -> dict, sonst ServerFehler."""
     adresse = (adresse or "").strip().rstrip("/")
     if not adresse.startswith(("http://", "https://")):
         raise ServerFehler("Die Adresse muss mit http:// oder https:// beginnen.")
@@ -43,11 +44,11 @@ def _anfrage(adresse, token, pfad, daten=None, wartezeit=WARTEZEIT):
     if daten is not None:
         rumpf = json.dumps(daten).encode("utf-8")
         kopf["Content-Type"] = "application/json"
-    anfrage = urllib.request.Request(adresse + pfad, data=rumpf, headers=kopf,
-                                     method="POST" if rumpf is not None else "GET")
+    aufruf = urllib.request.Request(adresse + pfad, data=rumpf, headers=kopf,
+                                    method="POST" if rumpf is not None else "GET")
     try:
         # nosec: die Adresse stellt die Person selbst ein
-        with urllib.request.urlopen(anfrage, timeout=wartezeit, context=ssl_kontext()) as antwort:
+        with urllib.request.urlopen(aufruf, timeout=wartezeit, context=ssl_kontext()) as antwort:
             return json.loads(antwort.read().decode("utf-8"))
     except urllib.error.HTTPError as e:
         if e.code == 401:
@@ -71,7 +72,7 @@ def _anfrage(adresse, token, pfad, daten=None, wartezeit=WARTEZEIT):
 
 def verbindung_testen(adresse, token):
     """Für den Knopf „Verbindung testen“: Text bei Erfolg, sonst ServerFehler."""
-    antwort = _anfrage(adresse, token, "/api/geraet/pruefen", wartezeit=5)
+    antwort = anfrage(adresse, token, "/api/geraet/pruefen", wartezeit=5)
     return f"Verbunden als „{antwort.get('benutzer', '?')}“ (Gerät „{antwort.get('geraet', '?')}“)."
 
 
@@ -97,5 +98,5 @@ def anwesenheit_senden(adresse, token, tage):
     """Schickt die Tage; gibt die Zahl der angenommenen Tage zurück oder wirft ServerFehler."""
     if not tage:
         return 0
-    antwort = _anfrage(adresse, token, "/api/geraet/anwesenheit", {"tage": tage})
+    antwort = anfrage(adresse, token, "/api/geraet/anwesenheit", {"tage": tage})
     return int(antwort.get("tage", 0))

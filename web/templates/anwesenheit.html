@@ -33,7 +33,7 @@
   {% if neues_token %}
   <div class="hinweis"><b>Neuer Gerätezugang – jetzt kopieren, er wird nur dieses eine Mal angezeigt:</b>
     <input type="text" readonly value="{{ neues_token }}" aria-label="Gerätezugang" data-markieren style="margin-top:6px;font-family:monospace">
-    In der Desktop-App unter <i>Einstellungen → System &amp; Design → Server-Version</i> eintragen,
+    In der Desktop-App unter <i>Einstellungen → Server-Version</i> eintragen,
     Adresse <b>{{ adresse }}</b>, dann „Verbindung testen“.</div>
   {% endif %}
   {% if geraete %}
@@ -41,7 +41,7 @@
     <tr><th>Gerät</th><th>Angelegt</th><th>Zuletzt gemeldet</th><th></th></tr>
     {% for d in geraete %}
     <tr><td>{{ d.name }}</td><td>{{ d.erstellt[:16] }}</td><td>{{ d.zuletzt[:16] if d.zuletzt else 'noch nie' }}</td>
-      <td style="text-align:right"><form method="post" data-frage="Gerätezugang „{{ d.name }}“ entfernen? Die Desktop-App kann dann nichts mehr melden.">
+      <td style="text-align:right"><form method="post" data-frage="Gerätezugang „{{ d.name }}“ entfernen? Die Desktop-App kann dann nichts mehr melden oder abgleichen.">
         <input type="hidden" name="_csrf" value="{{ csrf_token() }}"><input type="hidden" name="aktion" value="entfernen">
         <input type="hidden" name="id" value="{{ d.id }}">
         <button class="knopf klein gefahr" type="submit"><i class="bi bi-trash"></i> Entfernen</button></form></td></tr>
@@ -53,7 +53,8 @@
     <input type="text" name="name" maxlength="80" placeholder="Name des Rechners, z. B. Büro-PC" aria-label="Name des Rechners">
     <button class="knopf" type="submit"><i class="bi bi-key"></i> Zugang anlegen</button>
   </form>
-  <p class="leise klein">Jeder Rechner bekommt einen eigenen Zugang. Er darf nur Anmeldezeiten melden – lesen oder ändern
-    kann er nichts. Entfernen sperrt ihn sofort.</p>
+  <p class="leise klein">Jeder Rechner bekommt einen eigenen Zugang. Er meldet die Anmeldezeiten und gleicht deine
+    Einträge und Bereitschaften in beide Richtungen ab (in der Desktop-App abschaltbar) – an Einstellungen, Geräte oder
+    andere Personen kommt er nicht heran. Entfernen sperrt ihn sofort.</p>
 </section>
 {% endblock %}

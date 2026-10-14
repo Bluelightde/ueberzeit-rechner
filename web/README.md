@@ -33,15 +33,23 @@ Nicht in der Server-Version: Excel/PDF-Export.
 
 1. Server: **Anwesenheit → Desktop-App verbinden**, Namen des Rechners eingeben, „Zugang anlegen“. Der Gerätezugang
    (`uz_…`) wird **nur einmal** angezeigt; gespeichert wird nur sein SHA-256.
-2. Desktop-App: **Einstellungen → Server-Version**: Haken „Anmeldezeiten an die Server-Version senden“, Adresse
+2. Desktop-App: **Einstellungen → Server-Version**: Haken „Mit der Server-Version verbinden“, Adresse
    (z. B. `https://ueberzeit.example.de`) und Gerätezugang eintragen, „Verbindung testen“.
 3. Die App meldet beim Start und alle 30 Minuten im Hintergrund die Login-/Logout-Zeiten der letzten 62 Tage
    (`server_sync.py`). Der Server führt zusammen wie der Desktop: frühester Login, spätester Logout je Tag (auch über
    mehrere Rechner).
 
-Schnittstelle: `POST /api/geraet/anwesenheit` mit `Authorization: Bearer uz_…` und
+4. **Abgleich der Einträge** (seit 1.4.0, in der Desktop-App abschaltbar): Einträge und Bereitschaften gehen in beide
+   Richtungen, je Tag (`abgleich.py`, alle 5 Minuten und kurz nach jeder Änderung am Desktop). Wurde derselbe Tag auf
+   beiden Seiten geändert, gilt die neuere Änderung. Einstellungen werden nicht übertragen.
+
+Schnittstelle (alle mit `Authorization: Bearer uz_…`): `POST /api/geraet/anwesenheit` mit
 `{"tage": [{"date": "2026-10-13", "login": "07:12", "logout": "16:03"}]}` (höchstens 400 Tage),
-`GET /api/geraet/pruefen` zum Testen. Ein Gerätezugang darf nur melden, nichts lesen; falsche Zugänge zählen zur
+`GET /api/geraet/pruefen` zum Testen, für den Abgleich `GET /api/geraet/tage` (Fingerabdruck und Änderungszeit je
+Tag), `POST /api/geraet/tage/holen` (`{"daten": [...]}`) und `POST /api/geraet/tage/schreiben`
+(`{"tage": {datum: {"inhalt", "geaendert", "erwartet"}}}`, ersetzt nur Tage, die noch dem erwarteten Stand
+entsprechen). Änderungszeiten erfassen Trigger in `tag_stand` (Schema 3). Ein Gerätezugang kommt nur an Anmeldezeiten,
+Einträge und Bereitschaften seiner Person, nicht an Einstellungen oder Geräte; falsche Zugänge zählen zur
 Anmeldesperre. Entfernen unter Anwesenheit sperrt ihn sofort.
 
 ## Schnellstart (Docker Compose)

@@ -9,6 +9,8 @@ Datum immer als 'yyyy-MM-dd', Uhrzeit als 'HH:mm' (Strings wie in der Datenbank)
 """
 import datetime as _dt
 import functools
+import hashlib
+import json
 import logging
 
 import holidays as holidays_lib
@@ -379,3 +381,106 @@ def consolidate_blocks(entries, all_entries, settings):
         blocks.append([e])
     blocks.sort(key=lambda b: (b[0].date, b[0].start or ""), reverse=True)
     return blocks
+
+
+# --- Abgleich Desktop <-> Server ---------------------------------------------------------
+# Abgeglichen wird je Tag: alle Einträge und Bereitschaften eines Datums zusammen (Pause und
+# Überstunden hängen ohnehin am ganzen Tag). Beide Seiten bilden daraus mit denselben Regeln
+# einen Fingerabdruck; ein leerer Tag hat den Fingerabdruck "".
+
+MAX_JE_TAG = 50          # Einträge bzw. Bereitschaften je Tag, mehr nimmt der Abgleich nicht an
+_MAX_TEXT = 500
+
+
+def _ganzzahl(wert, leer=0):
+    return leer if wert is None or wert == "" else int(wert)
+
+
+def tag_inhalt(eintraege=(), bereitschaften=()):
+    """Einträge/Bereitschaften EINES Tages (WorkEntry/BereitschaftEntry) -> kanonische Form.
+
+    Reihenfolge und Datenbank-IDs spielen keine Rolle, leere Werte werden vereinheitlicht."""
+    e = [{"start": x.start or "", "end": x.end or "", "pause": _ganzzahl(x.pause),
+          "minutes": _ganzzahl(x.minutes), "reason": x.reason or "",
+          "target_minutes": _ganzzahl(x.target_minutes, -1), "type": x.entry_type or TYPE_WORK}
+         for x in eintraege]
+    b = [{"start": x.start or "", "end": x.end or "", "note": x.note or "",
+          "end_date": x.end_date or ""} for x in bereitschaften]
+
+    def ordnen(liste):
+        return sorted(liste, key=lambda d: json.dumps(d, sort_keys=True, ensure_ascii=False))
+
+    return {"eintraege": ordnen(e), "bereitschaft": ordnen(b)}
+
+
+def tag_hash(inhalt):
+    """Fingerabdruck eines Tages aus tag_inhalt(); "" für einen leeren Tag."""
+    if not inhalt.get("eintraege") and not inhalt.get("bereitschaft"):
+        return ""
+    text = json.dumps(inhalt, sort_keys=True, ensure_ascii=False, separators=(",", ":"))
+    return hashlib.sha256(text.encode("utf-8")).hexdigest()
+
+
+def tage_gruppieren(eintraege, bereitschaften):
+    """Alle Einträge/Bereitschaften -> {datum: tag_inhalt} (nur Tage mit Inhalt)."""
+    je_tag = {}
+    for x in eintraege:
+        je_tag.setdefault(x.date, ([], []))[0].append(x)
+    for x in bereitschaften:
+        je_tag.setdefault(x.date, ([], []))[1].append(x)
+    return {d: tag_inhalt(e, b) for d, (e, b) in je_tag.items()}
+
+
+def tag_inhalt_pruefen(inhalt):
+    """Von der anderen Seite empfangenen Tag prüfen -> kanonische Form; ValueError bei Unsinn."""
+    if not isinstance(inhalt, dict):
+        raise ValueError("Tag ist kein Objekt")
+    eintraege, bereitschaften = inhalt.get("eintraege", []), inhalt.get("bereitschaft", [])
+    if not isinstance(eintraege, list) or not isinstance(bereitschaften, list) \
+            or len(eintraege) > MAX_JE_TAG or len(bereitschaften) > MAX_JE_TAG:
+        raise ValueError("Einträge fehlen oder sind zu viele")
+
+    def zeit(wert):
+        if wert in ("", None):
+            return ""
+        if parse_hhmm(wert) is None:
+            raise ValueError(f"Ungültige Uhrzeit: {wert!r}")
+        return wert
+
+    def text(wert):
+        if wert is None:
+            return ""
+        if not isinstance(wert, str) or len(wert) > _MAX_TEXT:
+            raise ValueError("Ungültiger Text")
+        return wert
+
+    def zahl(wert, leer, grenze):
+        if isinstance(wert, bool):
+            raise ValueError("Ungültige Zahl")
+        z = _ganzzahl(wert, leer)
+        if not -grenze <= z <= grenze:
+            raise ValueError(f"Zahl außerhalb des Bereichs: {z}")
+        return z
+
+    e_neu = []
+    for x in eintraege:
+        if not isinstance(x, dict) or x.get("type", TYPE_WORK) not in ALL_TYPES:
+            raise ValueError("Ungültiger Eintrag")
+        e_neu.append({"start": zeit(x.get("start")), "end": zeit(x.get("end")),
+                      "pause": zahl(x.get("pause"), 0, 24 * 60),
+                      "minutes": zahl(x.get("minutes"), 0, 100000), "reason": text(x.get("reason")),
+                      "target_minutes": zahl(x.get("target_minutes"), -1, 24 * 60),
+                      "type": x.get("type", TYPE_WORK)})
+    b_neu = []
+    for x in bereitschaften:
+        if not isinstance(x, dict):
+            raise ValueError("Ungültige Bereitschaft")
+        bis = text(x.get("end_date"))
+        if bis and parse_date(bis) is None:
+            raise ValueError(f"Ungültiges Datum: {bis!r}")
+        b_neu.append({"start": zeit(x.get("start")), "end": zeit(x.get("end")),
+                      "note": text(x.get("note")), "end_date": bis})
+    def ordnen(liste):
+        return sorted(liste, key=lambda d: json.dumps(d, sort_keys=True, ensure_ascii=False))
+
+    return {"eintraege": ordnen(e_neu), "bereitschaft": ordnen(b_neu)}

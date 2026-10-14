@@ -16,7 +16,7 @@ from flask import current_app, g
 import kern
 from models import BereitschaftEntry, WorkEntry
 
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 3
 
 # Voreinstellungen wie in der Desktop-App (main.py), ohne die rein lokalen Schalter
 # (Anmeldezeit des Rechners, Datenbankpfad, Sprache).
@@ -127,8 +127,38 @@ def schema_anlegen():
                 zuletzt TEXT
             );
         ''')
+    if version < 3:
+        # Abgleich mit der Desktop-App: wann wurde ein Tag zuletzt geändert (UTC, ISO)? Trigger erfassen jede
+        # Änderung an Einträgen und Bereitschaften -- auch Austausch und Neuberechnung, ohne Code daran zu hängen.
+        d.executescript('''
+            CREATE TABLE IF NOT EXISTS tag_stand (
+                benutzer_id INTEGER NOT NULL REFERENCES benutzer(id) ON DELETE CASCADE,
+                date TEXT NOT NULL,
+                geaendert TEXT NOT NULL,
+                PRIMARY KEY (benutzer_id, date)
+            );
+        ''' + _trigger('entries', 'start, end, pause, minutes, reason, target_minutes, type')
+          + _trigger('bereitschaft_entries', 'start, end, note, end_date'))
     d.execute(f'PRAGMA user_version = {SCHEMA_VERSION}')
     d.commit()
+
+
+JETZT_SQL = "strftime('%Y-%m-%dT%H:%M:%fZ', 'now')"
+
+
+def _trigger(tabelle, spalten):
+    """Trigger, die bei jeder echten Änderung an `tabelle` den Tag in tag_stand als geändert markieren."""
+    markieren = ('INSERT OR REPLACE INTO tag_stand (benutzer_id, date, geaendert) '
+                 f'VALUES ({{z}}.benutzer_id, {{z}}.date, {JETZT_SQL});')
+    anders = ' OR '.join(f'OLD.{sp.strip()} IS NOT NEW.{sp.strip()}' for sp in ('date, ' + spalten).split(','))
+    return f'''
+        CREATE TRIGGER IF NOT EXISTS {tabelle}_neu AFTER INSERT ON {tabelle}
+        BEGIN {markieren.format(z='NEW')} END;
+        CREATE TRIGGER IF NOT EXISTS {tabelle}_weg AFTER DELETE ON {tabelle}
+        BEGIN {markieren.format(z='OLD')} END;
+        CREATE TRIGGER IF NOT EXISTS {tabelle}_anders AFTER UPDATE ON {tabelle} WHEN {anders}
+        BEGIN {markieren.format(z='OLD')} {markieren.format(z='NEW')} END;
+    '''
 
 
 # --- Einstellungen ------------------------------------------------------------
@@ -228,6 +258,46 @@ def bereitschaft_anlegen(benutzer_id, b):
 
 def bereitschaft_loeschen(benutzer_id, b_id):
     db().execute('DELETE FROM bereitschaft_entries WHERE id = ? AND benutzer_id = ?', (b_id, benutzer_id))
+
+
+# --- Abgleich mit der Desktop-App (je Tag, siehe kern.tag_inhalt) ------------------------------------
+
+def tage_stand(benutzer_id):
+    """{datum: {'hash', 'geaendert'}} für alle Tage mit Inhalt oder bekannter Änderung (auch gelöschte)."""
+    inhalte = kern.tage_gruppieren(eintraege(benutzer_id), bereitschaften(benutzer_id))
+    zeiten = dict(db().execute('SELECT date, geaendert FROM tag_stand WHERE benutzer_id = ?', (benutzer_id,)))
+    return {d: {'hash': kern.tag_hash(inhalte[d]) if d in inhalte else '', 'geaendert': zeiten.get(d, '')}
+            for d in set(inhalte) | set(zeiten)}
+
+
+def tage_inhalt(benutzer_id, daten):
+    """{datum: {'inhalt', 'hash', 'geaendert'}} für die genannten Tage (leere Tage mit leerem Inhalt)."""
+    daten = set(daten)
+    inhalte = kern.tage_gruppieren([e for e in eintraege(benutzer_id) if e.date in daten],
+                                   [b for b in bereitschaften(benutzer_id) if b.date in daten])
+    zeiten = dict(db().execute('SELECT date, geaendert FROM tag_stand WHERE benutzer_id = ?', (benutzer_id,)))
+    ergebnis = {}
+    for d in daten:
+        inhalt = inhalte.get(d, kern.tag_inhalt())
+        ergebnis[d] = {'inhalt': inhalt, 'hash': kern.tag_hash(inhalt), 'geaendert': zeiten.get(d, '')}
+    return ergebnis
+
+
+def tag_ersetzen(benutzer_id, datum, inhalt, geaendert):
+    """Ersetzt alle Einträge/Bereitschaften eines Tages durch `inhalt` (geprüft, kanonisch), ohne neu zu
+    rechnen: die Minuten kommen so, wie die andere Seite sie gerechnet hat. Der Tag gilt danach als
+    zum Zeitpunkt `geaendert` geändert (Änderungszeit der anderen Seite, wichtig für Konflikte)."""
+    d = db()
+    d.execute('DELETE FROM entries WHERE benutzer_id = ? AND date = ?', (benutzer_id, datum))
+    d.execute('DELETE FROM bereitschaft_entries WHERE benutzer_id = ? AND date = ?', (benutzer_id, datum))
+    for e in inhalt['eintraege']:
+        eintrag_anlegen(benutzer_id, WorkEntry(None, datum, e['start'], e['end'], e['pause'], e['minutes'],
+                                               e['reason'], e['target_minutes'], e['type']))
+    for b in inhalt['bereitschaft']:
+        bereitschaft_anlegen(benutzer_id, BereitschaftEntry(None, datum, b['start'], b['end'], b['note'],
+                                                            b['end_date']))
+    d.execute('INSERT OR REPLACE INTO tag_stand (benutzer_id, date, geaendert) VALUES (?, ?, ?)',
+              (benutzer_id, datum, geaendert))
 
 
 # --- Anwesenheit (Anmeldezeiten des Rechners, von der Desktop-App gemeldet) -------------------------

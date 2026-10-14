@@ -10,7 +10,8 @@ import sqlite3
 import sys
 import threading
 
-from PyQt6.QtCore import QDate, QLibraryInfo, QObject, Qt, QTimer, QTranslator, QUrl, pyqtSignal
+from PyQt6.QtCore import (QDate, QDateTime, QLibraryInfo, QObject, Qt, QTimer, QTranslator, QUrl,
+                          pyqtSignal)
 from PyQt6.QtGui import QColor, QDesktopServices, QIcon, QPalette
 from PyQt6.QtWidgets import (
     QApplication, QMainWindow, QTabWidget, QMessageBox, QFileDialog, QPushButton, QWidget
@@ -23,6 +24,7 @@ from database import DBManager
 from dialogs import SettingsDialog, WelcomeDialog
 
 from i18n import current_language, setup_i18n, tr
+import abgleich
 import server_sync
 import updater
 from tabs.main_tab import MainTab
@@ -62,6 +64,11 @@ class _UpdateBote(QObject):
     stand = pyqtSignal(str)                    # Fortschritt für die Statusleiste
 
 
+class _AbgleichBote(QObject):
+    """Bringt das Ergebnis des Abgleichs aus dem Hintergrund-Thread in den GUI-Thread."""
+    fertig = pyqtSignal(object, str, object)     # Ergebnis oder None, Fehlertext, Datenbank
+
+
 class UeberstundenApp(QMainWindow):
     """
     Hauptfenster der Anwendung Überzeit-Rechner.
@@ -80,6 +87,8 @@ class UeberstundenApp(QMainWindow):
             self.setWindowIcon(QIcon(ICON_PATH))
 
         self.system_is_dark = self._system_is_dark()
+        self._abgleich_bald = None          # Abgleich nach eigenen Änderungen (unten eingerichtet)
+        self._abgleich_uebernimmt = False
 
         self.settings = self.load_settings()
         self.db = DBManager(self._resolve_db_path())
@@ -152,6 +161,21 @@ class UeberstundenApp(QMainWindow):
         self._melde_timer.timeout.connect(self._sync_und_melden)
         self._melde_timer.start(30 * 60 * 1000)
 
+        # Einträge mit der Server-Version abgleichen (beide Richtungen, abgleich.py): kurz nach dem
+        # Start, alle 5 Minuten und 20 Sekunden nach jeder Änderung hier
+        self.abgleich_status = ""
+        self._abgleich_laeuft = False
+        self._abgleich_bote = _AbgleichBote(self)
+        self._abgleich_bote.fertig.connect(self._abgleich_fertig)
+        self._abgleich_timer = QTimer(self)
+        self._abgleich_timer.timeout.connect(self._abgleichen)
+        self._abgleich_timer.start(5 * 60 * 1000)
+        self._abgleich_bald = QTimer(self)    # vorher None: _on_data_changed läuft schon früher
+        self._abgleich_bald.setSingleShot(True)
+        self._abgleich_bald.setInterval(20 * 1000)
+        self._abgleich_bald.timeout.connect(self._abgleichen)
+        QTimer.singleShot(3000, self._abgleichen)
+
         # Updates: kurz nach dem Start und alle 6 Stunden auf GitHub suchen, im Hintergrund laden;
         # installiert wird beim Beenden oder per „Jetzt neu starten“
         self._update_ordner = os.path.join(BASE_DIR, ".update")
@@ -207,6 +231,73 @@ class UeberstundenApp(QMainWindow):
                 logger.warning("Anwesenheit nicht gemeldet: %s", exc)
 
         threading.Thread(target=senden, name="anwesenheit-melden", daemon=True).start()
+
+    # --- Abgleich der Einträge mit der Server-Version ---
+
+    def _abgleich_an(self):
+        return bool(self.settings.get("server_sync") and self.settings.get("server_abgleich", True))
+
+    def _abgleichen(self):
+        """Liest den hiesigen Stand (GUI-Thread) und gleicht im Hintergrund mit dem Server ab."""
+        if self._abgleich_laeuft or not self._abgleich_an():
+            return
+        adresse = self.settings.get("server_url", "")
+        token = self.settings.get("server_token", "")
+        try:
+            lokal, stand = self.db.tage_lokal(), self.db.abgleich_stand()
+        except sqlite3.Error as exc:
+            logger.warning("Abgleich: Datenbank nicht lesbar: %s", exc)
+            return
+        self._abgleich_laeuft = True
+        bote, db = self._abgleich_bote, self.db
+
+        def arbeiten():
+            try:
+                bote.fertig.emit(abgleich.ausfuehren(adresse, token, lokal, stand), "", db)
+            except abgleich.ServerFehler as exc:
+                bote.fertig.emit(None, str(exc), db)
+            except Exception as exc:  # pylint: disable=broad-except
+                logger.exception("Abgleich fehlgeschlagen")
+                bote.fertig.emit(None, str(exc), db)
+
+        threading.Thread(target=arbeiten, name="abgleich", daemon=True).start()
+
+    def _abgleich_fertig(self, ergebnis, fehler, db):
+        """Im GUI-Thread: geholte Tage übernehmen, Status merken, Anzeige auffrischen."""
+        self._abgleich_laeuft = False
+        if ergebnis is None:
+            self.abgleich_status = fehler
+            logger.warning("Abgleich: %s", fehler)
+            return
+        if db is not self.db:       # inzwischen andere Datenbank gewählt: Ergebnis passt nicht mehr
+            return
+        try:
+            geholt = abgleich.uebernehmen(self.db, ergebnis)
+        except sqlite3.Error as exc:
+            self.abgleich_status = str(exc)
+            logger.error("Abgleich: Übernehmen fehlgeschlagen: %s", exc)
+            return
+        gesendet, konflikte = ergebnis["gesendet"], len(ergebnis["konflikte"])
+        uhr = QDateTime.currentDateTime().toString("HH:mm")
+        self.abgleich_status = tr("Abgeglichen um {u} – Tage geholt: {g}, gesendet: {s}.").format(
+            u=uhr, g=geholt, s=gesendet)
+        if konflikte:
+            self.abgleich_status += " " + tr(
+                "{k} Tage waren auf beiden Seiten geändert, die neuere Änderung gilt.").format(
+                    k=konflikte)
+        if ergebnis["abgelehnt"]:
+            self.abgleich_status += " " + tr(
+                "{a} Tage nahm der Server nicht an (siehe Protokoll).").format(
+                    a=ergebnis["abgelehnt"])
+        if geholt or gesendet or konflikte:
+            logger.info("Abgleich: %s geholt, %s gesendet, Konflikte %s, abgelehnt %s", geholt,
+                        gesendet, ergebnis["konflikte"], ergebnis["abgelehnt"])
+        if geholt:
+            self._abgleich_uebernimmt = True
+            try:
+                self._on_data_changed()
+            finally:
+                self._abgleich_uebernimmt = False
 
     # --- Updates ---
 
@@ -478,6 +569,9 @@ class UeberstundenApp(QMainWindow):
         except (OSError, sqlite3.Error) as exc:
             logger.error("Wiederherstellung fehlgeschlagen: %s", exc)
             return False
+        # Der wiederhergestellte Stand soll beim nächsten Abgleich gewinnen,
+        # nicht vom Server überschrieben werden
+        self.db.abgleich_neu_beginnen()
         self.tab_main.entries = self.db.load_all()
         self.tab_main.recalculate_all_days()
         self.tab_main.on_settings_changed()
@@ -523,6 +617,7 @@ class UeberstundenApp(QMainWindow):
             "goal_hours": 0,
             "db_path": DB_FILE,
             "update_auto": True,
+            "server_abgleich": True,
             "first_run": True
         }
         if os.path.exists(SETTINGS_FILE):
@@ -1118,6 +1213,9 @@ class UeberstundenApp(QMainWindow):
         if self.tab_stats is not None:
             self.tab_stats.refresh(entries)
         self._pending_entries = entries
+        # Eigene Änderung -> bald abgleichen (nicht, wenn gerade Daten vom Server übernommen wurden)
+        if self._abgleich_bald is not None and not self._abgleich_uebernimmt:
+            self._abgleich_bald.start()
 
     def _ensure_stats_tab(self, index):
         """Lazy-Initialisierung des Statistik-Tabs beim ersten Sichtbarwerden.
@@ -1147,6 +1245,7 @@ class UeberstundenApp(QMainWindow):
                                 backup_cb=self.create_manual_backup,
                                 restore_cb=self.restore_backup,
                                 server_status=self.server_status,
+                                abgleich_status=self.abgleich_status,
                                 update_status=self.update_status,
                                 update_cb=lambda: self._update_pruefen(manuell=True))
         if dialog.exec():
@@ -1184,6 +1283,7 @@ class UeberstundenApp(QMainWindow):
             self.save_settings()
             self.apply_theme()
             self._anwesenheit_melden()
+            self._abgleichen()
 
             # Alle Tage neu berechnen, da sich das Soll geändert haben könnte
             self.tab_main.entries = self.db.load_all()
