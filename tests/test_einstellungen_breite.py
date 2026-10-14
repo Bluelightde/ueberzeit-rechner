@@ -1,4 +1,4 @@
-"""Das Einstellungsfenster ist so breit, dass alle Reiter ganz zu sehen sind (auch mit Stylesheet)."""
+"""Das Einstellungsfenster ist so breit, dass alle Reiter ganz zu sehen sind (mit Stylesheet)."""
 # pylint: disable=missing-function-docstring
 import os
 
