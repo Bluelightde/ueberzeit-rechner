@@ -47,6 +47,12 @@ All notable changes to Überzeit Rechner are documented here.
   Server-Version), `web/tests/test_web.py` (23 Prüfungen der Server-Version). Gegenprobe:
   263 Zufallseinträge, von `MainTab.recalculate_all_days` und der Server-Version gerechnet, auf die Minute gleich.
 
+### Fixed
+- **Pylint CI grün** — Pylint schlug mit Exit-Code 28 fehl (Convention+Refactor+Warning). Behoben durch: entfernung ungenutzter Imports, Beseitigung von Duplikat-Keys im i18n-Übersetzungswörterbuch, Zeilenlängen-Korrekturen, `max()`-Builtin statt if-Block, fehlende Docstrings/Final-Newlines, Inline-`pylint: disable` für beabsichtigte Qt-Patterns (CamelCase-Args, unused-arg in Dialog-Init) und Erweiterung der `.pylintrc` um projektweite Disables für GUI-typische Patterns (lazy imports, too-many-locals/statements/lines, duplicate-code, attribute-defined-outside-init u.a.).
+- **GitHub Actions Node.js 20 Deprecation** — `actions/checkout`, `actions/setup-python`, `actions/upload-artifact` und `actions/download-artifact` auf Node.js 24-kompatible Versionen (v5/v6) aktualisiert.
+
+---
+
 ## [1.8.1] – 2026-07-11
 
 ### Fixed

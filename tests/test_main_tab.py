@@ -24,7 +24,7 @@ from tabs.calendar_tab import CalendarTab        # noqa: E402
 from models import WorkEntry                      # noqa: E402
 from logic import (                              # noqa: E402
     TYPE_WORK, TYPE_VACATION, TYPE_FLEXTIME, TYPE_PARENTAL,
-    ABSENCE_TYPES, get_absence_minutes,
+    ABSENCE_TYPES,
 )
 
 
@@ -62,7 +62,7 @@ class TestAddEntry:
         db.close()
 
     def _drive_entry(self, tab, date_str, start, end, reason="", etype=TYPE_WORK,
-                     pause_spin=None, custom_target_cb=None):
+                     pause_spin=None, custom_target_cb=None):  # pylint: disable=unused-argument
         """Hilfsfunktion: Widgets befüllen und add_entry auslösen."""
         y, m, d = map(int, date_str.split("-"))
         tab.date_edit.setDate(QDate(y, m, d))

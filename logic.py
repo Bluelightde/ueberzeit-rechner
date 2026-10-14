@@ -8,7 +8,7 @@ import logging
 import re
 import subprocess
 import sys
-from PyQt6.QtCore import QDate, QDateTime, QLocale, QTime
+from PyQt6.QtCore import QDate, QLocale, QTime
 from i18n import get_locale
 # Rechenregeln ohne Qt liegen in kern.py (gemeinsam mit der Server-Version web/);
 # hier unter den bisherigen Namen weiter angeboten.
@@ -294,7 +294,8 @@ def _get_reboot_end_times_linux():
             parts = line.split(None, 3)
             if len(parts) < 4:
                 continue
-            # Format: "reboot  system boot  KERNEL  Day Mon D HH:MM:SS YYYY - Day Mon D HH:MM:SS YYYY  (duration)"
+            # Format: "reboot system boot KERNEL Day Mon D HH:MM:SS YYYY
+            #          - Day Mon D HH:MM:SS YYYY (duration)"
             m = re.search(
                 r"-\s+(\w{3}\s+\w{3}\s+\d+\s+\d{2}:\d{2}:\d{2}\s+\d{4})", line)
             if m:

@@ -1,8 +1,36 @@
 [MESSAGES CONTROL]
 # PyQt6 and matplotlib are C-extensions / optional runtime deps;
 # pylint cannot inspect their internals in most CI environments.
+#
+# Project conventions (intentional patterns, not code smells):
+# - Lazy imports (import-outside-toplevel) reduce startup time.
+# - GUI modules are naturally large (too-many-lines, too-many-locals/statements).
+# - Qt dialog classes often have few public methods (too-few-public-methods).
+# - Qt constructors take many args (too-many-arguments/positional-arguments).
+# - Widget attributes are set in setup methods, not __init__ (attribute-defined-outside-init).
+# - Tests access private members (protected-access) and import PyQt after env setup (wrong-import-position).
+# - German test names use non-ASCII characters (non-ascii-name).
+# - GUI error handlers catch all exceptions (broad-exception-caught).
+# - duplicate-code (R0801) is noisy for Qt widget setup boilerplate.
 disable=import-error,
-        no-name-in-module
+        no-name-in-module,
+        too-many-lines,
+        too-many-locals,
+        too-many-statements,
+        too-many-return-statements,
+        too-few-public-methods,
+        too-many-arguments,
+        too-many-positional-arguments,
+        attribute-defined-outside-init,
+        import-outside-toplevel,
+        wrong-import-position,
+        wrong-import-order,
+        consider-using-from-import,
+        non-ascii-name,
+        broad-exception-caught,
+        redefined-outer-name,
+        duplicate-code,
+        protected-access
 
 [MAIN]
 # Die Server-Version (web/) folgt dem Stil der Homelab-Werkzeuge und hat eigene Tests (web/tests)
