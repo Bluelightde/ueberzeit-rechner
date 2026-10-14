@@ -25,6 +25,12 @@ All notable changes to Überzeit Rechner are documented here.
     30 Minuten im Hintergrund. Der Server zeigt sie im Reiter „Anwesenheit“ und im Kalender, schlägt die Anmeldezeit als
     Start vor („Login-Zeit als Startzeit verwenden“) und bietet „Kommen um 07:12“. Austausch/Export nehmen
     `device_login` mit.
+- **Updates aus der App** — die Desktop-App sucht beim Start und alle 6 Stunden auf GitHub nach einer neuen Version,
+  lädt das passende Paket (Linux/Windows/macOS) im Hintergrund und prüft die SHA-256-Prüfsumme. Danach fragt sie
+  „Jetzt neu starten“ oder „Später“ (dann wird beim Beenden installiert). Datenbank, Einstellungen und Backups bleiben;
+  die alten Programmdateien werden ersetzt, nicht überschrieben. Schalter und „Jetzt suchen“ unter Einstellungen →
+  System & Design. Läuft die App aus dem Quellcode oder ist der Programmordner schreibgeschützt, gibt es nur einen
+  Hinweis mit Link zur Download-Seite.
 - **`kern.py`** — die Rechenregeln (Feiertage, Tagessoll, Pausen nach ArbZG, Überstunden, Mitternachtsschichten,
   Überschneidungen) ohne PyQt, gemeinsam für Desktop und Server.
 

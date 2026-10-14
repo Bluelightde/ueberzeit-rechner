@@ -88,13 +88,15 @@ class SettingsDialog(QDialog):
     Dialog zum Verwalten der Benutzereinstellungen wie Standardarbeitszeiten,
     Bundesland und Sonderarbeitstage.
     """
-    def __init__(self, current_settings, parent=None, backup_cb=None, restore_cb=None, server_status=""):
+    def __init__(self, current_settings, parent=None, backup_cb=None, restore_cb=None, server_status="",
+                 update_status="", update_cb=None):
         """
         Initialisiert den Einstellungsdialog mit den aktuellen Werten.
         """
         super().__init__(parent)
         self._backup_cb = backup_cb
         self._restore_cb = restore_cb
+        self._update_cb = update_cb
         self._db_path = current_settings.get("db_path", DB_FILE)
         self.setWindowTitle(tr("Einstellungen"))
         self.resize(650, 520)
@@ -177,6 +179,8 @@ class SettingsDialog(QDialog):
         backup_layout.addWidget(btn_backup)
         backup_layout.addWidget(btn_restore)
         layout_system.addLayout(backup_layout)
+        layout_system.addSpacing(10)
+        self._setup_update_ui(layout_system, current_settings, update_status)
         layout_system.addStretch()
         self.tabs.addTab(tab_system, tr("System && Design"))
 
@@ -561,6 +565,32 @@ class SettingsDialog(QDialog):
             QApplication.restoreOverrideCursor()
         self.server_status_lbl.setText(text)
 
+    def _setup_update_ui(self, layout, current_settings, update_status):
+        """Updates von GitHub: automatisch suchen/laden, Knopf zum sofortigen Suchen."""
+        layout.addWidget(QLabel(f"<b>{tr('Updates:')}</b>"))
+        zeile = QHBoxLayout()
+        self.update_auto_cb = QCheckBox(tr("Automatisch nach Updates suchen und herunterladen"))
+        self.update_auto_cb.setChecked(current_settings.get("update_auto", True))
+        self.update_auto_cb.setToolTip(tr(
+            "Sucht beim Start und alle 6 Stunden auf GitHub nach einer neuen Version und lädt sie im Hintergrund.\n"
+            "Installiert wird erst nach Rückfrage oder beim Beenden; Daten und Einstellungen bleiben erhalten."))
+        zeile.addWidget(self.update_auto_cb)
+        zeile.addStretch()
+        btn_suchen = QPushButton(tr("Jetzt suchen"))
+        btn_suchen.clicked.connect(self._update_suchen)
+        btn_suchen.setEnabled(self._update_cb is not None)
+        zeile.addWidget(btn_suchen)
+        layout.addLayout(zeile)
+        self.update_status_lbl = QLabel(update_status)
+        self.update_status_lbl.setWordWrap(True)
+        self.update_status_lbl.setStyleSheet("color: gray;")
+        layout.addWidget(self.update_status_lbl)
+
+    def _update_suchen(self):
+        """Startet die Suche im Hauptfenster; das Ergebnis meldet es selbst."""
+        self.update_status_lbl.setText(tr("Suche nach Updates …"))
+        self._update_cb()
+
     def _setup_db_path_ui(self, layout, current_settings):
         layout.addSpacing(10)
         layout.addWidget(QLabel(f"<b>{tr('Speicherort der Datenbank:')}</b>"))
@@ -728,6 +758,7 @@ class SettingsDialog(QDialog):
             "server_sync": self.server_sync_cb.isChecked(),
             "server_url": self.server_url_edit.text().strip().rstrip("/"),
             "server_token": self.server_token_edit.text().strip(),
+            "update_auto": self.update_auto_cb.isChecked(),
         }
 
 

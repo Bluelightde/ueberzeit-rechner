@@ -10,20 +10,21 @@ import sqlite3
 import sys
 import threading
 
-from PyQt6.QtCore import QDate, QLibraryInfo, Qt, QTimer, QTranslator
-from PyQt6.QtGui import QColor, QIcon, QPalette
+from PyQt6.QtCore import QDate, QLibraryInfo, QObject, Qt, QTimer, QTranslator, QUrl, pyqtSignal
+from PyQt6.QtGui import QColor, QDesktopServices, QIcon, QPalette
 from PyQt6.QtWidgets import (
-    QApplication, QMainWindow, QTabWidget, QMessageBox, QFileDialog
+    QApplication, QMainWindow, QTabWidget, QMessageBox, QFileDialog, QPushButton
 )
 
 # Configuration must be imported before matplotlib for MPLCONFIGDIR
 # pylint: disable=wrong-import-position, wrong-import-order
-from config import BASE_DIR, DB_FILE, SETTINGS_FILE, ICON_PATH, LOG_FILE
+from config import APP_VERSION, BASE_DIR, DB_FILE, SETTINGS_FILE, ICON_PATH, LOG_FILE
 from database import DBManager
 from dialogs import SettingsDialog, WelcomeDialog
 
 from i18n import current_language, setup_i18n, tr
 import server_sync
+import updater
 from tabs.main_tab import MainTab
 from tabs.goals_tab import GoalsTab
 from tabs.calendar_tab import CalendarTab
@@ -56,6 +57,12 @@ def setup_logging():
 
 # --- HAUPTANWENDUNG ---
 # pylint: disable=too-many-instance-attributes
+class _UpdateBote(QObject):
+    """Bringt Ergebnisse aus dem Update-Thread in den GUI-Thread."""
+    fertig = pyqtSignal(object, str, bool)     # Info oder None, Fehlertext, manuell gesucht
+    stand = pyqtSignal(str)                    # Fortschritt für die Statusleiste
+
+
 class UeberstundenApp(QMainWindow):
     """
     Hauptfenster der Anwendung Überzeit-Rechner.
@@ -133,6 +140,27 @@ class UeberstundenApp(QMainWindow):
         self._melde_timer.timeout.connect(self._sync_und_melden)
         self._melde_timer.start(30 * 60 * 1000)
 
+        # Updates: kurz nach dem Start und alle 6 Stunden auf GitHub suchen, im Hintergrund laden;
+        # installiert wird beim Beenden oder per „Jetzt neu starten“
+        self._update_ordner = os.path.join(BASE_DIR, ".update")
+        self._update_info = None
+        self._update_bereit = False
+        self._update_neustart = False
+        self._update_laeuft = False
+        self.update_status = ""
+        self._update_bote = _UpdateBote(self)
+        self._update_bote.fertig.connect(self._update_ergebnis)
+        self._update_bote.stand.connect(self._update_stand)
+        self._update_knopf = QPushButton()
+        self._update_knopf.clicked.connect(self._update_knopf_geklickt)
+        self.statusBar().addPermanentWidget(self._update_knopf)
+        self.statusBar().setVisible(False)
+        self._update_nach_start()
+        QTimer.singleShot(8000, self._update_pruefen)
+        self._update_timer = QTimer(self)
+        self._update_timer.timeout.connect(self._update_pruefen)
+        self._update_timer.start(6 * 60 * 60 * 1000)
+
     def _sync_und_melden(self):
         self._sync_system_sessions()
         self._anwesenheit_melden()
@@ -167,6 +195,160 @@ class UeberstundenApp(QMainWindow):
                 logger.warning("Anwesenheit nicht gemeldet: %s", exc)
 
         threading.Thread(target=senden, name="anwesenheit-melden", daemon=True).start()
+
+    # --- Updates ---
+
+    def _update_nach_start(self):
+        """Meldet das Ergebnis eines Updates beim letzten Beenden und räumt dessen Reste weg."""
+        erwartet = self.settings.pop("update_erwartet", None)
+        if erwartet:
+            self.save_settings()
+            if updater.version_tupel(APP_VERSION) >= updater.version_tupel(erwartet):
+                logger.info("Update auf %s installiert", APP_VERSION)
+                self.statusBar().setVisible(True)
+                self.statusBar().showMessage(tr("Auf Version {v} aktualisiert.").format(v=APP_VERSION), 30000)
+                QTimer.singleShot(30000, self._statusleiste_anpassen)
+            else:
+                log = os.path.join(self._update_ordner, "update.log")
+                logger.error("Update auf %s nicht installiert, es läuft %s", erwartet, APP_VERSION)
+                QTimer.singleShot(0, lambda: QMessageBox.warning(self, tr("Update"), tr(
+                    "Das Update auf Version {v} hat nicht geklappt, Version {a} läuft weiter.\n"
+                    "Details im Protokoll ({p}).").format(v=erwartet, a=APP_VERSION,
+                                                          p=log if os.path.exists(log) else LOG_FILE)))
+        if getattr(sys, "frozen", False):
+            updater.aufraeumen(self._update_ordner)
+
+    def _update_pruefen(self, manuell=False):
+        """Sucht im Hintergrund nach einer neueren Version und lädt sie, wenn möglich, gleich herunter."""
+        if self._update_bereit:
+            if manuell:
+                self._update_fragen()
+            return
+        if self._update_laeuft or not (manuell or self.settings.get("update_auto", True)):
+            return
+        self._update_laeuft = True
+        darf, grund = updater.kann_installieren(BASE_DIR)
+        if manuell:
+            self._update_stand(tr("Suche nach Updates …"))
+        bote, ordner = self._update_bote, self._update_ordner
+
+        def arbeiten():
+            info, fehler = None, ""
+            try:
+                info = updater.suchen(APP_VERSION)
+                if info and info["paket"] and darf:
+                    zuletzt = [-1]
+
+                    def fortschritt(geladen, gesamt):
+                        prozent = int(geladen * 100 / gesamt) if gesamt else 0
+                        if prozent // 5 != zuletzt[0]:
+                            zuletzt[0] = prozent // 5
+                            bote.stand.emit(tr("Update {v} wird geladen: {p} %").format(v=info["version"], p=prozent))
+
+                    archiv = updater.herunterladen(info["paket"], ordner, fortschritt)
+                    bote.stand.emit(tr("Update {v} wird ausgepackt …").format(v=info["version"]))
+                    updater.auspacken(archiv, ordner)
+                    info["bereit"] = True
+                elif info:
+                    info["grund"] = grund if info["paket"] else updater.KEIN_PAKET
+            except updater.UpdateFehler as exc:
+                fehler = str(exc)
+            except Exception as exc:  # pylint: disable=broad-except
+                logger.exception("Update fehlgeschlagen")
+                fehler = str(exc)
+            bote.fertig.emit(info, fehler, manuell)
+
+        threading.Thread(target=arbeiten, name="update", daemon=True).start()
+
+    def _update_stand(self, text):
+        self.statusBar().setVisible(True)
+        self.statusBar().showMessage(text)
+
+    def _statusleiste_anpassen(self):
+        """Statusleiste nur zeigen, solange sie etwas zu sagen hat."""
+        self._update_knopf.setVisible(self._update_info is not None)
+        self.statusBar().setVisible(self._update_info is not None or bool(self.statusBar().currentMessage()))
+
+    def _update_ergebnis(self, info, fehler, manuell):
+        self._update_laeuft = False
+        self.statusBar().clearMessage()
+        if fehler:
+            logger.warning("Update: %s", fehler)
+        if not info:
+            self.update_status = fehler or tr("Version {v} ist aktuell.").format(v=APP_VERSION)
+            self._statusleiste_anpassen()
+            if manuell:
+                if fehler:
+                    QMessageBox.warning(self, tr("Update"), fehler)
+                else:
+                    QMessageBox.information(self, tr("Update"), self.update_status)
+            return
+        neu_gefunden = self._update_info is None or self._update_info["version"] != info["version"]
+        self._update_info = info
+        if info.get("bereit"):
+            logger.info("Update %s heruntergeladen", info["version"])
+            self._update_bereit = True
+            self.update_status = tr("Version {v} ist heruntergeladen und wird beim Beenden installiert.").format(
+                v=info["version"])
+            self._update_knopf.setText(tr("Update {v}: jetzt neu starten").format(v=info["version"]))
+            self._statusleiste_anpassen()
+            self._update_fragen()
+            return
+        self.update_status = tr("Version {v} ist verfügbar.").format(v=info["version"])
+        grund = fehler or info.get("grund")
+        if grund:
+            self.update_status += " " + tr(grund)
+        self._update_knopf.setText(tr("Version {v} verfügbar – herunterladen").format(v=info["version"]))
+        self._statusleiste_anpassen()
+        if manuell or neu_gefunden:
+            logger.info("Neue Version %s verfügbar (%s)", info["version"], grund or "")
+        if manuell:
+            self._update_knopf_geklickt()
+
+    def _update_fragen(self):
+        """Fragt, ob die heruntergeladene Version jetzt installiert werden soll."""
+        info = self._update_info
+        box = QMessageBox(self)
+        box.setIcon(QMessageBox.Icon.Information)
+        box.setWindowTitle(tr("Update verfügbar"))
+        box.setText(tr("Version {v} ist heruntergeladen (installiert ist {a}).\n\n"
+                       "Jetzt neu starten und installieren? Sonst wird sie beim Beenden installiert; "
+                       "deine Daten bleiben erhalten.").format(v=info["version"], a=APP_VERSION))
+        if info.get("notizen"):
+            box.setDetailedText(info["notizen"])
+        btn_jetzt = box.addButton(tr("Jetzt neu starten"), QMessageBox.ButtonRole.AcceptRole)
+        box.addButton(tr("Später"), QMessageBox.ButtonRole.RejectRole)
+        box.exec()
+        if box.clickedButton() is btn_jetzt:
+            self._update_neustart = True
+            self.close()
+
+    def _update_knopf_geklickt(self):
+        if self._update_bereit:
+            self._update_neustart = True
+            self.close()
+        elif self._update_info:
+            box = QMessageBox(self)
+            box.setIcon(QMessageBox.Icon.Information)
+            box.setWindowTitle(tr("Update verfügbar"))
+            box.setText(self.update_status + "\n\n" + tr("Die Download-Seite öffnen?"))
+            if self._update_info.get("notizen"):
+                box.setDetailedText(self._update_info["notizen"])
+            box.setStandardButtons(QMessageBox.StandardButton.Open | QMessageBox.StandardButton.Close)
+            if box.exec() == QMessageBox.StandardButton.Open:
+                QDesktopServices.openUrl(QUrl(self._update_info["seite"]))
+
+    def _update_installieren(self):
+        """Beim Beenden: heruntergeladenes Update einspielen (Einstellungen sind gespeichert, DB zu)."""
+        self.settings["update_erwartet"] = self._update_info["version"]
+        self.save_settings()
+        try:
+            updater.installieren(self._update_ordner, BASE_DIR, self._update_neustart)
+        except (updater.UpdateFehler, OSError) as exc:
+            logger.error("Update nicht installiert: %s", exc)
+            self.settings.pop("update_erwartet", None)
+            self.save_settings()
+            QMessageBox.warning(self, tr("Update"), tr("Update nicht installiert: {e}").format(e=exc))
 
     def _sync_system_sessions(self):
         """Liest Login/Logout-Sessions aus den System-Protokollen und
@@ -318,6 +500,7 @@ class UeberstundenApp(QMainWindow):
             "goal_end_date": QDate.currentDate().addDays(35).toString("yyyy-MM-dd"),
             "goal_hours": 0,
             "db_path": DB_FILE,
+            "update_auto": True,
             "first_run": True
         }
         if os.path.exists(SETTINGS_FILE):
@@ -920,7 +1103,9 @@ class UeberstundenApp(QMainWindow):
         dialog = SettingsDialog(self.settings, self,
                                 backup_cb=self.create_manual_backup,
                                 restore_cb=self.restore_backup,
-                                server_status=self.server_status)
+                                server_status=self.server_status,
+                                update_status=self.update_status,
+                                update_cb=lambda: self._update_pruefen(manuell=True))
         if dialog.exec():
             new_settings = dialog.get_settings()
             new_db_path = new_settings.get("db_path", DB_FILE)
@@ -972,6 +1157,8 @@ class UeberstundenApp(QMainWindow):
         """Wird beim Schließen der Anwendung aufgerufen. Speichert Einstellungen und DB."""
         self.save_settings()
         self.db.close()
+        if self._update_bereit:
+            self._update_installieren()
         super().closeEvent(event)
 
 

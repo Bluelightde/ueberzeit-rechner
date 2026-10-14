@@ -46,6 +46,7 @@ The application is modularized into several components:
 - `main.py` — Entry point, initializes the application and main window (`UeberstundenApp`).
 - `kern.py` — Qt-free calculation rules (holidays, daily target, ArbZG breaks, overtime, overlaps, midnight shifts). Shared by the desktop app and the server version — change rules here, never duplicate them.
 - `server_sync.py` — Qt-free: sends the attendance (`device_login`) to the server version with a device token (`POST /api/geraet/anwesenheit`); called from `main.py` at start and every 30 min in a background thread. Settings keys `server_sync`, `server_url`, `server_token`.
+- `updater.py` — Qt-free self-update from GitHub releases (`releases/latest`): picks the package for this OS, downloads it to `<BASE_DIR>/.update/`, verifies GitHub's SHA-256 `digest`, unpacks to `.update/neu/` and swaps the program files on exit (old ones to `.update/alt/`; db/settings/backups stay). Linux/macOS swap in-process, Windows via a generated `update.cmd` that waits for the PID. `main.py` checks 8 s after start and every 6 h in a background thread (setting `update_auto`, default on), asks “Jetzt neu starten / Später”, stores `update_erwartet` to report success/failure on the next start. Only frozen builds with a writable folder install themselves; otherwise it just links the release page.
 - `logic.py` — Re-exports the rules from `kern.py` plus Qt helpers (date/time formatting, OS login/session detection).
 - `database.py` — SQLite database management (`DBManager`).
 - `models.py` — Data structures (e.g., `WorkEntry`).

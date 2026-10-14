@@ -414,6 +414,53 @@ _EN: dict[str, str] = {
     ),
     "Verbindung testen": "Test connection",
     "Zuletzt gemeldet: {n} Tage": "Last report: {n} days",
+    # --- Updates ---
+    "Updates:": "Updates:",
+    "Automatisch nach Updates suchen und herunterladen": "Automatically check for and download updates",
+    (
+        "Sucht beim Start und alle 6 Stunden auf GitHub nach einer neuen Version und lädt sie im Hintergrund.\n"
+        "Installiert wird erst nach Rückfrage oder beim Beenden; Daten und Einstellungen bleiben erhalten."
+    ): (
+        "Checks GitHub for a new version at startup and every 6 hours and downloads it in the background.\n"
+        "It is installed only after asking or when the app is closed; data and settings are kept."
+    ),
+    "Jetzt suchen": "Check now",
+    "Suche nach Updates …": "Checking for updates …",
+    "Update": "Update",
+    "Update verfügbar": "Update available",
+    "Auf Version {v} aktualisiert.": "Updated to version {v}.",
+    (
+        "Das Update auf Version {v} hat nicht geklappt, Version {a} läuft weiter.\n"
+        "Details im Protokoll ({p})."
+    ): (
+        "The update to version {v} did not work, version {a} is still running.\n"
+        "Details in the log ({p})."
+    ),
+    "Update {v} wird geladen: {p} %": "Downloading update {v}: {p} %",
+    "Update {v} wird ausgepackt …": "Unpacking update {v} …",
+    "Version {v} ist aktuell.": "Version {v} is up to date.",
+    "Version {v} ist heruntergeladen und wird beim Beenden installiert.":
+        "Version {v} has been downloaded and will be installed when the app is closed.",
+    "Update {v}: jetzt neu starten": "Update {v}: restart now",
+    "Version {v} ist verfügbar.": "Version {v} is available.",
+    "Version {v} verfügbar – herunterladen": "Version {v} available – download",
+    (
+        "Version {v} ist heruntergeladen (installiert ist {a}).\n\n"
+        "Jetzt neu starten und installieren? Sonst wird sie beim Beenden installiert; "
+        "deine Daten bleiben erhalten."
+    ): (
+        "Version {v} has been downloaded (installed: {a}).\n\n"
+        "Restart and install now? Otherwise it is installed when the app is closed; "
+        "your data is kept."
+    ),
+    "Jetzt neu starten": "Restart now",
+    "Später": "Later",
+    "Die Download-Seite öffnen?": "Open the download page?",
+    "Update nicht installiert: {e}": "Update not installed: {e}",
+    "Die App läuft aus dem Quellcode (git pull statt Update).":
+        "The app runs from source (use git pull instead).",
+    "Der Programmordner ist schreibgeschützt.": "The program folder is read-only.",
+    "Für dieses System gibt es kein fertiges Paket.": "There is no ready-made package for this system.",
 }
 
 TRANSLATIONS: dict[str, dict[str, str]] = {"en": _EN}

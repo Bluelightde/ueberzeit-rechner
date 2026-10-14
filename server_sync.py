@@ -15,6 +15,8 @@ import logging
 import urllib.error
 import urllib.request
 
+from netz import ssl_kontext
+
 logger = logging.getLogger(__name__)
 
 TAGE = 62           # so viele zurückliegende Tage werden jedes Mal mitgeschickt (verpasste Meldungen holen sich nach)
@@ -40,7 +42,7 @@ def _anfrage(adresse, token, pfad, daten=None, wartezeit=WARTEZEIT):
     anfrage = urllib.request.Request(adresse + pfad, data=rumpf, headers=kopf,
                                      method="POST" if rumpf is not None else "GET")
     try:
-        with urllib.request.urlopen(anfrage, timeout=wartezeit) as antwort:   # nosec: Adresse stellt die Person ein
+        with urllib.request.urlopen(anfrage, timeout=wartezeit, context=ssl_kontext()) as antwort:   # nosec: Adresse stellt die Person ein
             return json.loads(antwort.read().decode("utf-8"))
     except urllib.error.HTTPError as e:
         if e.code == 401:
