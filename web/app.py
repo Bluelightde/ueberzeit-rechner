@@ -35,7 +35,7 @@ import speicher  # noqa: E402
 from models import BereitschaftEntry, WorkEntry  # noqa: E402
 from speicher import db  # noqa: E402
 
-VERSION = '1.5.2'
+VERSION = '1.5.3'
 ABGLEICH_MAX_TAGE = 1000
 ZEITSTEMPEL = re.compile(r'\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{1,6})?Z')
 log = logging.getLogger('ueberzeit')
@@ -565,6 +565,7 @@ def _routen(app):  # noqa: C901
             heute_eintraege=heute_eintraege, tag_saldo=sum(e.minutes for e in heute_eintraege), lauf=lauf,
             bloecke=aw.bloecke(alle(), werte(), None if monat == 'alle' else monat), monate=monate, monat=monat,
             angemeldet=_anmeldezeit(datum),
+            woche=aw.woche(alle(), werte(), h),
             monat_name=_monat_name, leer=not alle())
 
     @app.post('/api/vorschau')

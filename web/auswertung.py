@@ -160,6 +160,27 @@ def bloecke(alle, werte, monat=None):
             for b in kern.consolidate_blocks(gefiltert, alle, werte)]
 
 
+def woche(alle, werte, heute):
+    """Die laufende Woche (Mo-So) für die Startseite: je Tag Zeiten, Art und Tag-Saldo, dazu die Summe."""
+    montag = heute - dt.timedelta(days=heute.weekday())
+    feiertage = {}
+    for jahr in {montag.year, (montag + dt.timedelta(days=6)).year}:
+        feiertage.update(kern.get_holidays(jahr, werte.get('country', 'DE'), werte.get('state')))
+    tage = []
+    for i in range(7):
+        d = montag + dt.timedelta(days=i)
+        ds = d.isoformat()
+        eintraege = sorted((e for e in alle if e.date == ds), key=lambda e: e.start or '')
+        arbeit = [e for e in eintraege if e.entry_type == kern.TYPE_WORK and e.start and e.end]
+        anders = next((e.entry_type for e in eintraege if e.entry_type != kern.TYPE_WORK), None)
+        tage.append({'datum': ds, 'name': WOCHENTAGE[i], 'tag': d.day, 'heute': d == heute,
+                     'zukunft': d > heute, 'erfasst': bool(eintraege), 'minuten': sum(e.minutes for e in eintraege),
+                     'zeiten': f'{arbeit[0].start}–{arbeit[-1].end}' if arbeit else '', 'typ': anders,
+                     'feiertag': feiertage.get(ds),
+                     'frei': kern.get_target_minutes_for_date(ds, alle, werte) == 0})
+    return {'tage': tage, 'summe': sum(t['minuten'] for t in tage), 'kw': heute.isocalendar()[1]}
+
+
 def bereitschaft_tage(bereitschaften):
     tage = {}
     for b in bereitschaften:

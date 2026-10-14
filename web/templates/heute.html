@@ -56,6 +56,22 @@
   {{ eintrag_formular(url_for('eintragen'), form_datum, start, ende, auto) }}
 </section>
 
+<section class="karte woche" aria-label="Diese Woche">
+  <h2>Diese Woche <span class="rechts leise klein">KW {{ woche.kw }}</span></h2>
+  <ul class="woche-tage">
+    {% for t in woche.tage %}
+    <li><a href="{{ url_for('kalender', monat=t.datum[:7], tag=t.datum) }}#tag"
+           class="{{ 'heute' if t.heute }}{{ ' zukunft' if t.zukunft }}">
+      <span class="wt">{{ t.name }} <span class="leise">{{ t.tag }}.</span></span>
+      <span class="was leise">{% if t.zeiten %}{{ t.zeiten }}{% elif t.typ %}<i class="bi {{ art_symbol[t.typ] }}"></i> {{ art_name[t.typ] }}{% elif t.feiertag %}{{ t.feiertag }}{% elif t.frei %}frei{% elif not t.zukunft and not t.heute %}–{% endif %}</span>
+      <span class="zahl {{ 'plus' if t.minuten > 0 else ('minus' if t.minuten < 0 else 'null') }}">{% if t.erfasst and (t.minuten or not t.typ) %}{{ zeit(t.minuten, true) }}{% endif %}</span>
+    </a></li>
+    {% endfor %}
+  </ul>
+  <div class="woche-summe"><span>Woche</span>
+    <b class="zahl {{ 'plus' if woche.summe > 0 else ('minus' if woche.summe < 0 else 'null') }}">{{ zeit(woche.summe, true) }}</b></div>
+</section>
+
 <section class="liste-bereich">
   {{ werkzeugleiste(monate, monat, monat_name, url_for('heute_seite')) }}
   {% if bloecke %}{{ eintrag_tabelle(bloecke, request.full_path) }}

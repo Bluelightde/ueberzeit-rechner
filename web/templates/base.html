@@ -35,7 +35,7 @@
 <header class="kopf">
   <a class="marke" href="{{ url_for('heute_seite') }}"><img src="{{ url_for('static', filename='icons/icon.svg') }}?v={{ version }}" alt=""> Überzeit Rechner</a>
   <nav class="reiter" aria-label="Hauptmenü">
-    {% for ziel, name, kurz, symbol, gruppe, handy in navi %}<a href="{{ url_for(ziel) }}" class="{{ 'aktiv' if seite in gruppe }}">{{ name }}</a>{% endfor %}
+    {% for ziel, name, kurz, symbol, gruppe, handy in navi %}<a href="{{ url_for(ziel) }}" class="{{ 'aktiv' if seite in gruppe }}"{% if kurz != name %} title="{{ name }}"{% endif %}><span class="lang">{{ name }}</span><span class="kurz">{{ kurz }}</span></a>{% endfor %}
   </nav>
 </header>
 {% endif %}

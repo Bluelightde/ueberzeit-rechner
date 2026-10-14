@@ -159,6 +159,28 @@ class Browser(unittest.TestCase):
         s.locator('#datum').fill('2026-10-13')
         self.assertEqual(s.evaluate('document.activeElement.id'), '', 'Datum behält den Fokus')
 
+    def test_desktop_kopf_einzeilig_und_woche_links(self):
+        """Am Rechner: Reiter in einer Zeile, links unter der Stempeluhr die Woche (Wunsch Micha 14.10.2026)."""
+        for breite in (1000, 1366, 1600):
+            ctx = self.browser.new_context(viewport={'width': breite, 'height': 900})
+            try:
+                s = ctx.new_page()
+                s.goto(self.url + '/anmelden')
+                s.fill('#name', 'admin')
+                s.fill('#passwort', 'geheim123')
+                s.click('button[type=submit]')
+                s.wait_for_url(re.compile(r'.*/$'))
+                reiter = s.locator('.reiter a')
+                oben = {round(reiter.nth(i).bounding_box()['y']) for i in range(reiter.count())}
+                self.assertEqual(len(oben), 1, f'{breite} px: Reiter in mehreren Zeilen')
+                self.assertLess(s.locator('.marke').bounding_box()['height'], 40, f'{breite} px: Marke bricht um')
+                woche, eingabe = s.locator('.woche').bounding_box(), s.locator('#eintragen').bounding_box()
+                self.assertLess(woche['x'] + woche['width'], eingabe['x'], f'{breite} px: Woche nicht links')
+                self.assertLess(woche['y'], eingabe['y'] + eingabe['height'])
+                self.assertEqual(s.locator('.woche-tage li').count(), 7)
+            finally:
+                ctx.close()
+
     def test_desktop_normales_feld_zum_eintippen(self):
         """Mit Maus und Tastatur (kein Touch) keine Uhr, sondern das normale Uhrzeitfeld (Wunsch Micha 14.10.2026)."""
         ctx = self.browser.new_context(viewport={'width': 1280, 'height': 900})

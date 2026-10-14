@@ -51,12 +51,12 @@ h2 { font-size: 1rem; font-weight: 600; }
 :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
 /* --- Kopf: Name links, Reiter als Leiste (wie die Suche im Dashboard: Panel mit Rand und Schatten) --- */
-.kopf { max-width: 1080px; margin: 0 auto; padding: calc(18px + env(safe-area-inset-top)) 16px 4px; }
+.kopf { max-width: 1280px; margin: 0 auto; padding: calc(18px + env(safe-area-inset-top)) 16px 4px; }
 .marke { display: inline-flex; align-items: center; gap: 10px; color: var(--fg); font-weight: 700; font-size: 1.35rem;
-  letter-spacing: -.02em; text-decoration: none !important; }
+  letter-spacing: -.02em; text-decoration: none !important; white-space: nowrap; flex-shrink: 0; }
 .marke img { width: 30px; height: 30px; border-radius: 8px; }
 .reiter { display: none; }
-.seite { max-width: 1080px; margin: 0 auto; padding: 12px 16px; }
+.seite { max-width: 1280px; margin: 0 auto; padding: 12px 16px; }
 
 .unten-nav {
   position: fixed; left: 0; right: 0; bottom: 0; z-index: 20; display: flex; justify-content: space-around;
@@ -73,13 +73,20 @@ h2 { font-size: 1rem; font-weight: 600; }
 @media (min-width: 900px) {
   body { padding-bottom: 24px; font-size: 15px; }
   .kopf { display: flex; align-items: center; gap: 20px; padding-bottom: 8px; }
-  .reiter { display: flex; flex-wrap: wrap; gap: 2px; margin-left: auto; padding: 4px; background: var(--panel);
+  .reiter { display: flex; flex-wrap: nowrap; gap: 2px; margin-left: auto; padding: 4px; background: var(--panel);
     border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow); }
   .reiter a { color: var(--dim); font-size: .9rem; font-weight: 600; padding: 6px 12px; border-radius: 8px;
     white-space: nowrap; text-decoration: none; }
   .reiter a:hover { color: var(--fg); background: var(--chip); }
   .reiter a.aktiv { color: var(--accent); background: var(--accent-hell); }
+  .reiter .kurz { display: none; }
   .unten-nav { display: none; }
+}
+
+@media (min-width: 900px) and (max-width: 1299px) {
+  /* Zu schmal für die langen Reiternamen in einer Zeile: Kurznamen wie unten am Handy */
+  .reiter .lang { display: none; }
+  .reiter .kurz { display: inline; }
 }
 
 /* --- Karten wie die Kacheln im Dashboard; Titel klein, grau, in Großbuchstaben --- */
@@ -98,7 +105,22 @@ h2 { font-size: 1rem; font-weight: 600; }
   .seite:has(> #eintragen) { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.6fr); gap: 0 14px;
     align-items: start; }
   .seite:has(> #eintragen) > :not(.karte) { grid-column: 1 / -1; }
+  /* Eingabe rechts über zwei Zeilen, links Stempeluhr und darunter die Woche */
+  .seite:has(> #eintragen) > #eintragen { grid-column: 2; grid-row: span 2; }
+  .seite:has(> #eintragen) > .woche { grid-column: 1; }
 }
+
+/* Diese Woche (Startseite) */
+.woche-tage { list-style: none; margin: 0; padding: 0; }
+.woche-tage a { display: grid; grid-template-columns: 4.2em minmax(0, 1fr) auto; gap: 8px; align-items: center;
+  padding: 7px 8px; margin: 0 -8px; border-radius: var(--radius-klein); text-decoration: none; color: var(--fg); }
+.woche-tage a:hover { background: var(--chip); }
+.woche-tage a.heute { background: var(--chip); font-weight: 600; }
+.woche-tage a.zukunft { opacity: .55; }
+.woche-tage .wt { white-space: nowrap; }
+.woche-tage .was { font-size: .85rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.woche-summe { display: flex; justify-content: space-between; border-top: 1px solid var(--line); margin-top: 6px;
+  padding-top: 9px; }
 
 /* Gesamt-Saldo: groß, darunter die Kennzahlen als Chips */
 .saldo-kopf { text-align: center; padding: 10px 0 18px; }
@@ -314,7 +336,7 @@ input[type=time]::-webkit-calendar-picker-indicator, input[type=date]::-webkit-c
 .tabelle th { font-size: 11.5px; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; color: var(--faint); }
 .tabelle input:not([type=checkbox]), .tabelle select, .tabelle .uhr-feld { min-height: 36px; }
 
-.fuss { max-width: 1080px; margin: 24px auto 0; padding: 16px 16px 14px; border-top: 1px solid var(--line2);
+.fuss { max-width: 1280px; margin: 24px auto 0; padding: 16px 16px 14px; border-top: 1px solid var(--line2);
   color: var(--faint); font-size: 12.5px; text-align: center; }
 .fuss a { color: var(--accent); }
 .mitte-seite { min-height: 70dvh; display: grid; place-items: center; }

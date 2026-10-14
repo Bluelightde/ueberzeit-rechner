@@ -9,6 +9,10 @@ All notable changes to Überzeit Rechner are documented here.
 Desktop 1.9.0, Server-Version 1.4.0 und 1.5.0.
 
 ### Added
+- **Server-Version 1.5.3: Woche auf der Startseite, Kopfzeile in einer Zeile** — am Rechner steht links unter der
+  Stempeluhr die laufende Woche (Mo–So mit Zeiten, Abwesenheit und Tag-Saldo, darunter der Wochensaldo; ein Tag öffnet
+  ihn im Kalender), am Handy unter der Eingabe. Seite und Kopf sind am Rechner breiter (1280 px); Marke und Reiter
+  brechen nicht mehr um, bei knapper Breite zeigen die Reiter die Kurznamen.
 - **Server-Version 1.5.2: Uhr nur am Handy, keine hängenden Rahmen** — am Desktop (Maus/Touchpad als Hauptzeiger)
   bleibt das normale Uhrzeitfeld zum Eintippen, die eigene Uhr gibt es nur bei Touch (`uhr.js`, geteilt). Nach dem
   Antippen von Häkchen, Datum oder Auswahllisten bleibt kein Fokus-Rahmen mehr stehen; Tippfelder zeigen beim Schreiben
