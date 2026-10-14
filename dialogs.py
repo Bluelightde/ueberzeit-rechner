@@ -196,6 +196,17 @@ class SettingsDialog(QDialog):
         self.btn_save.clicked.connect(self.accept)
         main_layout.addWidget(self.btn_save)
 
+    def showEvent(self, event):  # pylint: disable=invalid-name
+        """So breit, dass alle Reiter ganz zu sehen sind.
+
+        Erst beim Anzeigen stehen Schrift, Sprache und Stylesheet fest."""
+        super().showEvent(event)
+        leiste = self.tabs.tabBar()
+        rand = self.width() - self.tabs.width() + 24
+        noetig = sum(leiste.tabRect(i).width() for i in range(leiste.count())) + rand
+        if noetig > self.width():
+            self.resize(noetig, self.height())
+
     def _setup_workdays_ui(self, layout, current_settings):
         layout.addWidget(QLabel(f"<b>{tr('Arbeitstage & Soll pro Wochentag:')}</b>"))
         layout.addWidget(QLabel(tr("Häkchen = Arbeitstag; die Zeit ist das jeweilige Tagessoll.")))

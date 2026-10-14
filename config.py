@@ -8,7 +8,7 @@ import holidays as holidays_lib
 import pycountry
 
 # Anwendungsversion (zentrale Quelle für das "Über"-Fenster, Builds usw.)
-APP_VERSION = "1.9.0"
+APP_VERSION = "1.9.1"
 
 # --- KONFIGURATION & PFADE (PyInstaller-kompatibel) ---
 if getattr(sys, 'frozen', False):

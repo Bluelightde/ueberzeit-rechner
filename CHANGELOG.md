@@ -4,6 +4,11 @@ All notable changes to Überzeit Rechner are documented here.
 
 ---
 
+## [1.9.1] – 2026-10-14
+
+- **Einstellungsfenster breit genug für alle Reiter** — der Reiter „Server-Version“ war abgeschnitten. Das Fenster
+  richtet seine Breite jetzt nach den Reitern (Schrift, Sprache, Stylesheet), mindestens wie bisher 650 px.
+
 ## [1.9.0] – 2026-10-14
 
 Desktop 1.9.0, Server-Version 1.4.0 und 1.5.0.
