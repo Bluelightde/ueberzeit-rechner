@@ -218,20 +218,22 @@ class UeberstundenApp(QMainWindow):
             if updater.version_tupel(APP_VERSION) >= updater.version_tupel(erwartet):
                 logger.info("Update auf %s installiert", APP_VERSION)
                 self.statusBar().setVisible(True)
-                self.statusBar().showMessage(tr("Auf Version {v} aktualisiert.").format(v=APP_VERSION), 30000)
+                self.statusBar().showMessage(
+                    tr("Auf Version {v} aktualisiert.").format(v=APP_VERSION), 30000)
                 QTimer.singleShot(30000, self._statusleiste_anpassen)
             else:
                 log = os.path.join(self._update_ordner, "update.log")
+                log = log if os.path.exists(log) else LOG_FILE
                 logger.error("Update auf %s nicht installiert, es läuft %s", erwartet, APP_VERSION)
-                QTimer.singleShot(0, lambda: QMessageBox.warning(self, tr("Update"), tr(
-                    "Das Update auf Version {v} hat nicht geklappt, Version {a} läuft weiter.\n"
-                    "Details im Protokoll ({p}).").format(v=erwartet, a=APP_VERSION,
-                                                          p=log if os.path.exists(log) else LOG_FILE)))
+                text = tr("Das Update auf Version {v} hat nicht geklappt, "
+                          "Version {a} läuft weiter.\nDetails im Protokoll ({p}).").format(
+                              v=erwartet, a=APP_VERSION, p=log)
+                QTimer.singleShot(0, lambda: QMessageBox.warning(self, tr("Update"), text))
         if getattr(sys, "frozen", False):
             updater.aufraeumen(self._update_ordner)
 
     def _update_pruefen(self, manuell=False):
-        """Sucht im Hintergrund nach einer neueren Version und lädt sie, wenn möglich, gleich herunter."""
+        """Sucht im Hintergrund nach einer neueren Version und lädt sie, wenn möglich, gleich."""
         if self._update_bereit:
             if manuell:
                 self._update_fragen()
@@ -255,7 +257,8 @@ class UeberstundenApp(QMainWindow):
                         prozent = int(geladen * 100 / gesamt) if gesamt else 0
                         if prozent // 5 != zuletzt[0]:
                             zuletzt[0] = prozent // 5
-                            bote.stand.emit(tr("Update {v} wird geladen: {p} %").format(v=info["version"], p=prozent))
+                            bote.stand.emit(tr("Update {v} wird geladen: {p} %").format(
+                                v=info["version"], p=prozent))
 
                     archiv = updater.herunterladen(info["paket"], ordner, fortschritt)
                     bote.stand.emit(tr("Update {v} wird ausgepackt …").format(v=info["version"]))
@@ -279,7 +282,8 @@ class UeberstundenApp(QMainWindow):
     def _statusleiste_anpassen(self):
         """Statusleiste nur zeigen, solange sie etwas zu sagen hat."""
         self._update_knopf.setVisible(self._update_info is not None)
-        self.statusBar().setVisible(self._update_info is not None or bool(self.statusBar().currentMessage()))
+        self.statusBar().setVisible(self._update_info is not None
+                                    or bool(self.statusBar().currentMessage()))
 
     def _update_ergebnis(self, info, fehler, manuell):
         self._update_laeuft = False
@@ -300,9 +304,11 @@ class UeberstundenApp(QMainWindow):
         if info.get("bereit"):
             logger.info("Update %s heruntergeladen", info["version"])
             self._update_bereit = True
-            self.update_status = tr("Version {v} ist heruntergeladen und wird beim Beenden installiert.").format(
-                v=info["version"])
-            self._update_knopf.setText(tr("Update {v}: jetzt neu starten").format(v=info["version"]))
+            self.update_status = tr(
+                "Version {v} ist heruntergeladen und wird beim Beenden installiert.").format(
+                    v=info["version"])
+            self._update_knopf.setText(
+                tr("Update {v}: jetzt neu starten").format(v=info["version"]))
             self._statusleiste_anpassen()
             self._update_fragen()
             return
@@ -310,7 +316,8 @@ class UeberstundenApp(QMainWindow):
         grund = fehler or info.get("grund")
         if grund:
             self.update_status += " " + tr(grund)
-        self._update_knopf.setText(tr("Version {v} verfügbar – herunterladen").format(v=info["version"]))
+        self._update_knopf.setText(
+            tr("Version {v} verfügbar – herunterladen").format(v=info["version"]))
         self._statusleiste_anpassen()
         if manuell or neu_gefunden:
             logger.info("Neue Version %s verfügbar (%s)", info["version"], grund or "")
@@ -324,8 +331,9 @@ class UeberstundenApp(QMainWindow):
         box.setIcon(QMessageBox.Icon.Information)
         box.setWindowTitle(tr("Update verfügbar"))
         box.setText(tr("Version {v} ist heruntergeladen (installiert ist {a}).\n\n"
-                       "Jetzt neu starten und installieren? Sonst wird sie beim Beenden installiert; "
-                       "deine Daten bleiben erhalten.").format(v=info["version"], a=APP_VERSION))
+                       "Jetzt neu starten und installieren? Sonst wird sie beim Beenden "
+                       "installiert; deine Daten bleiben erhalten.").format(
+                           v=info["version"], a=APP_VERSION))
         if info.get("notizen"):
             box.setDetailedText(info["notizen"])
         btn_jetzt = box.addButton(tr("Jetzt neu starten"), QMessageBox.ButtonRole.AcceptRole)
@@ -346,12 +354,13 @@ class UeberstundenApp(QMainWindow):
             box.setText(self.update_status + "\n\n" + tr("Die Download-Seite öffnen?"))
             if self._update_info.get("notizen"):
                 box.setDetailedText(self._update_info["notizen"])
-            box.setStandardButtons(QMessageBox.StandardButton.Open | QMessageBox.StandardButton.Close)
+            box.setStandardButtons(QMessageBox.StandardButton.Open
+                                   | QMessageBox.StandardButton.Close)
             if box.exec() == QMessageBox.StandardButton.Open:
                 QDesktopServices.openUrl(QUrl(self._update_info["seite"]))
 
     def _update_installieren(self):
-        """Beim Beenden: heruntergeladenes Update einspielen (Einstellungen sind gespeichert, DB zu)."""
+        """Beim Beenden: heruntergeladenes Update einspielen (Einstellungen gespeichert, DB zu)."""
         self.settings["update_erwartet"] = self._update_info["version"]
         self.save_settings()
         try:
@@ -360,7 +369,8 @@ class UeberstundenApp(QMainWindow):
             logger.error("Update nicht installiert: %s", exc)
             self.settings.pop("update_erwartet", None)
             self.save_settings()
-            QMessageBox.warning(self, tr("Update"), tr("Update nicht installiert: {e}").format(e=exc))
+            QMessageBox.warning(self, tr("Update"),
+                                tr("Update nicht installiert: {e}").format(e=exc))
 
     def _sync_system_sessions(self):
         """Liest Login/Logout-Sessions aus den System-Protokollen und

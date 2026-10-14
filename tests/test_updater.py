@@ -64,10 +64,12 @@ def github(monkeypatch):
 
 def _release(tag, daten=b"paket", digest=True, **mehr):
     return json.dumps({
-        "tag_name": tag, "html_url": f"https://github.com/x/releases/tag/{tag}", "body": "Neu: Updates",
+        "tag_name": tag, "html_url": f"https://github.com/x/releases/tag/{tag}",
+        "body": "Neu: Updates",
         "assets": [{"name": f"Uberzeit-Rechner-{tag[1:]}-linux-x86_64.tar.gz", "size": len(daten),
                     "browser_download_url": "https://example.invalid/paket.tar.gz",
-                    "digest": "sha256:" + hashlib.sha256(daten).hexdigest() if digest else None}], **mehr,
+                    "digest": "sha256:" + hashlib.sha256(daten).hexdigest() if digest else None}],
+        **mehr,
     }).encode()
 
 
@@ -93,7 +95,8 @@ def test_herunterladen(github, tmp_path):
     pfad = updater.herunterladen(paket, str(tmp_path), lambda g, t: stand.append((g, t)))
     assert open(pfad, "rb").read() == b"echtes paket" and stand[-1] == (12, 12)
     del github["https://example.invalid/paket.tar.gz"]
-    assert updater.herunterladen(paket, str(tmp_path)) == pfad          # liegt schon da: nicht neu laden
+    # liegt schon da: nicht neu laden
+    assert updater.herunterladen(paket, str(tmp_path)) == pfad
 
     github["https://example.invalid/paket.tar.gz"] = b"manipuliert!"
     os.remove(pfad)
@@ -135,9 +138,11 @@ def test_auspacken_tar_und_zip(tmp_path):
 
 def test_auspacken_lehnt_fremde_pakete_ab(tmp_path):
     with pytest.raises(updater.UpdateFehler):
-        updater.auspacken(_tar(tmp_path / "a.tar.gz", {"../../boese": b"x"}, wurzel=""), str(tmp_path / "u"))
+        updater.auspacken(_tar(tmp_path / "a.tar.gz", {"../../boese": b"x"}, wurzel=""),
+                          str(tmp_path / "u"))
     with pytest.raises(updater.UpdateFehler, match="_internal"):
-        updater.auspacken(_tar(tmp_path / "b.tar.gz", {"nur_eine_datei": b"x"}), str(tmp_path / "u"))
+        updater.auspacken(_tar(tmp_path / "b.tar.gz", {"nur_eine_datei": b"x"}),
+                          str(tmp_path / "u"))
     z = tmp_path / "c.zip"
     with zipfile.ZipFile(z, "w") as f:
         f.writestr("../ausbruch", b"x")
@@ -163,7 +168,8 @@ def test_tauschen_behaelt_daten(tmp_path):
     neu = updater.auspacken(_tar(tmp_path / "p.tar.gz"), str(app / ".update"))
     updater.tauschen(neu, str(app), str(app / ".update" / "alt"))
     assert (app / "Überzeit-Rechner").read_bytes() == b"programm 1.9"
-    assert sorted(os.listdir(app / "_internal")) == ["base_library.zip"]     # nichts Veraltetes bleibt liegen
+    # nichts Veraltetes bleibt liegen
+    assert sorted(os.listdir(app / "_internal")) == ["base_library.zip"]
     assert (app / "ueberstunden_daten.db").read_bytes() == b"DATEN"
     assert (app / "ueberstunden_settings.json").exists() and (app / "backups").is_dir()
     assert (app / ".update" / "alt" / "Überzeit-Rechner").read_bytes() == b"programm 1.8"
@@ -212,10 +218,12 @@ def test_windows_skript_nur_ascii():
 
 
 def test_ssl_kontext_laedt_systemzertifikate(tmp_path, monkeypatch):
-    assert netz.ssl_kontext().cert_store_stats()["x509_ca"] > 0        # hier findet OpenSSL selbst welche
+    # hier findet OpenSSL selbst welche
+    assert netz.ssl_kontext().cert_store_stats()["x509_ca"] > 0
     leer = netz.ssl.create_default_context
+    # wie im Bundle: OpenSSL findet nichts
     monkeypatch.setattr(netz.ssl, "create_default_context",
-                        lambda: leer(cafile=None, capath=str(tmp_path)))   # wie im Bundle: nichts gefunden
+                        lambda: leer(cafile=None, capath=str(tmp_path)))
     assert netz.ssl_kontext(dateien=()).cert_store_stats()["x509_ca"] == 0
     vorhanden = [d for d in netz.SYSTEM_ZERTIFIKATE if os.path.isfile(d)]
     if not vorhanden:

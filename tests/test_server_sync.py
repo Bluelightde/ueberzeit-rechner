@@ -1,7 +1,8 @@
 """
 Tests für server_sync.py — die Desktop-App meldet die Anwesenheit an die Server-Version.
 
-Der Rundweg läuft gegen die echte Server-Version (web/) auf einem freien Port, falls Flask installiert ist.
+Der Rundweg läuft gegen die echte Server-Version (web/) auf einem freien Port, falls Flask
+installiert ist.
 """
 # pylint: disable=missing-function-docstring,import-outside-toplevel
 import os
@@ -22,10 +23,11 @@ def test_tage_auswaehlen():
                     {"date": "2026-10-12", "login": "07:12", "logout": "16:03"},
                     {"date": "2026-10-10", "login": "", "logout": "15:00"}]
     # heute schon mit Logout, aber ohne Login: Login ergänzen
-    tage = server_sync.tage_auswaehlen([{"date": "2026-10-13", "start": "", "end": "09:00"}], "2026-10-13", "08:00")
+    tage = server_sync.tage_auswaehlen([{"date": "2026-10-13", "start": "", "end": "09:00"}],
+                                       "2026-10-13", "08:00")
     assert tage == [{"date": "2026-10-13", "login": "08:00", "logout": "09:00"}]
-    assert len(server_sync.tage_auswaehlen(
-        [{"date": f"2026-01-{i:02d}", "start": "07:00", "end": ""} for i in range(1, 32)], "2026-10-13", tage=10)) == 10
+    viele = [{"date": f"2026-01-{i:02d}", "start": "07:00", "end": ""} for i in range(1, 32)]
+    assert len(server_sync.tage_auswaehlen(viele, "2026-10-13", tage=10)) == 10
 
 
 def test_falsche_angaben():
@@ -62,11 +64,12 @@ def server(tmp_path):
 def test_rundweg_mit_server_version(server):
     adresse, token, anwendung, speicher = server
     assert "Test-PC" in server_sync.verbindung_testen(adresse + "/", token)
-    tage = server_sync.tage_auswaehlen([{"date": "2026-10-12", "start": "07:12", "end": "16:03"}], "2026-10-13",
-                                       "06:55")
+    tage = server_sync.tage_auswaehlen([{"date": "2026-10-12", "start": "07:12", "end": "16:03"}],
+                                       "2026-10-13", "06:55")
     assert server_sync.anwesenheit_senden(adresse, token, tage) == 2
     with anwendung.app_context():
-        assert speicher.anwesenheit_tag(1, "2026-10-12") == {"date": "2026-10-12", "start": "07:12", "end": "16:03"}
+        assert speicher.anwesenheit_tag(1, "2026-10-12") == {
+            "date": "2026-10-12", "start": "07:12", "end": "16:03"}
         assert speicher.anwesenheit_tag(1, "2026-10-13")["start"] == "06:55"
     with pytest.raises(server_sync.ServerFehler, match="unbekannt"):
         server_sync.anwesenheit_senden(adresse, "uz_falsch", tage)

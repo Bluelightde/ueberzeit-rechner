@@ -391,37 +391,41 @@ _EN: dict[str, str] = {
     # --- Server-Version (Anwesenheit melden) ---
     "Server-Version": "Server version",
     (
-        "Die Server-Version (Browser/Handy) kann die Anmeldezeit dieses Rechners nicht selbst lesen. "
-        "Ist das Senden eingeschaltet, schickt die App beim Start und alle 30 Minuten die Login- und "
-        "Logout-Zeiten der letzten Wochen (Tab „Anwesenheit“) an den Server. Dort erscheinen sie unter "
-        "„Anwesenheit“ und als Startzeit-Vorschlag. Andere Daten werden nicht übertragen."
+        "Die Server-Version (Browser/Handy) kann die Anmeldezeit dieses Rechners nicht selbst "
+        "lesen. Ist das Senden eingeschaltet, schickt die App beim Start und alle 30 Minuten die "
+        "Login- und Logout-Zeiten der letzten Wochen (Tab „Anwesenheit“) an den Server. Dort "
+        "erscheinen sie unter „Anwesenheit“ und als Startzeit-Vorschlag. Andere Daten werden nicht "
+        "übertragen."
     ): (
         "The server version (browser/phone) cannot read this computer's login time itself. "
         "If sending is enabled, the app sends the login and logout times of the last weeks "
-        "(tab \"Attendance\") to the server at startup and every 30 minutes. They appear there under "
-        "\"Anwesenheit\" and as suggested start time. No other data is transmitted."
+        "(tab \"Attendance\") to the server at startup and every 30 minutes. They appear there "
+        "under \"Anwesenheit\" and as suggested start time. No other data is transmitted."
     ),
     "Anmeldezeiten an die Server-Version senden": "Send login times to the server version",
     "Adresse:": "Address:",
     "Gerätezugang:": "Device token:",
     (
-        "In der Server-Version unter „Anwesenheit → Desktop-App verbinden“ anlegen und hier einfügen.\n"
-        "Der Zugang darf nur Anmeldezeiten melden."
+        "In der Server-Version unter „Anwesenheit → Desktop-App verbinden“ anlegen und hier "
+        "einfügen.\nDer Zugang darf nur Anmeldezeiten melden."
     ): (
-        "Create it in the server version under \"Anwesenheit → Desktop-App verbinden\" and paste it here.\n"
-        "The token can only report login times."
+        "Create it in the server version under \"Anwesenheit → Desktop-App verbinden\" and paste "
+        "it here.\nThe token can only report login times."
     ),
     "Verbindung testen": "Test connection",
     "Zuletzt gemeldet: {n} Tage": "Last report: {n} days",
     # --- Updates ---
     "Updates:": "Updates:",
-    "Automatisch nach Updates suchen und herunterladen": "Automatically check for and download updates",
+    "Automatisch nach Updates suchen und herunterladen":
+        "Automatically check for and download updates",
     (
-        "Sucht beim Start und alle 6 Stunden auf GitHub nach einer neuen Version und lädt sie im Hintergrund.\n"
-        "Installiert wird erst nach Rückfrage oder beim Beenden; Daten und Einstellungen bleiben erhalten."
+        "Sucht beim Start und alle 6 Stunden auf GitHub nach einer neuen Version und lädt sie im "
+        "Hintergrund.\nInstalliert wird erst nach Rückfrage oder beim Beenden; Daten und "
+        "Einstellungen bleiben erhalten."
     ): (
-        "Checks GitHub for a new version at startup and every 6 hours and downloads it in the background.\n"
-        "It is installed only after asking or when the app is closed; data and settings are kept."
+        "Checks GitHub for a new version at startup and every 6 hours and downloads it in the "
+        "background.\nIt is installed only after asking or when the app is closed; data and "
+        "settings are kept."
     ),
     "Jetzt suchen": "Check now",
     "Suche nach Updates …": "Checking for updates …",
@@ -429,8 +433,8 @@ _EN: dict[str, str] = {
     "Update verfügbar": "Update available",
     "Auf Version {v} aktualisiert.": "Updated to version {v}.",
     (
-        "Das Update auf Version {v} hat nicht geklappt, Version {a} läuft weiter.\n"
-        "Details im Protokoll ({p})."
+        "Das Update auf Version {v} hat nicht geklappt, "
+        "Version {a} läuft weiter.\nDetails im Protokoll ({p})."
     ): (
         "The update to version {v} did not work, version {a} is still running.\n"
         "Details in the log ({p})."
@@ -459,7 +463,8 @@ _EN: dict[str, str] = {
     "Die App läuft aus dem Quellcode (git pull statt Update).":
         "The app runs from source (use git pull instead).",
     "Der Programmordner ist schreibgeschützt.": "The program folder is read-only.",
-    "Für dieses System gibt es kein fertiges Paket.": "There is no ready-made package for this system.",
+    "Für dieses System gibt es kein fertiges Paket.":
+        "There is no ready-made package for this system.",
 }
 
 TRANSLATIONS: dict[str, dict[str, str]] = {"en": _EN}

@@ -89,8 +89,8 @@ class SettingsDialog(QDialog):
     Dialog zum Verwalten der Benutzereinstellungen wie Standardarbeitszeiten,
     Bundesland und Sonderarbeitstage.
     """
-    def __init__(self, current_settings, parent=None, backup_cb=None, restore_cb=None, server_status="",
-                 update_status="", update_cb=None):
+    def __init__(self, current_settings, parent=None, *, backup_cb=None, restore_cb=None,
+                 server_status="", update_status="", update_cb=None):
         """
         Initialisiert den Einstellungsdialog mit den aktuellen Werten.
         """
@@ -512,10 +512,11 @@ class SettingsDialog(QDialog):
     def _setup_server_ui(self, layout, current_settings, server_status):
         """Anwesenheit an die Server-Version senden: Adresse, Gerätezugang, Verbindung testen."""
         info = QLabel(tr(
-            "Die Server-Version (Browser/Handy) kann die Anmeldezeit dieses Rechners nicht selbst lesen. "
-            "Ist das Senden eingeschaltet, schickt die App beim Start und alle 30 Minuten die Login- und "
-            "Logout-Zeiten der letzten Wochen (Tab „Anwesenheit“) an den Server. Dort erscheinen sie unter "
-            "„Anwesenheit“ und als Startzeit-Vorschlag. Andere Daten werden nicht übertragen."
+            "Die Server-Version (Browser/Handy) kann die Anmeldezeit dieses Rechners nicht "
+            "selbst lesen. Ist das Senden eingeschaltet, schickt die App beim Start und alle "
+            "30 Minuten die Login- und Logout-Zeiten der letzten Wochen (Tab „Anwesenheit“) an "
+            "den Server. Dort erscheinen sie unter „Anwesenheit“ und als Startzeit-Vorschlag. "
+            "Andere Daten werden nicht übertragen."
         ))
         info.setWordWrap(True)
         info.setStyleSheet("color: gray;")
@@ -536,8 +537,8 @@ class SettingsDialog(QDialog):
         self.server_token_edit.setEchoMode(QLineEdit.EchoMode.Password)
         self.server_token_edit.setPlaceholderText("uz_…")
         self.server_token_edit.setToolTip(tr(
-            "In der Server-Version unter „Anwesenheit → Desktop-App verbinden“ anlegen und hier einfügen.\n"
-            "Der Zugang darf nur Anmeldezeiten melden."
+            "In der Server-Version unter „Anwesenheit → Desktop-App verbinden“ anlegen und hier "
+            "einfügen.\nDer Zugang darf nur Anmeldezeiten melden."
         ))
         form.addWidget(self.server_token_edit, 1, 1)
         layout.addLayout(form)
@@ -557,7 +558,8 @@ class SettingsDialog(QDialog):
         """Prüft Adresse und Gerätezugang (höchstens 5 Sekunden)."""
         QApplication.setOverrideCursor(Qt.CursorShape.WaitCursor)
         try:
-            text = server_sync.verbindung_testen(self.server_url_edit.text(), self.server_token_edit.text())
+            text = server_sync.verbindung_testen(self.server_url_edit.text(),
+                                                 self.server_token_edit.text())
             self.server_status_lbl.setStyleSheet(f"color: {COLOR_POSITIVE};")
         except server_sync.ServerFehler as exc:
             text = str(exc)
@@ -573,8 +575,9 @@ class SettingsDialog(QDialog):
         self.update_auto_cb = QCheckBox(tr("Automatisch nach Updates suchen und herunterladen"))
         self.update_auto_cb.setChecked(current_settings.get("update_auto", True))
         self.update_auto_cb.setToolTip(tr(
-            "Sucht beim Start und alle 6 Stunden auf GitHub nach einer neuen Version und lädt sie im Hintergrund.\n"
-            "Installiert wird erst nach Rückfrage oder beim Beenden; Daten und Einstellungen bleiben erhalten."))
+            "Sucht beim Start und alle 6 Stunden auf GitHub nach einer neuen Version und lädt "
+            "sie im Hintergrund.\nInstalliert wird erst nach Rückfrage oder beim Beenden; Daten "
+            "und Einstellungen bleiben erhalten."))
         zeile.addWidget(self.update_auto_cb)
         zeile.addStretch()
         btn_suchen = QPushButton(tr("Jetzt suchen"))
