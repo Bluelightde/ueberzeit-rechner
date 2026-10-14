@@ -33,6 +33,7 @@ import urllib.request
 import zipfile
 
 from netz import ssl_kontext
+from umgebung import system_env
 
 logger = logging.getLogger(__name__)
 
@@ -245,15 +246,16 @@ def _dmg_auspacken(archiv, ziel):
     mount = os.path.join(os.path.dirname(ziel), "dmg")
     os.makedirs(mount, exist_ok=True)
     subprocess.run(["hdiutil", "attach", "-nobrowse", "-readonly", "-noautoopen",
-                    "-mountpoint", mount, archiv], check=True, capture_output=True, timeout=120)
+                    "-mountpoint", mount, archiv], check=True, capture_output=True, timeout=120,
+                    env=system_env())
     try:
         for e in os.listdir(mount):
             if e.endswith(".app"):
                 subprocess.run(["ditto", os.path.join(mount, e), os.path.join(ziel, e)],
-                               check=True, timeout=300)
+                               check=True, timeout=300, env=system_env())
     finally:
         subprocess.run(["hdiutil", "detach", mount, "-force"],
-                       capture_output=True, timeout=60, check=False)
+                       capture_output=True, timeout=60, check=False, env=system_env())
         _weg(mount)
 
 
@@ -379,7 +381,7 @@ def _neu_starten(ziel):
     else:
         befehl = [os.path.join(ziel, os.path.basename(sys.executable))]
     # pylint: disable=consider-using-with
-    subprocess.Popen(befehl, cwd=ziel, start_new_session=True, close_fds=True)
+    subprocess.Popen(befehl, cwd=ziel, start_new_session=True, close_fds=True, env=system_env())
 
 
 def aufraeumen(ordner):

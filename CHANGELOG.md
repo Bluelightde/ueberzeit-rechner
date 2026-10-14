@@ -4,6 +4,14 @@ All notable changes to Überzeit Rechner are documented here.
 
 ---
 
+## [1.9.3] – 2026-10-14
+
+- **Anmeldezeit wird wieder erkannt (Linux)** — die gebaute App gab ihre mitgelieferten Bibliotheken
+  (`LD_LIBRARY_PATH` → `_internal`) an `journalctl`, `last` und `who` weiter; `journalctl` brach mit
+  „version OPENSSL_3.4.0 not found“ ab, die Startzeit fiel auf den Standard zurück und die Anwesenheit fehlte.
+  Systemprogramme laufen jetzt mit der Umgebung des Systems (`umgebung.system_env`), auch beim Neustart nach
+  einem Update und unter macOS (`hdiutil`, `ditto`).
+
 ## [1.9.1] – 2026-10-14
 
 - **Einstellungsfenster breit genug für alle Reiter** — der Reiter „Server-Version“ war abgeschnitten. Das Fenster

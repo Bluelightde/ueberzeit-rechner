@@ -10,6 +10,7 @@ import subprocess
 import sys
 from PyQt6.QtCore import QDate, QLocale, QTime
 from i18n import get_locale
+from umgebung import system_env
 # Rechenregeln ohne Qt liegen in kern.py (gemeinsam mit der Server-Version web/);
 # hier unter den bisherigen Namen weiter angeboten.
 # pylint: disable=unused-import
@@ -36,7 +37,7 @@ def _get_login_time_linux():
             ["journalctl", "-u", "systemd-logind",
              "--grep", f"New session.*{user}",
              "--since", "today", "--output=short-iso", "--no-pager"],
-            capture_output=True, text=True, timeout=5, check=False
+            capture_output=True, text=True, timeout=5, check=False, env=system_env()
         )
         if r.returncode == 0 and r.stdout.strip():
             for line in r.stdout.strip().splitlines():
@@ -53,7 +54,7 @@ def _get_login_time_linux():
             ["journalctl", "-u", "systemd-logind",
              "--grep", f"New session.*{user}",
              "-n", "1", "--output=short-iso", "--no-pager"],
-            capture_output=True, text=True, timeout=5, check=False
+            capture_output=True, text=True, timeout=5, check=False, env=system_env()
         )
         if r.returncode == 0 and r.stdout.strip():
             m = re.search(r"T(\d{2}):(\d{2}):", r.stdout.strip().split("\n")[-1])
@@ -64,7 +65,8 @@ def _get_login_time_linux():
 
     # Fallback: who
     try:
-        r = subprocess.run(["who"], capture_output=True, text=True, timeout=3, check=False)
+        r = subprocess.run(["who"], capture_output=True, text=True, timeout=3, check=False,
+                           env=system_env())
         if r.returncode == 0:
             logins = []
             for line in r.stdout.strip().splitlines():
@@ -84,7 +86,7 @@ def _get_login_time_darwin():
     user = getpass.getuser()
     try:
         # last -y zeigt das Jahr, LC_ALL=C für stabiles Datumsformat
-        r = subprocess.run(["last", "-y", user], env={"LC_ALL": "C"},
+        r = subprocess.run(["last", "-y", user], env=system_env(LC_ALL="C"),
                            capture_output=True, text=True, timeout=5, check=False)
         if r.returncode == 0 and r.stdout:
             # "ddd MMM d" in English locale (e.g. "Thu Apr 2")
@@ -111,7 +113,8 @@ def _get_login_time_darwin():
 
     # Fallback: who
     try:
-        r = subprocess.run(["who"], capture_output=True, text=True, timeout=3, check=False)
+        r = subprocess.run(["who"], capture_output=True, text=True, timeout=3, check=False,
+                           env=system_env())
         if r.returncode == 0:
             logins = []
             for line in r.stdout.strip().splitlines():
@@ -143,7 +146,7 @@ def _get_login_time_win32():
         )
         r = subprocess.run(
             ["powershell", "-NoProfile", "-NonInteractive", "-Command", ps_cmd],
-            capture_output=True, text=True, timeout=8, check=False, **_no_win
+            capture_output=True, text=True, timeout=8, check=False, **_no_win, env=system_env()
         )
         if r.returncode == 0 and r.stdout.strip():
             return QTime.fromString(r.stdout.strip(), "HH:mm")
@@ -215,7 +218,7 @@ def _get_system_sessions_linux():
              "--grep", "New session|logged out",
              "--since", "30 days ago",
              "--output=short-iso", "--no-pager"],
-            capture_output=True, text=True, timeout=10, check=False
+            capture_output=True, text=True, timeout=10, check=False, env=system_env()
         )
         if r.returncode != 0:
             return []
@@ -280,7 +283,8 @@ def _get_reboot_end_times_linux():
     shutdowns = []
     try:
         r = subprocess.run(["last", "-F", "reboot"],
-                           capture_output=True, text=True, timeout=5, check=False)
+                           capture_output=True, text=True, timeout=5, check=False,
+                           env=system_env())
         if r.returncode != 0:
             return shutdowns
         # C-Locale für stabiles Datumsformat
@@ -326,7 +330,7 @@ def _get_system_sessions_darwin():
     user = getpass.getuser()
     results = []
     try:
-        r = subprocess.run(["last", "-y", user], env={"LC_ALL": "C"},
+        r = subprocess.run(["last", "-y", user], env=system_env(LC_ALL="C"),
                            capture_output=True, text=True, timeout=5, check=False)
         if r.returncode != 0:
             return []
