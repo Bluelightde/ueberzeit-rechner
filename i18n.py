@@ -411,7 +411,8 @@ _EN: dict[str, str] = {
         "Synced at {u} – days fetched: {g}, sent: {s}.",
     "{k} Tage waren auf beiden Seiten geändert, die neuere Änderung gilt.":
         "{k} days were changed on both sides, the newer change wins.",
-    "{a} Tage nahm der Server nicht an (siehe Protokoll).": "{a} days were rejected by the server (see log).",
+    "{a} Tage nahm der Server nicht an (siehe Protokoll).":
+        "{a} days were rejected by the server (see log).",
     "Adresse:": "Address:",
     "Gerätezugang:": "Device token:",
     (
