@@ -25,6 +25,10 @@ All notable changes to Überzeit Rechner are documented here.
     30 Minuten im Hintergrund. Der Server zeigt sie im Reiter „Anwesenheit“ und im Kalender, schlägt die Anmeldezeit als
     Start vor („Login-Zeit als Startzeit verwenden“) und bietet „Kommen um 07:12“. Austausch/Export nehmen
     `device_login` mit.
+- **Server-Version 1.3.0: Look wie das Homelab-Dashboard** (`dash.rm-weiss.de`) statt wie die Desktop-App — gleiche
+  Farben hell/dunkel, Systemschrift, weiße Karten mit feinem Rand und runden Ecken, kleine graue Abschnittstitel,
+  blauer Akzent, Reiter als Leiste, Arten als Chips, Kalender mit abgerundeten Tagen. Am PC stehen Stempeluhr und
+  Eingabe nebeneinander. Aufbau und Inhalte unverändert.
 - **Updates aus der App** — die Desktop-App sucht beim Start und alle 6 Stunden auf GitHub nach einer neuen Version,
   lädt das passende Paket (Linux/Windows/macOS) im Hintergrund und prüft die SHA-256-Prüfsumme. Danach fragt sie
   „Jetzt neu starten“ oder „Später“ (dann wird beim Beenden installiert). Datenbank, Einstellungen und Backups bleiben;

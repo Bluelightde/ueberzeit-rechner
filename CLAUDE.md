@@ -74,6 +74,6 @@ The application is modularized into several components:
 
 ## Server Version (`web/`)
 
-Flask app in `web/` (browser + installable PWA, one data set per user, OIDC login). It imports `kern.py` and `models.py`
+Flask app in `web/` (browser + installable PWA, one data set per user, OIDC login). Since 1.3.0 its look follows Micha's homelab dashboard (`dash.rm-weiss.de`: same color tokens, system font, white 12 px cards, small uppercase section titles), not the desktop app. It imports `kern.py` and `models.py`
 from the repo root; Docker builds from the root (`compose.yml`, `web/Dockerfile`). Tests:
 `python -m unittest discover -s web/tests`. Details in `web/README.md`. The desktop app does not depend on `web/`.

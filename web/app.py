@@ -35,7 +35,7 @@ import speicher  # noqa: E402
 from models import BereitschaftEntry, WorkEntry  # noqa: E402
 from speicher import db  # noqa: E402
 
-VERSION = '1.2.0'
+VERSION = '1.3.0'
 log = logging.getLogger('ueberzeit')
 
 ARTEN = [(kern.TYPE_WORK, 'Arbeit'), (kern.TYPE_VACATION, 'Urlaub'), (kern.TYPE_SICK, 'Krank'),
