@@ -9,6 +9,10 @@ All notable changes to Überzeit Rechner are documented here.
 Desktop 1.9.0, Server-Version 1.4.0 und 1.5.0.
 
 ### Added
+- **Server-Version 1.5.1: Uhr öffnet mit Animation, kein weißer Kasten beim Antippen** — die Uhr blendet beim Öffnen
+  und Schließen ein bzw. aus und wächst dabei leicht (wie die Android-Dialoge, `@starting-style`), der Hintergrund
+  blendet mit. Die Antipp-Markierung von Chrome auf Android (grauer/weißer Kasten) ist in der ganzen App abgeschaltet;
+  Rückmeldung kommt über `:active`. Gilt über `gemeinsam.py` auch für Notizen, Vorratsliste und Wohnungssuche.
 - **Server-Version 1.5.0: eigene Uhr statt Android-Systemuhr und gründlichere Oberfläche** — Uhrzeitfelder öffnen die
   gemeinsame Uhr der Homelab-Apps (`web/static/js/uhr.js`, `css/uhr.css`, gepflegt mit `gemeinsam.py` zusammen mit
   Notizen/Vorratsliste/Wohnungssuche): Zifferblatt wie bei Android, Zahlen tippen, „Ohne“ für optionale Zeiten, passt

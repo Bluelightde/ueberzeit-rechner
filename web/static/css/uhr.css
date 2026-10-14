@@ -22,7 +22,23 @@
 
 .uhr-blatt { width: min(360px, 94vw); max-width: none; padding: 0; border: 1px solid var(--uhr-u-linie); border-radius: 18px;
              background: var(--uhr-u-flaeche); color: var(--uhr-u-text); box-shadow: 0 18px 40px -12px rgba(0, 0, 0, .35); }
-.uhr-blatt::backdrop { background: rgba(20, 18, 14, .4); }
+/* Öffnen und Schließen wie die Android-Dialoge: einblenden und leicht wachsen, der Hintergrund blendet mit (14.10.2026,
+   Wunsch Micha: ohne Übergang wirkte die Uhr hart). Rein mit CSS über @starting-style und allow-discrete (Chrome 117+,
+   Safari 17.5+) -- ältere Browser öffnen wie bisher ohne Übergang. */
+.uhr-blatt { opacity: 0; transform: translateY(10px) scale(.94);
+             transition: opacity .18s ease, transform .24s cubic-bezier(.2, 0, 0, 1),
+                         overlay .24s allow-discrete, display .24s allow-discrete; }
+.uhr-blatt[open] { opacity: 1; transform: none; }
+@starting-style { .uhr-blatt[open] { opacity: 0; transform: translateY(10px) scale(.94); } }
+.uhr-blatt::backdrop { background: rgba(20, 18, 14, 0);
+                       transition: background-color .24s ease, overlay .24s allow-discrete, display .24s allow-discrete; }
+.uhr-blatt[open]::backdrop { background: rgba(20, 18, 14, .4); }
+@starting-style { .uhr-blatt[open]::backdrop { background: rgba(20, 18, 14, 0); } }
+@media (prefers-reduced-motion: reduce) { .uhr-blatt, .uhr-blatt::backdrop { transition: none; } }
+/* Kein grauer/weißer Kasten beim Antippen (Antipp-Markierung von Chrome auf Android); Rückmeldung kommt über :active */
+.uhr-feld, .uhr-blatt button, .uhr-blatt input, .uhr-scheibe { -webkit-tap-highlight-color: transparent; }
+.uhr-feld:active { background: var(--uhr-u-weich); }
+.uhr-knopf:active, .uhr-teil:active, .uhr-symbol:active { filter: brightness(.92); }
 .uhr-blatt form { padding: 18px 16px 14px; margin: 0; }
 .uhr-blatt button { font: inherit; }
 .uhr-kopf { display: flex; justify-content: center; align-items: center; gap: 4px; font-size: 2.8rem; font-weight: 600;
