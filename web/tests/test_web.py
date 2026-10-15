@@ -119,6 +119,23 @@ class EintragenTest(Grundlage):
         self.assertEqual((e.pause, e.minutes, e.reason), (30, 30, 'Test'))
         self.assertIn('+30m', self.meldungen()[0][1])
 
+    def test_formular_startzustand_vom_server(self):
+        """Was app.js sonst nach dem Laden aus- und einblendet, schickt schon der Server richtig (kein Springen)."""
+        import re
+        html = self.c.get('/').text
+        versteckt = lambda attr: re.search(attr + r' class="[^"]*versteckt', html) is not None  # noqa: E731
+        self.assertTrue(versteckt('data-nur="abwesend"'), 'bis-Feld sichtbar')
+        self.assertTrue(versteckt('data-soll'), 'Soll-Feld sichtbar')
+        self.assertTrue(versteckt('data-nur="korrektur"'), 'Korrektur sichtbar')
+        self.assertFalse(versteckt('data-nur="zeiten"'))
+        self.assertIn('Tag-Saldo <span class="gross zahl', html)          # Vorschau schon gerechnet
+        self.assertNotIn('Berechne …', html)
+        self.assertRegex(html, r'id="pause" name="pause"[^>]*value="30"')
+        self.post('/eintragen', art='work', datum='2026-10-12', start='07:00', ende='16:00')
+        e, = self.eintraege()
+        html = self.c.get(f'/eintrag/{e.id}').text
+        self.assertIn('Netto 8h 30m', html)
+
     def test_zweiter_block_und_ueberschneidung(self):
         self.post('/eintragen', art='work', datum='2026-10-12', start='07:00', ende='12:00')
         self.post('/eintragen', art='work', datum='2026-10-12', start='11:00', ende='13:00')

@@ -1,7 +1,10 @@
 {# Eingabe für Arbeit, Korrektur und Abwesenheit -- auf "Heute" (neu) und beim Bearbeiten (e gesetzt) #}
-{% macro eintrag_formular(ziel, datum, start, ende, auto, e=None, soll_text='', weiter='') -%}
+{% macro eintrag_formular(ziel, datum, start, ende, auto, e=None, soll_text='', weiter='', vorschau=None) -%}
 {% set art = e.entry_type if e else 'work' %}
 {% set korrektur = e and e.entry_type == 'work' and not e.start %}
+{# Sichtbarkeit und Vorschau schon vom Server wie nach sichtbar()/zeigen() in app.js -- sonst springt die Karte beim Laden #}
+{% set arbeit = art == 'work' %}
+{% macro aus(an) %}{{ '' if an else ' versteckt' }}{% endmacro %}
 <form method="post" action="{{ ziel }}" class="eintrag-form" data-ohne-id="{{ e.id if e else '' }}" data-auto="{{ 1 if auto else 0 }}">
   <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
   <input type="hidden" name="weiter" value="{{ weiter }}">
@@ -13,12 +16,12 @@
 
   <div class="raster2">
     <div><label for="datum">Datum</label><input type="date" id="datum" name="datum" value="{{ datum }}" required></div>
-    {% if not e %}<div data-nur="abwesend"><label for="bis">bis einschließlich</label><input type="date" id="bis" name="bis" value="{{ datum }}"></div>{% endif %}
+    {% if not e %}<div data-nur="abwesend" class="{{ aus(not arbeit) }}"><label for="bis">bis einschließlich</label><input type="date" id="bis" name="bis" value="{{ datum }}"></div>{% endif %}
   </div>
 
-  <div data-nur="arbeit">
+  <div data-nur="arbeit" class="{{ aus(arbeit) }}">
     <label class="haken"><input type="checkbox" name="korrektur" value="1" {{ 'checked' if korrektur }}> Ohne Uhrzeit (Korrektur in Minuten)</label>
-    <div data-nur="zeiten">
+    <div data-nur="zeiten" class="{{ aus(not korrektur) }}">
       <div class="raster2">
         <div><label for="start">Beginn</label>
           <div class="feld-mit-knopf"><input type="time" id="start" name="start" value="{{ start }}"><button type="button" class="symbolknopf" data-jetzt="start" title="Aktuelle Uhrzeit als Startzeit setzen" aria-label="Start jetzt">Jetzt</button></div></div>
@@ -27,21 +30,29 @@
       </div>
       <div class="raster2">
         <div><label for="pause">Pause in Minuten{% if auto %} (automatisch){% endif %}</label>
-          <input type="number" id="pause" name="pause" min="0" max="600" value="{{ e.pause if e else 0 }}" {{ 'readonly' if auto }}
+          <input type="number" id="pause" name="pause" min="0" max="600" value="{{ e.pause if e else (vorschau.pause if vorschau and vorschau.pause is defined else 0) }}" {{ 'readonly' if auto }}
             {% if auto %}title="Wird nach den Pausenregeln (Einstellungen) berechnet"{% endif %}></div>
-        <div data-soll><label for="soll">Tagessoll an diesem Tag</label>
-          <input type="time" id="soll" name="soll" value="{{ soll_text or '04:00' }}"></div>
+        <div data-soll class="{{ aus(soll_text) }}"><label for="soll">Tagessoll an diesem Tag</label>
+          <input type="time" id="soll" name="soll" value="{{ soll_text or '04:00' }}" {{ 'disabled' if not soll_text }}></div>
       </div>
       <label class="haken"><input type="checkbox" name="eigenes_soll" value="1" {{ 'checked' if soll_text }}> Eigenes Tagessoll für diesen Tag
         <span class="leise klein">(sonst gilt das Soll aus den Einstellungen)</span></label>
     </div>
-    <div data-nur="korrektur"><label for="minuten">Korrektur in Minuten (plus oder minus)</label>
+    <div data-nur="korrektur" class="{{ aus(korrektur) }}"><label for="minuten">Korrektur in Minuten (plus oder minus)</label>
       <input type="text" id="minuten" name="minuten" inputmode="text" placeholder="z. B. 45, -30 oder 1:30" value="{{ e.minutes if korrektur else '' }}"></div>
     <label for="anlass">Anlass (optional)</label>
     <input type="text" id="anlass" name="anlass" maxlength="200" value="{{ e.reason if e else '' }}" placeholder="z. B. Projekt, Fortbildung, Dienstreise">
-    <div class="vorschau" aria-live="polite" data-nur="zeiten"><span class="leise">Berechne …</span></div>
+    <div class="vorschau{{ ' warnung' if vorschau and vorschau.ueberschneidung }}{{ aus(not korrektur) }}" aria-live="polite" data-nur="zeiten">
+      {%- if vorschau and vorschau.ueberschneidung %}⚠️ Überschneidung mit {{ vorschau.ueberschneidung }}
+      {%- elif vorschau and vorschau.netto is defined %}
+      <div>Tag-Saldo <span class="gross zahl {{ 'plus' if vorschau.tag_saldo > 0 else ('minus' if vorschau.tag_saldo < 0 else 'null') }}">{{ zeit(vorschau.tag_saldo, true) }}</span></div>
+      <div class="leise klein">Netto {{ zeit(vorschau.netto) }} · Soll {{ zeit(vorschau.soll) if vorschau.soll else 'frei' }} · Pause {{ vorschau.pause }} min</div>
+      {%- if vorschau.mitternacht %}<div class="leise klein">Über Mitternacht: zählt komplett zum Starttag.</div>{% endif %}
+      {%- for w in vorschau.warnungen %}<div class="warnhinweis">⚠️ {{ w }}</div>{% endfor %}
+      {%- else %}<span class="leise">Berechne …</span>{% endif -%}
+    </div>
   </div>
-  <p class="leise klein" data-nur="abwesend">Urlaub, Krank, Feiertag und Elternzeit lassen den Saldo unverändert; Gleitzeitabbau zieht das Tagessoll ab.{% if not e %} Über mehrere Tage werden Wochenenden und Feiertage übersprungen.{% endif %}</p>
+  <p class="leise klein{{ aus(not arbeit) }}" data-nur="abwesend">Urlaub, Krank, Feiertag und Elternzeit lassen den Saldo unverändert; Gleitzeitabbau zieht das Tagessoll ab.{% if not e %} Über mehrere Tage werden Wochenenden und Feiertage übersprungen.{% endif %}</p>
   <div class="absenden"><button class="knopf haupt" type="submit"><i class="bi bi-check2"></i> {{ 'Speichern' if e else 'Eintragen' }}</button></div>
 </form>
 {%- endmacro %}

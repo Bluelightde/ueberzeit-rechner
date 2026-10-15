@@ -35,7 +35,7 @@ import speicher  # noqa: E402
 from models import BereitschaftEntry, WorkEntry  # noqa: E402
 from speicher import db  # noqa: E402
 
-VERSION = '1.5.3'
+VERSION = '1.5.4'
 ABGLEICH_MAX_TAGE = 1000
 ZEITSTEMPEL = re.compile(r'\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{1,6})?Z')
 log = logging.getLogger('ueberzeit')
@@ -557,9 +557,10 @@ def _routen(app):  # noqa: C901
                     'seit': int((jetzt() - beginn).total_seconds() // 60), 'beginn_ms': int(beginn.timestamp() * 1000)}
         heute_eintraege = sorted([e for e in alle() if e.date == datum], key=lambda e: e.start or '')
         monate, monat = _monatswahl()   # Tabelle darunter wie im Desktop-Reiter „Eingabe & Liste“
+        ende = aw.ende_vorschlag(alle(), werte(), form_datum, start)
         return render_template(
-            'heute.html', datum=datum, form_datum=form_datum, start=start,
-            ende=aw.ende_vorschlag(alle(), werte(), form_datum, start),
+            'heute.html', datum=datum, form_datum=form_datum, start=start, ende=ende,
+            vorschau=aw.vorschau(alle(), werte(), form_datum, start, ende) if start and ende else None,
             saldo=aw.saldo(alle()), urlaub=aw.urlaub(alle(), werte(), h.year), ziel=aw.ziel(alle(), werte(), h),
             soll=kern.get_target_minutes_for_date(datum, alle(), werte()), auto=werte().get('auto_break', True),
             heute_eintraege=heute_eintraege, tag_saldo=sum(e.minutes for e in heute_eintraege), lauf=lauf,
@@ -735,8 +736,12 @@ def _routen(app):  # noqa: C901
         if e is None:
             abort(404)
         if request.method == 'GET':
+            vorschau = None
+            if e.entry_type == kern.TYPE_WORK and e.start and e.end:
+                vorschau = aw.vorschau(alle(), werte(), e.date, e.start, e.end, e.pause,
+                                       e.target_minutes if e.target_minutes != -1 else None, e.id)
             return render_template('bearbeiten.html', e=e, weiter=request.args.get('weiter', ''),
-                                   auto=werte().get('auto_break', True),
+                                   auto=werte().get('auto_break', True), vorschau=vorschau,
                                    soll_text=kern.minutes_to_hhmm(e.target_minutes) if e.target_minutes != -1 else '')
         f = request.form
         alt_datum = e.date

@@ -4,7 +4,7 @@
 {% block inhalt %}
 <section class="karte">
   <h2><i class="bi bi-pencil"></i> {{ datum_lang(e.date) }}</h2>
-  {{ eintrag_formular(url_for('bearbeiten', eintrag_id=e.id), e.date, e.start or '07:00', e.end or '15:30', auto, e, soll_text, weiter) }}
+  {{ eintrag_formular(url_for('bearbeiten', eintrag_id=e.id), e.date, e.start or '07:00', e.end or '15:30', auto, e, soll_text, weiter, vorschau) }}
 </section>
 <form method="post" action="{{ url_for('loeschen') }}" data-frage="Eintrag vom {{ datum_kurz(e.date) }} wirklich löschen?">
   <input type="hidden" name="_csrf" value="{{ csrf_token() }}">

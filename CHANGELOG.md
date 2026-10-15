@@ -22,6 +22,10 @@ All notable changes to Überzeit Rechner are documented here.
 Desktop 1.9.0, Server-Version 1.4.0 und 1.5.0.
 
 ### Added
+- **Server-Version 1.5.4: Startseite springt beim Laden nicht mehr** — Felder, die nur bei Abwesenheit, eigenem
+  Tagessoll oder Korrektur gebraucht werden, waren beim ersten Zeichnen kurz sichtbar und verschwanden erst durch das
+  Skript; die Pause sprang von 0 auf 30 und die Vorschau zeigte „Berechne …“. Der Server liefert Sichtbarkeit, Pause
+  und Vorschau jetzt schon fertig (Startseite und Bearbeiten), die Eingabe-Karte behält ihre Höhe.
 - **Server-Version 1.5.3: Woche auf der Startseite, Kopfzeile in einer Zeile** — am Rechner steht links unter der
   Stempeluhr die laufende Woche (Mo–So mit Zeiten, Abwesenheit und Tag-Saldo, darunter der Wochensaldo; ein Tag öffnet
   ihn im Kalender), am Handy unter der Eingabe. Seite und Kopf sind am Rechner breiter (1280 px); Marke und Reiter
