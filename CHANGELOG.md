@@ -4,6 +4,13 @@ All notable changes to Überzeit Rechner are documented here.
 
 ---
 
+## Server-Version 1.5.5 – 2026-10-17
+
+- **Offene Datenbankverbindung beim Start** — die Verbindung aus `speicher.schema_anlegen()` blieb offen, weil
+  `teardown_appcontext` in `erstelle_app()` noch nicht eingetragen war; jetzt wird sie dort geschlossen.
+
+---
+
 ## [1.9.3] – 2026-10-14
 
 - **Anmeldezeit wird wieder erkannt (Linux)** — die gebaute App gab ihre mitgelieferten Bibliotheken

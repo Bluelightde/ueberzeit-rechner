@@ -35,7 +35,7 @@ import speicher  # noqa: E402
 from models import BereitschaftEntry, WorkEntry  # noqa: E402
 from speicher import db  # noqa: E402
 
-VERSION = '1.5.4'
+VERSION = '1.5.5'
 ABGLEICH_MAX_TAGE = 1000
 ZEITSTEMPEL = re.compile(r'\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{1,6})?Z')
 log = logging.getLogger('ueberzeit')
@@ -103,6 +103,7 @@ def erstelle_app(test_konfig=None):
     with app.app_context():
         speicher.schema_anlegen()
         erster_start()
+        speicher.schliessen()       # teardown_appcontext ist hier noch nicht eingetragen -- sonst bleibt die Verbindung offen
     for endung in ('', '-wal', '-shm'):
         try:
             os.chmod(app.config['DATENBANK'] + endung, 0o600)
