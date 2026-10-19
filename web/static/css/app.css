@@ -291,6 +291,21 @@ input[type=time]::-webkit-calendar-picker-indicator, input[type=date]::-webkit-c
 .kal a.gewaehlt { box-shadow: inset 0 0 0 2px var(--fg); }
 .kal a .bereit { position: absolute; bottom: 4px; left: 15%; width: 70%; height: 4px; border-radius: 2px; background: #eab308; }
 @media (max-width: 499px) { .kal { gap: 2px; } .kal a { min-height: 52px; border-radius: 6px; } .kal a .fname { display: none; } .kal a .m { font-size: .72rem; letter-spacing: -.02em; } }
+@media (min-width: 900px) {
+  /* Am Rechner füllt der Monat das Fenster (Wunsch 19.10.2026: Heatmap war nur ein flacher Streifen oben): Zeilenhöhe aus
+     der Fensterhöhe abzüglich Kopf, Monatsleiste, Wochentage, Legende, Saldo und Ränder (~380 px), geteilt durch die Wochen des Monats */
+  .kal a, .kal span.leer-tag { min-height: clamp(64px, calc((100vh - 380px - (var(--wochen, 6) - 1) * 4px) / var(--wochen, 6)), 150px); }
+  .kal a { justify-content: flex-start; align-items: flex-start; padding: 8px 10px; text-align: left; font-size: .85rem; }
+  .kal a .t { font-size: 1.05rem; }
+  .kal a .m { margin-top: auto; font-size: .85rem; font-weight: 600; }
+  .kal a .fname { white-space: normal; }
+}
+@media (min-width: 1100px) {
+  /* Gewählter Tag rechts neben dem Monat statt darunter -- kein Scrollen weg vom Kalender */
+  .seite:has(> #tag) { display: grid; grid-template-columns: minmax(0, 1fr) 360px; gap: 0 14px; align-items: start; }
+  .seite:has(> #tag) > :not(.karte) { grid-column: 1 / -1; }
+  .seite:has(> #tag) > #tag { position: sticky; top: 14px; }
+}
 .legende { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: .8rem; color: var(--dim); margin-top: 10px; }
 .legende span { display: inline-flex; align-items: center; gap: 5px; }
 .legende i.farbe { width: 12px; height: 12px; border-radius: 3px; display: inline-block; }
