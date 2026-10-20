@@ -213,7 +213,10 @@ def kalender(alle, bereitschaften, werte, jahr, monat, heute):
             zeile.append({'tag': tag, 'datum': ds, 'minuten': tag_min.get(ds, 0), 'erfasst': ds in hat_eintrag,
                           'typ': tag_typ.get(ds), 'feiertag': feiertage.get(ds),
                           'frei': kern.get_target_minutes_for_date(ds, alle, werte) == 0, 'heute': datum == heute,
-                          'bereitschaft': ds in bereit, 'wochenende': spalte >= 5})
+                          'bereitschaft': ds in bereit, 'wochenende': spalte >= 5,
+                          # Linie läuft durch, wenn der Nachbartag auch Bereitschaft hat (Wunsch 20.10.2026)
+                          'bereit_vorher': (datum - dt.timedelta(days=1)).isoformat() in bereit,
+                          'bereit_nachher': (datum + dt.timedelta(days=1)).isoformat() in bereit})
         wochen.append(zeile)
     return {'wochen': wochen, 'summe': sum(tag_min.values()), 'name': f'{MONATE[monat - 1]} {jahr}'}
 

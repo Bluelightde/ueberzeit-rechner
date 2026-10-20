@@ -24,7 +24,7 @@
           <span class="t">{{ t.tag }}</span>
           {% if t.feiertag %}<span class="fname">{{ t.feiertag }}</span>{% endif %}
           {% if t.erfasst and t.minuten %}<span class="m">({{ zeit(t.minuten, true) }})</span>{% endif %}
-          {% if t.bereitschaft %}<span class="bereit"></span>{% endif %}
+          {% if t.bereitschaft %}<span class="bereit{{ ' weiter-links' if t.bereit_vorher }}{{ ' weiter-rechts' if t.bereit_nachher }}"></span>{% endif %}
         </a>
       {% else %}<span class="leer-tag"></span>{% endif %}
     {% endfor %}{% endfor %}

@@ -18,6 +18,12 @@ All notable changes to Überzeit Rechner are documented here.
 - **Urlaubskonto entfernt** — Anzeige „Urlaub: x/30 Tage übrig“ und Einstellung „Urlaubsanspruch“ sind weg. Die
   Eintragsart „Urlaub“ bleibt.
 
+## Server-Version 1.8.2 – 2026-10-20
+
+- **Bereitschaft als durchgehende Linie** — mehrere Tage Bereitschaft verbinden sich über die Lücken zwischen den
+  Kästchen; abgerundet nur an Anfang und Ende. Am Rechner liegt die Linie bei etwa zwei Dritteln der Höhe über dem
+  Saldo statt am unteren Rand.
+
 ## Server-Version 1.8.1 – 2026-10-20
 
 - **Kalendertag aus einer Zeitspanne zeigt die ganze Spanne** — z. B. „05.10. – 16.10.2026 · Elternzeit · 10 Tage“
