@@ -156,6 +156,21 @@ class EintragenTest(Grundlage):
         self.assertEqual(sorted((e.date, e.entry_type) for e in self.eintraege()),
                          [('2026-10-15', 'sick'), ('2026-10-16', 'sick')])
 
+    def test_bereitschaftslinie_endet_am_rasterrand(self):
+        import types  # pylint: disable=import-outside-toplevel
+        import auswertung as aw  # pylint: disable=import-outside-toplevel
+        b = types.SimpleNamespace(date='2026-10-24', effective_end_date='2026-11-02')
+        k = aw.kalender([], [b], {}, 2026, 10, dt.date(2026, 10, 12))
+        tage = {t['tag']: t for w in k['wochen'] for t in w if t}
+        self.assertTrue(tage[24]['bereit_nachher'])
+        self.assertFalse(tage[25]['bereit_nachher'])   # Sonntag: nächster Tag steht in der nächsten Zeile
+        self.assertFalse(tage[26]['bereit_vorher'])    # Montag: Vortag in der Zeile darüber
+        self.assertTrue(tage[30]['bereit_nachher'])
+        self.assertFalse(tage[31]['bereit_nachher'])   # Monatsende: rechts daneben kein Kästchen
+        k = aw.kalender([], [b], {}, 2026, 11, dt.date(2026, 10, 12))
+        tage = {t['tag']: t for w in k['wochen'] for t in w if t}
+        self.assertFalse(tage[1]['bereit_vorher'])     # Monatsanfang
+
     def test_kalendertag_zeigt_ganze_zeitspanne(self):
         # Wunsch 20.10.2026: ein Tag aus einer mehrtägigen Abwesenheit zeigt im Kalender die ganze Zeitspanne
         self.post('/eintragen', art='parental', datum='2026-10-05', bis='2026-10-16')

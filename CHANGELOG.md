@@ -18,6 +18,11 @@ All notable changes to Überzeit Rechner are documented here.
 - **Urlaubskonto entfernt** — Anzeige „Urlaub: x/30 Tage übrig“ und Einstellung „Urlaubsanspruch“ sind weg. Die
   Eintragsart „Urlaub“ bleibt.
 
+## Server-Version 1.8.3 – 2026-10-20
+
+- **Bereitschaftslinie ragt nicht mehr über den Rand** — am Monatsende und am Zeilenende (Sonntag/Montag) endet die
+  Linie am Kästchen, auch wenn die Bereitschaft weitergeht.
+
 ## Server-Version 1.8.2 – 2026-10-20
 
 - **Bereitschaft als durchgehende Linie** — mehrere Tage Bereitschaft verbinden sich über die Lücken zwischen den

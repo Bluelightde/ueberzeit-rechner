@@ -214,9 +214,12 @@ def kalender(alle, bereitschaften, werte, jahr, monat, heute):
                           'typ': tag_typ.get(ds), 'feiertag': feiertage.get(ds),
                           'frei': kern.get_target_minutes_for_date(ds, alle, werte) == 0, 'heute': datum == heute,
                           'bereitschaft': ds in bereit, 'wochenende': spalte >= 5,
-                          # Linie läuft durch, wenn der Nachbartag auch Bereitschaft hat (Wunsch 20.10.2026)
-                          'bereit_vorher': (datum - dt.timedelta(days=1)).isoformat() in bereit,
-                          'bereit_nachher': (datum + dt.timedelta(days=1)).isoformat() in bereit})
+                          # Linie läuft durch, wenn der Nachbartag auch Bereitschaft hat (Wunsch 20.10.2026),
+                          # aber nur zu einem Kästchen in derselben Zeile – sonst ragt sie über den Rand
+                          'bereit_vorher': spalte > 0 and tag > 1
+                                           and (datum - dt.timedelta(days=1)).isoformat() in bereit,
+                          'bereit_nachher': spalte < 6 and bool(woche[spalte + 1])
+                                            and (datum + dt.timedelta(days=1)).isoformat() in bereit})
         wochen.append(zeile)
     return {'wochen': wochen, 'summe': sum(tag_min.values()), 'name': f'{MONATE[monat - 1]} {jahr}'}
 
