@@ -156,6 +156,19 @@ class EintragenTest(Grundlage):
         self.assertEqual(sorted((e.date, e.entry_type) for e in self.eintraege()),
                          [('2026-10-15', 'sick'), ('2026-10-16', 'sick')])
 
+    def test_kalendertag_zeigt_ganze_zeitspanne(self):
+        # Wunsch 20.10.2026: ein Tag aus einer mehrtägigen Abwesenheit zeigt im Kalender die ganze Zeitspanne
+        self.post('/eintragen', art='parental', datum='2026-10-05', bis='2026-10-16')
+        self.post('/eintragen', art='work', datum='2026-10-20', start='08:00', ende='16:30')
+        ids = ','.join(str(e.id) for e in sorted(self.eintraege(), key=lambda e: e.date) if e.entry_type == 'parental')
+        text = self.c.get('/kalender?monat=2026-10&tag=2026-10-08').text.replace('&amp;', '&')
+        tag = text[text.index('id="tag"'):]
+        self.assertIn('Elternzeit · 10 Tage', tag)
+        self.assertIn(f'/abwesenheit?ids={ids}&', tag)                    # Bearbeiten für den ganzen Block
+        self.assertIn('05.10. – 16.10.2026', tag)
+        einzel = self.c.get('/kalender?monat=2026-10&tag=2026-10-20').text
+        self.assertIn('08:00–16:30', einzel[einzel.index('id="tag"'):])   # Arbeitstag wie bisher
+
     def test_gleitzeitabbau_und_korrektur(self):
         self.post('/eintragen', art='flextime', datum='2026-10-13')
         self.post('/eintragen', art='work', korrektur='1', datum='2026-10-01', minuten='-1:30', anlass='Arzt')

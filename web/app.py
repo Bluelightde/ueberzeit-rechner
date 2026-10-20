@@ -35,7 +35,7 @@ import speicher  # noqa: E402
 from models import BereitschaftEntry, WorkEntry  # noqa: E402
 from speicher import db  # noqa: E402
 
-VERSION = '1.8.0'
+VERSION = '1.8.1'
 ABGLEICH_MAX_TAGE = 1000
 ZEITSTEMPEL = re.compile(r'\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{1,6})?Z')
 log = logging.getLogger('ueberzeit')
@@ -835,7 +835,13 @@ def _routen(app):  # noqa: C901
             return None
         feiertag = kern.get_holidays(int(ds[:4]), werte().get('country', 'DE'), werte().get('state')).get(ds)
         bereit = [b for b in speicher.bereitschaften(bid()) if b.date <= ds <= (b.effective_end_date or b.date)]
-        return {'datum': ds, 'eintraege': sorted([e for e in alle() if e.date == ds], key=lambda e: e.start or ''),
+        # Gehört der Tag zu einer mehrtägigen Abwesenheit, steht die ganze Zeitspanne da (wie in der Liste), mit
+        # Bearbeiten/Löschen für den ganzen Block (Wunsch 20.10.2026)
+        eintraege = sorted([e for e in alle() if e.date == ds], key=lambda e: e.start or '')
+        ids = {e.id for e in eintraege}
+        bloecke = [b for b in aw.bloecke(alle(), werte()) if ids & {e.id for e in b['eintraege']}]
+        bloecke.sort(key=lambda b: (b['erster'].start or '', b['erster'].date))
+        return {'datum': ds, 'eintraege': eintraege, 'bloecke': bloecke,
                 'soll': kern.get_target_minutes_for_date(ds, alle(), werte()), 'feiertag': feiertag,
                 'bereitschaft': bereit, 'anwesenheit': speicher.anwesenheit_tag(bid(), ds)}
 

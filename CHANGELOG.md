@@ -18,6 +18,11 @@ All notable changes to Überzeit Rechner are documented here.
 - **Urlaubskonto entfernt** — Anzeige „Urlaub: x/30 Tage übrig“ und Einstellung „Urlaubsanspruch“ sind weg. Die
   Eintragsart „Urlaub“ bleibt.
 
+## Server-Version 1.8.1 – 2026-10-20
+
+- **Kalendertag aus einer Zeitspanne zeigt die ganze Spanne** — z. B. „05.10. – 16.10.2026 · Elternzeit · 10 Tage“
+  wie in der Liste; Bearbeiten öffnet den ganzen Block.
+
 ## Server-Version 1.8.0 – 2026-10-20
 
 - **Kalender am Rechner: Tag als Popover am Kästchen** — statt rechts daneben (der Monat schrumpfte) öffnet ein
