@@ -18,6 +18,12 @@ All notable changes to Überzeit Rechner are documented here.
 - **Urlaubskonto entfernt** — Anzeige „Urlaub: x/30 Tage übrig“ und Einstellung „Urlaubsanspruch“ sind weg. Die
   Eintragsart „Urlaub“ bleibt.
 
+## Server-Version 1.8.0 – 2026-10-20
+
+- **Kalender am Rechner: Tag als Popover am Kästchen** — statt rechts daneben (der Monat schrumpfte) öffnet ein
+  angeklickter Tag ein Popover direkt neben dem Tag, mit Pfeil; rechts, sonst links. Schließen mit ✕, Esc, Klick
+  daneben oder nochmal auf den Tag. Nach Bearbeiten/Löschen ist es wieder offen. Am Handy unverändert.
+
 ## Server-Version 1.7.0 – 2026-10-20
 
 - **Urlaubskonto entfernt** — „Urlaub: x/30 Tage übrig“ auf der Startseite und „Urlaubstage im Jahr“ in den

@@ -32,13 +32,84 @@
   }
 
   // --- Rückfragen vor dem Absenden (Löschen, Abmelden überall) ---
-  document.querySelectorAll('form[data-frage]').forEach(function (f) {
-    f.addEventListener('submit', function (ev) { if (!window.confirm(f.getAttribute('data-frage'))) ev.preventDefault(); });
+  // (am Dokument statt je Formular: auch für nachgeladene Formulare, z. B. im Tages-Popup des Kalenders)
+  document.addEventListener('submit', function (ev) {
+    var f = ev.target;
+    if (f.matches && f.matches('form[data-frage]') && !window.confirm(f.getAttribute('data-frage'))) ev.preventDefault();
   });
   // Auswahlfelder, die sofort umschalten (Monat, Jahr)
   document.querySelectorAll('form[data-sofort] select').forEach(function (s) {
     s.addEventListener('change', function () { s.form.submit(); });
   });
+
+  // --- Kalender am Rechner: angeklickter Tag als Popover direkt am Tag (Wunsch 20.10.2026) ---
+  // Erst lag der Tag daneben (der Monat schrumpfte), dann als Popup in der Mitte; Micha möchte ihn am Tag selbst.
+  // Ohne JavaScript oder am Handy bleibt es beim Abschnitt unter dem Monat. Der Tag wird nachgeladen (dieselbe Seite
+  // mit ?tag=), sein Abschnitt kommt in einen nicht-modalen <dialog> neben dem Kästchen, mit Pfeil zum Tag. Die
+  // Adresse zeigt den Tag, damit Bearbeiten/Löschen (weiter=…) zurück zum offenen Tag führen; beim Schließen fällt
+  // ?tag= weg. Schließen: ✕, Esc, Klick daneben.
+  var kal = document.querySelector('.kal'), breit = window.matchMedia('(min-width: 900px)');
+  if (kal && window.HTMLDialogElement) {
+    var pop = document.createElement('dialog'), popAn = null, popNr = 0;   // popNr: nur die letzte Anfrage zählt
+    pop.className = 'tag-popover';
+    pop.setAttribute('aria-labelledby', 'tag-popover-titel');
+    document.body.appendChild(pop);
+    var popSetzen = function () {                  // neben das Kästchen: rechts, sonst links; Pfeil zeigt auf den Tag
+      if (!popAn || !pop.open) return;
+      var z = popAn.getBoundingClientRect(), w = pop.offsetWidth, h = pop.offsetHeight, abstand = 12, rand = 12;
+      var rechts = z.right + abstand + w <= window.innerWidth - rand;
+      var x = rechts ? z.right + abstand : Math.max(rand, z.left - abstand - w);
+      var y = Math.min(Math.max(rand, z.top + z.height / 2 - 40), Math.max(rand, window.innerHeight - h - rand));
+      pop.classList.toggle('links', !rechts);
+      pop.style.left = (x + window.scrollX) + 'px';
+      pop.style.top = (y + window.scrollY) + 'px';
+      pop.style.setProperty('--pfeil', Math.min(Math.max(14, z.top + z.height / 2 - y), h - 14) + 'px');
+    };
+    var popZeigen = function (abschnitt, zelle) {
+      abschnitt.removeAttribute('id');
+      var titel = abschnitt.querySelector('h2');
+      if (titel) titel.id = 'tag-popover-titel';
+      pop.innerHTML = '<button type="button" class="symbolknopf tag-popover-zu" aria-label="Schließen"><i class="bi bi-x-lg"></i></button>';
+      pop.appendChild(abschnitt);
+      kal.querySelectorAll('a.gewaehlt').forEach(function (x) { x.classList.remove('gewaehlt'); });
+      zelle.classList.add('gewaehlt');
+      popAn = zelle;
+      if (!pop.open) pop.show();
+      popSetzen();
+    };
+    var direkt = document.getElementById('tag'), direktZelle = kal.querySelector('a.gewaehlt');
+    if (direkt && direktZelle && breit.matches) { window.scrollTo(0, 0); popZeigen(direkt, direktZelle); }
+    kal.addEventListener('click', function (ev) {
+      var a = ev.target.closest('a');
+      if (!a || !breit.matches || ev.ctrlKey || ev.metaKey || ev.shiftKey || ev.button) return;
+      ev.preventDefault();
+      if (pop.open && popAn === a) { pop.close(); return; }   // derselbe Tag nochmal: zu
+      var nr = ++popNr;
+      fetch(a.href, { credentials: 'same-origin' }).then(function (r) {
+        if (!r.ok) throw new Error(r.status);
+        return r.text();
+      }).then(function (html) {
+        if (nr !== popNr) return;                    // inzwischen ein anderer Tag angeklickt
+        var neu = new DOMParser().parseFromString(html, 'text/html').getElementById('tag');
+        if (!neu) { location.href = a.href; return; }
+        popZeigen(document.importNode(neu, true), a);
+        history.replaceState(null, '', a.href.split('#')[0]);
+      }).catch(function () { location.href = a.href; });
+    });
+    pop.addEventListener('click', function (ev) { if (ev.target.closest('.tag-popover-zu')) pop.close(); });
+    document.addEventListener('mousedown', function (ev) {          // daneben geklickt (nicht auf einen anderen Tag)
+      if (pop.open && !pop.contains(ev.target) && !(ev.target.closest && ev.target.closest('.kal a'))) pop.close();
+    });
+    document.addEventListener('keydown', function (ev) { if (ev.key === 'Escape' && pop.open) pop.close(); });
+    window.addEventListener('resize', function () { if (!breit.matches && pop.open) pop.close(); else popSetzen(); });
+    pop.addEventListener('close', function () {
+      kal.querySelectorAll('a.gewaehlt').forEach(function (x) { x.classList.remove('gewaehlt'); });
+      popAn = null;
+      var u = new URL(location.href);
+      u.searchParams.delete('tag'); u.hash = '';
+      history.replaceState(null, '', u.pathname + u.search);
+    });
+  }
 
   // --- Eintragsformular ---
   document.querySelectorAll('form.eintrag-form').forEach(function (form) {

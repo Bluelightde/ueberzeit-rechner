@@ -205,3 +205,27 @@ class Browser(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+
+
+    def test_desktop_tag_als_popup(self):
+        # Am Rechner öffnet ein angeklickter Tag ein Popover direkt am Tag; der Monat bleibt so groß wie vorher (Wunsch 20.10.2026)
+        ctx = self.browser.new_context(viewport={'width': 1440, 'height': 900}, storage_state=self.ctx.storage_state())
+        s = ctx.new_page()
+        s.on('pageerror', lambda e: self.fehler.append(str(e)))
+        try:
+            s.goto(self.url + '/kalender?monat=2026-10')
+            groesse = lambda: s.evaluate("() => document.querySelector('.kal').getBoundingClientRect().width")
+            vorher = groesse()
+            s.click('.kal a[href*="tag=2026-10-14"]')
+            s.wait_for_selector('dialog.tag-popover[open]')
+            self.assertIn('14. Oktober 2026', s.inner_text('dialog.tag-popover h2'))
+            self.assertEqual(groesse(), vorher)
+            self.assertIn('tag=2026-10-14', s.evaluate('location.search'))
+            s.click('.tag-popover-zu')
+            s.wait_for_selector('dialog.tag-popover[open]', state='hidden')
+            self.assertNotIn('tag=', s.evaluate('location.search'))
+            s.goto(self.url + '/kalender?monat=2026-10&tag=2026-10-07#tag')    # direkt (z. B. nach dem Bearbeiten)
+            s.wait_for_selector('dialog.tag-popover[open]')
+            self.assertIn('7. Oktober', s.inner_text('dialog.tag-popover h2'))
+        finally:
+            ctx.close()

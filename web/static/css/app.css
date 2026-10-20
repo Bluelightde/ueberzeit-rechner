@@ -300,12 +300,24 @@ input[type=time]::-webkit-calendar-picker-indicator, input[type=date]::-webkit-c
   .kal a .m { margin-top: auto; font-size: .85rem; font-weight: 600; }
   .kal a .fname { white-space: normal; }
 }
-@media (min-width: 1100px) {
-  /* Gewählter Tag rechts neben dem Monat statt darunter -- kein Scrollen weg vom Kalender */
-  .seite:has(> #tag) { display: grid; grid-template-columns: minmax(0, 1fr) 360px; gap: 0 14px; align-items: start; }
-  .seite:has(> #tag) > :not(.karte) { grid-column: 1 / -1; }
-  .seite:has(> #tag) > #tag { position: sticky; top: 14px; }
-}
+/* Gewählter Tag am Rechner als Popover am Kästchen (app.js setzt left/top und --pfeil; .links = links vom Tag) */
+.tag-popover { position: absolute; inset: auto; margin: 0; width: 360px; max-height: min(70vh, 560px); padding: 0;
+  border: 1px solid var(--line); border-radius: 14px; background: var(--panel); color: var(--fg); overflow: visible;
+  box-shadow: 0 12px 36px rgba(0, 0, 0, .22); z-index: 30;
+  opacity: 0; transform: scale(.97); transform-origin: left var(--pfeil, 40px);
+  transition: opacity .15s, transform .15s, overlay .15s allow-discrete, display .15s allow-discrete; }
+.tag-popover.links { transform-origin: right var(--pfeil, 40px); }
+.tag-popover[open] { opacity: 1; transform: none; }
+@starting-style { .tag-popover[open] { opacity: 0; transform: scale(.97); } }
+@media (prefers-reduced-motion: reduce) { .tag-popover { transition: none; } }
+.tag-popover::before { content: ''; position: absolute; top: calc(var(--pfeil, 40px) - 7px); left: -8px; width: 14px;
+  height: 14px; background: var(--panel); border-left: 1px solid var(--line); border-bottom: 1px solid var(--line);
+  transform: rotate(45deg); }
+.tag-popover.links::before { left: auto; right: -8px; transform: rotate(-135deg); }
+.tag-popover > .karte { margin: 0; border: 0; box-shadow: none; background: transparent; padding: 14px 16px 16px;
+  max-height: min(70vh, 560px); overflow: auto; border-radius: 14px; }
+.tag-popover > .karte > h2:first-child { padding-right: 36px; }
+.tag-popover-zu { position: absolute; top: 6px; right: 6px; z-index: 1; }
 .legende { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: .8rem; color: var(--dim); margin-top: 10px; }
 .legende span { display: inline-flex; align-items: center; gap: 5px; }
 .legende i.farbe { width: 12px; height: 12px; border-radius: 3px; display: inline-block; }
