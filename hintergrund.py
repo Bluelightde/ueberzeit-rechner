@@ -1,9 +1,10 @@
 """
 Mit dem Rechner starten und im Hintergrund weiterlaufen (Wunsch 20.10.2026).
 
-Die App soll nach der Anmeldung von selbst starten, nur als Symbol in der Taskleiste (Infobereich, unter macOS die
-Menüleiste) sitzen und die Anwesenheit an die Server-Version melden. Das Symbol selbst baut main.py (Qt); hier steht
-nur der Autostart, ohne Qt und ohne Fremdpakete, damit er sich testen lässt:
+Die App soll nach der Anmeldung von selbst starten, nur als Symbol in der Taskleiste (Infobereich,
+unter macOS die Menüleiste) sitzen und die Anwesenheit an die Server-Version melden. Das Symbol
+selbst baut main.py (Qt); hier steht nur der Autostart, ohne Qt und ohne Fremdpakete, damit er sich
+testen lässt:
 
     Windows  HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Run  (Wert "UeberzeitRechner")
     Linux    ~/.config/autostart/ueberzeit-rechner.desktop       (XDG, GNOME/KDE/XFCE)
@@ -64,14 +65,16 @@ def autostart_aktiv(plattform=None):
 
 
 def autostart_setzen(an, plattform=None, icon=None):
-    """Trägt den Autostart ein (an=True) oder entfernt ihn. Fehler gehen als OSError an den Aufrufer."""
+    """Trägt den Autostart ein (an=True) oder entfernt ihn. Fehler gehen als OSError hoch."""
     plattform = plattform or sys.platform
     befehl = startbefehl()
     if plattform.startswith("win"):
         import winreg  # pylint: disable=import-outside-toplevel,import-error
-        with winreg.OpenKey(winreg.HKEY_CURRENT_USER, RUN_SCHLUESSEL, 0, winreg.KEY_SET_VALUE) as schluessel:
+        with winreg.OpenKey(winreg.HKEY_CURRENT_USER, RUN_SCHLUESSEL, 0,
+                            winreg.KEY_SET_VALUE) as schluessel:
             if an:
-                winreg.SetValueEx(schluessel, NAME_WINDOWS, 0, winreg.REG_SZ, _windows_befehl(befehl))
+                winreg.SetValueEx(schluessel, NAME_WINDOWS, 0, winreg.REG_SZ,
+                                  _windows_befehl(befehl))
             else:
                 try:
                     winreg.DeleteValue(schluessel, NAME_WINDOWS)
@@ -101,9 +104,10 @@ def autostart_setzen(an, plattform=None, icon=None):
 
 
 def instanz_name(basis):
-    """Name für die Einzelinstanz-Sperre (QLocalServer): je Benutzer und Installationsordner einer."""
+    """Name für eine Einzelinstanz-Sperre: je Benutzer und Installationsordner einer."""
     try:
         wer = getpass.getuser()
     except (KeyError, OSError):
         wer = "user"
-    return "ueberzeit-rechner-" + hashlib.sha1(f"{wer}|{os.path.abspath(basis)}".encode()).hexdigest()[:12]
+    pruef = hashlib.sha1(f"{wer}|{os.path.abspath(basis)}".encode()).hexdigest()[:12]
+    return "ueberzeit-rechner-" + pruef

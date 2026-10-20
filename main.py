@@ -10,11 +10,13 @@ import sqlite3
 import sys
 import threading
 
-from PyQt6.QtCore import (QDate, QDateTime, QLibraryInfo, QLockFile, QObject, Qt, QTimer, QTranslator, QUrl,
+from PyQt6.QtCore import (QDate, QDateTime, QLibraryInfo, QLockFile, QObject, Qt, QTimer,
+                          QTranslator, QUrl,
                           pyqtSignal)
 from PyQt6.QtGui import QColor, QDesktopServices, QIcon, QPalette
 from PyQt6.QtWidgets import (
-    QApplication, QMainWindow, QTabWidget, QMessageBox, QFileDialog, QPushButton, QWidget, QSystemTrayIcon, QMenu
+    QApplication, QMainWindow, QTabWidget, QMessageBox, QFileDialog, QPushButton, QWidget,
+    QSystemTrayIcon, QMenu
 )
 
 # Configuration must be imported before matplotlib for MPLCONFIGDIR
@@ -1295,8 +1297,9 @@ class UeberstundenApp(QMainWindow):
                     hintergrund.autostart_setzen(autostart, icon=ICON_PATH)
                 except OSError as exc:
                     logger.warning("Autostart nicht geändert: %s", exc)
-                    QMessageBox.warning(self, tr("Autostart"),
-                                        tr("Autostart konnte nicht geändert werden:\n{e}").format(e=exc))
+                    QMessageBox.warning(
+                        self, tr("Autostart"),
+                        tr("Autostart konnte nicht geändert werden:\n{e}").format(e=exc))
             self._anwesenheit_melden()
             self._abgleichen()
 
@@ -1312,9 +1315,10 @@ class UeberstundenApp(QMainWindow):
     # --- Lebenszyklus ---
 
     # --- Hintergrund: Symbol in der Taskleiste ---
-    # 🔑 Die Timer (Anwesenheit alle 30 min, Abgleich alle 5 min, Updates) laufen bei verstecktem Fenster weiter --
-    #    die App meldet also auch, wenn niemand sie öffnet. Ohne Infobereich (GNOME ohne AppIndicator-Erweiterung)
-    #    gibt es kein Symbol; dann schließt das Fenster wie früher die App, sonst wäre sie unerreichbar.
+    # 🔑 Die Timer (Anwesenheit alle 30 min, Abgleich alle 5 min, Updates) laufen bei
+    #    verstecktem Fenster weiter -- die App meldet also auch, wenn niemand sie öffnet.
+    #    Ohne Infobereich (GNOME ohne AppIndicator-Erweiterung) gibt es kein Symbol; dann
+    #    schließt das Fenster wie früher die App, sonst wäre sie unerreichbar.
 
     def _hintergrund_an(self):
         return bool(self._tray is not None and self.settings.get("tray_aktiv", True))
@@ -1336,18 +1340,20 @@ class UeberstundenApp(QMainWindow):
         self._tray_anpassen()
 
     def _tray_anpassen(self):
-        """Symbol zeigen/verstecken nach Einstellung; ohne Symbol beendet das letzte Fenster die App."""
+        """Symbol nach Einstellung zeigen; ohne Symbol beendet das letzte Fenster die App."""
         if self._tray is not None:
             self._tray.setVisible(bool(self.settings.get("tray_aktiv", True)))
         QApplication.instance().setQuitOnLastWindowClosed(not self._hintergrund_an())
 
     def _tray_text(self):
         if self._tray is not None:
-            zeilen = ["Überzeit Rechner"] + [t for t in (self.server_status, self.abgleich_status) if t]
+            stand = [t for t in (self.server_status, self.abgleich_status) if t]
+            zeilen = ["Überzeit Rechner"] + stand
             self._tray.setToolTip("\n".join(zeilen))
 
     def _tray_geklickt(self, grund):
-        # macOS öffnet beim Klick in der Menüleiste ohnehin das Menü -- dort nicht zusätzlich das Fenster umschalten
+        # macOS öffnet beim Klick in der Menüleiste ohnehin das Menü -- dort nicht zusätzlich
+        # das Fenster umschalten
         if sys.platform == "darwin" or grund not in (QSystemTrayIcon.ActivationReason.Trigger,
                                                     QSystemTrayIcon.ActivationReason.DoubleClick):
             return
@@ -1375,7 +1381,8 @@ class UeberstundenApp(QMainWindow):
     def _aufraeumen(self):
         """Einmal beim Beenden: Einstellungen, Datenbank, ein fertig geladenes Update einspielen.
 
-        Läuft auch bei aboutToQuit (Abmelden/Herunterfahren mit verstecktem Fenster), deshalb nur einmal."""
+        Läuft auch bei aboutToQuit (Abmelden/Herunterfahren mit verstecktem Fenster), deshalb
+        nur einmal."""
         if self._aufgeraeumt:
             return
         self._aufgeraeumt = True
@@ -1395,7 +1402,8 @@ class UeberstundenApp(QMainWindow):
             if not self.settings.get("tray_hinweis_gezeigt"):
                 self._tray.showMessage("Überzeit Rechner", tr(
                     "Läuft im Hintergrund weiter und meldet die Zeiten an den Server. "
-                    "Beenden über das Symbol in der Taskleiste."), QSystemTrayIcon.MessageIcon.Information, 8000)
+                    "Beenden über das Symbol in der Taskleiste."),
+                    QSystemTrayIcon.MessageIcon.Information, 8000)
                 self.settings["tray_hinweis_gezeigt"] = True
                 self.save_settings()
             return
@@ -1454,9 +1462,10 @@ if __name__ == "__main__":
         logger.debug("Qt-Übersetzung für %s nicht gefunden in %s",
                      current_language(), qt_translations_path)
 
-    # Nur eine laufende App je Installation: Ein zweiter Start (Autostart + Doppelklick) holt das vorhandene Fenster
-    # nach vorn, statt doppelt zu melden und dieselbe Datenbank zweimal zu öffnen. QLockFile erkennt verwaiste Sperren
-    # (Absturz) selbst; die Bitte "zeigen" geht über eine Datei, weil QtNetwork nicht im Paket ist.
+    # Nur eine laufende App je Installation: Ein zweiter Start (Autostart + Doppelklick) holt
+    # das vorhandene Fenster nach vorn, statt doppelt zu melden und die Datenbank zweimal zu öffnen.
+    # QLockFile erkennt verwaiste Sperren (Absturz) selbst; die Bitte "zeigen" geht über eine Datei,
+    # weil QtNetwork nicht im Paket ist.
     im_hintergrund = hintergrund.HINTERGRUND_ARG in sys.argv[1:]
     sperre = QLockFile(os.path.join(BASE_DIR, ".laeuft.lock"))
     sperre.setStaleLockTime(0)
@@ -1468,16 +1477,18 @@ if __name__ == "__main__":
                     _f.write("1")
             except OSError:
                 pass
-        logger.info("Läuft schon – %s", "beendet" if im_hintergrund else "vorhandenes Fenster geholt")
+        logger.info("Läuft schon – %s",
+                    "beendet" if im_hintergrund else "vorhandenes Fenster geholt")
         sys.exit(0)
-    if os.path.exists(zeigen_datei):                 # Rest von früher: nicht gleich das Fenster aufreißen
+    if os.path.exists(zeigen_datei):        # Rest von früher: nicht gleich das Fenster aufreißen
         try:
             os.remove(zeigen_datei)
         except OSError:
             pass
 
     window = UeberstundenApp()
-    if im_hintergrund and window._hintergrund_an() and not window.settings.get("first_run", True):  # pylint: disable=protected-access
+    # pylint: disable-next=protected-access
+    if im_hintergrund and window._hintergrund_an() and not window.settings.get("first_run", True):
         logger.info("Im Hintergrund gestartet (nur Symbol)")
     elif im_hintergrund:
         window.showMinimized()

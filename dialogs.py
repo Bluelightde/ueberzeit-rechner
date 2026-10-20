@@ -536,9 +536,11 @@ class SettingsDialog(QDialog):
         self.server_abgleich_cb.setEnabled(self.server_sync_cb.isChecked())
         self.server_sync_cb.toggled.connect(self.server_abgleich_cb.setEnabled)
         layout.addWidget(self.server_abgleich_cb)
-        # Im Hintergrund weiterlaufen und mit dem Rechner starten (Wunsch 20.10.2026): dann meldet die App die
-        # Zeiten auch, wenn niemand sie öffnet. Der Autostart steht im System (hintergrund.py), nicht in den Einstellungen.
-        self.tray_cb = QCheckBox(tr("Beim Schließen im Hintergrund weiterlaufen (Symbol in der Taskleiste)"))
+        # Im Hintergrund weiterlaufen und mit dem Rechner starten (Wunsch 20.10.2026): dann
+        # meldet die App die Zeiten auch, wenn niemand sie öffnet. Der Autostart steht im
+        # System (hintergrund.py), nicht in den Einstellungen.
+        self.tray_cb = QCheckBox(
+            tr("Beim Schließen im Hintergrund weiterlaufen (Symbol in der Taskleiste)"))
         self.tray_cb.setChecked(current_settings.get("tray_aktiv", True))
         layout.addWidget(self.tray_cb)
         self.autostart_cb = QCheckBox(tr("Mit dem Rechner starten – ohne Fenster, nur als Symbol"))

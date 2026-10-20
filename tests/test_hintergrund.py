@@ -1,4 +1,6 @@
-"""Autostart und Hintergrundbetrieb (hintergrund.py, Schließen ins Taskleisten-Symbol in main.py)."""
+"""Autostart und Hintergrundbetrieb (hintergrund.py, Schließen ins Taskleisten-Symbol, main.py)."""
+# pylint: disable=missing-function-docstring,missing-class-docstring,protected-access
+# pylint: disable=too-many-instance-attributes,attribute-defined-outside-init
 import os
 import plistlib
 import sys
@@ -30,23 +32,25 @@ def test_linux_autostart_datei(tmp_path, monkeypatch):
     hintergrund.autostart_setzen(True, "linux", icon="/home/m/icon.png")
     datei = tmp_path / "autostart" / "ueberzeit-rechner.desktop"
     text = datei.read_text(encoding="utf-8")
-    assert "Exec='/home/m/Über zeit/Überzeit-Rechner' --hintergrund\n" in text   # Leerzeichen im Pfad gequotet
+    # Leerzeichen im Pfad werden gequotet
+    assert "Exec='/home/m/Über zeit/Überzeit-Rechner' --hintergrund\n" in text
     assert "Icon=/home/m/icon.png" in text and text.startswith("[Desktop Entry]\n")
     assert hintergrund.autostart_aktiv("linux")
     hintergrund.autostart_setzen(False, "linux")
     assert not datei.exists() and not hintergrund.autostart_aktiv("linux")
-    hintergrund.autostart_setzen(False, "linux")                                 # schon aus: kein Fehler
+    hintergrund.autostart_setzen(False, "linux")              # schon aus: kein Fehler
 
 
 def test_mac_launch_agent(tmp_path, monkeypatch):
     monkeypatch.setenv("HOME", str(tmp_path))
     monkeypatch.setattr(sys, "frozen", True, raising=False)
-    monkeypatch.setattr(sys, "executable", "/Applications/Überzeit.app/Contents/MacOS/Überzeit-Rechner")
+    programm = "/Applications/Überzeit.app/Contents/MacOS/Überzeit-Rechner"
+    monkeypatch.setattr(sys, "executable", programm)
     hintergrund.autostart_setzen(True, "darwin")
     datei = tmp_path / "Library" / "LaunchAgents" / "de.bluelight.ueberzeit-rechner.plist"
     with open(datei, "rb") as f:
         p = plistlib.load(f)
-    assert p["ProgramArguments"] == ["/Applications/Überzeit.app/Contents/MacOS/Überzeit-Rechner", "--hintergrund"]
+    assert p["ProgramArguments"] == [programm, "--hintergrund"]
     assert p["RunAtLoad"] is True and p["Label"] == "de.bluelight.ueberzeit-rechner"
     assert hintergrund.autostart_aktiv("darwin")
     hintergrund.autostart_setzen(False, "darwin")
@@ -82,7 +86,8 @@ def test_windows_registry(monkeypatch):
     monkeypatch.setattr(sys, "executable", r"C:\Program Files\Überzeit\Überzeit-Rechner.exe")
     assert not hintergrund.autostart_aktiv("win32")
     hintergrund.autostart_setzen(True, "win32")
-    assert werte["UeberzeitRechner"] == r'"C:\Program Files\Überzeit\Überzeit-Rechner.exe" --hintergrund'
+    soll = r'"C:\Program Files\Überzeit\Überzeit-Rechner.exe" --hintergrund'
+    assert werte["UeberzeitRechner"] == soll
     assert hintergrund.autostart_aktiv("win32")
     hintergrund.autostart_setzen(False, "win32")
     assert not werte and not hintergrund.autostart_aktiv("win32")
@@ -115,7 +120,8 @@ class _Fenster:
         self._update_bereit = False
         self.versteckt = self.gespeichert = self.db_zu = 0
         self.meldungen = []
-        self._tray = types.SimpleNamespace(showMessage=lambda *a: self.meldungen.append(a), hide=lambda: None)
+        self._tray = types.SimpleNamespace(showMessage=lambda *a: self.meldungen.append(a),
+                                           hide=lambda: None)
         self.db = types.SimpleNamespace(close=self._db_zu)
 
     def _db_zu(self):

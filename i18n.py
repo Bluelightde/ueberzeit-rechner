@@ -53,14 +53,18 @@ _EN: dict[str, str] = {
     "Typ:": "Type:",
     "Beim Schließen im Hintergrund weiterlaufen (Symbol in der Taskleiste)":
         "Keep running in the background when closed (icon in the taskbar)",
-    "Mit dem Rechner starten – ohne Fenster, nur als Symbol": "Start with the computer – no window, icon only",
+    "Mit dem Rechner starten – ohne Fenster, nur als Symbol":
+        "Start with the computer – no window, icon only",
     "Öffnen": "Open",
     "Jetzt mit dem Server abgleichen": "Sync with the server now",
     "Beenden": "Quit",
     (
         "Läuft im Hintergrund weiter und meldet die Zeiten an den Server. "
         "Beenden über das Symbol in der Taskleiste."
-    ): "Keeps running in the background and reports your times to the server. Quit via the taskbar icon.",
+    ): (
+        "Keeps running in the background and reports your times to the server. "
+        "Quit via the taskbar icon."
+    ),
     "Autostart": "Autostart",
     "Autostart konnte nicht geändert werden:\n{e}": "Could not change autostart:\n{e}",
     "Arbeit": "Work",
