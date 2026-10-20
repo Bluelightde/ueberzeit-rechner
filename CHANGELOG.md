@@ -4,6 +4,32 @@ All notable changes to Überzeit Rechner are documented here.
 
 ---
 
+## [1.10.0] – 2026-10-20
+
+- **Läuft im Hintergrund weiter** — Schließen versteckt das Fenster nur; die App sitzt als Symbol in der Taskleiste
+  (Windows: Infobereich, macOS: Menüleiste, Linux: KDE/XFCE von Haus aus, GNOME mit der Erweiterung „AppIndicator“)
+  und meldet Anwesenheit und Einträge weiter an die Server-Version. Menü am Symbol: Öffnen, Jetzt abgleichen, Beenden.
+  Ohne Infobereich beendet das Schließen die App wie bisher. Einstellung „Beim Schließen im Hintergrund weiterlaufen“.
+- **Mit dem Rechner starten** — Einstellung „Mit dem Rechner starten – ohne Fenster, nur als Symbol“ trägt den
+  Autostart ins System ein (Windows: `HKCU\…\Run`, Linux: `~/.config/autostart`, macOS: LaunchAgent) und startet mit
+  `--hintergrund` (`hintergrund.py`).
+- **Nur eine laufende App** — ein zweiter Start holt das vorhandene Fenster nach vorn (Sperre `.laeuft.lock` neben
+  der Datenbank), statt die Datenbank doppelt zu öffnen.
+- **Urlaubskonto entfernt** — Anzeige „Urlaub: x/30 Tage übrig“ und Einstellung „Urlaubsanspruch“ sind weg. Die
+  Eintragsart „Urlaub“ bleibt.
+
+## Server-Version 1.7.0 – 2026-10-20
+
+- **Urlaubskonto entfernt** — „Urlaub: x/30 Tage übrig“ auf der Startseite und „Urlaubstage im Jahr“ in den
+  Einstellungen. Die Eintragsart „Urlaub“ bleibt.
+
+## Server-Version 1.6.0 – 2026-10-19
+
+- **Kalender am Rechner füllt das Fenster** — Zeilenhöhe aus Fensterhöhe und Wochenzahl; der gewählte Tag steht ab
+  1100 px rechts neben dem Monat.
+
+---
+
 ## Server-Version 1.5.5 – 2026-10-17
 
 - **Offene Datenbankverbindung beim Start** — die Verbindung aus `speicher.schema_anlegen()` blieb offen, weil

@@ -149,7 +149,7 @@ class EintragenTest(Grundlage):
         self.post('/eintragen', art='vacation', datum='2026-10-15', bis='2026-10-20')
         self.assertEqual([e.date for e in sorted(self.eintraege(), key=lambda e: e.date)],
                          ['2026-10-15', '2026-10-16', '2026-10-19', '2026-10-20'])
-        self.assertIn('<b>26/30</b>', self.c.get('/').text)
+        self.assertNotIn('Tage übrig', self.c.get('/').text)   # Urlaubskonto seit 1.7.0 weg
         ids = ','.join(str(e.id) for e in sorted(self.eintraege(), key=lambda e: e.date))
         self.assertIn(f'ids={ids}&', self.c.get('/eintraege?monat=2026-10').text.replace('&amp;', '&'))   # ein Block
         self.post('/abwesenheit', ids=ids, art='sick', von='2026-10-15', bis='2026-10-16')

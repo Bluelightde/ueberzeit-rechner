@@ -10,7 +10,6 @@
   <div class="saldo zahl {{ 'plus' if saldo > 0 else ('minus' if saldo < 0 else '') }}">{{ zeit(saldo) }}</div>
   <div class="unter leise">
     <span>Heute: <b>{{ zeit(tag_saldo, true) if heute_eintraege else ('frei' if soll == 0 else 'Soll ' ~ zeit(soll)) }}</b></span>
-    <span>Urlaub: <b>{{ urlaub.rest }}/{{ urlaub.anspruch }}</b> Tage übrig</span>
     {% if ziel %}<a href="{{ url_for('ziel_seite') }}">Ziel: <b>{{ ziel.prozent }} %</b></a>{% endif %}
   </div>
 </section>

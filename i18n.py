@@ -51,6 +51,18 @@ _EN: dict[str, str] = {
     "Häkchen = Arbeitstag; die Zeit ist das jeweilige Tagessoll.":
         "Check = workday; the time is that day's target.",
     "Typ:": "Type:",
+    "Beim Schließen im Hintergrund weiterlaufen (Symbol in der Taskleiste)":
+        "Keep running in the background when closed (icon in the taskbar)",
+    "Mit dem Rechner starten – ohne Fenster, nur als Symbol": "Start with the computer – no window, icon only",
+    "Öffnen": "Open",
+    "Jetzt mit dem Server abgleichen": "Sync with the server now",
+    "Beenden": "Quit",
+    (
+        "Läuft im Hintergrund weiter und meldet die Zeiten an den Server. "
+        "Beenden über das Symbol in der Taskleiste."
+    ): "Keeps running in the background and reports your times to the server. Quit via the taskbar icon.",
+    "Autostart": "Autostart",
+    "Autostart konnte nicht geändert werden:\n{e}": "Could not change autostart:\n{e}",
     "Arbeit": "Work",
     "Urlaub": "Vacation",
     "Krank": "Sick",
@@ -58,9 +70,6 @@ _EN: dict[str, str] = {
     "Gleitzeitabbau": "Flextime reduction",
     "Elternzeit": "Parental leave",
     "bis:": "to:",
-    "Urlaub: {r}/{e} Tage übrig": "Vacation: {r}/{e} days left",
-    "Urlaubsanspruch:": "Vacation entitlement:",
-    "Tage / Jahr": "days/year",
     " ({n} Tage)": " ({n} days)",
     "Abwesenheit bearbeiten": "Edit absence",
     "Von:": "From:",

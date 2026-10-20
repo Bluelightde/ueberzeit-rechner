@@ -35,7 +35,7 @@ import speicher  # noqa: E402
 from models import BereitschaftEntry, WorkEntry  # noqa: E402
 from speicher import db  # noqa: E402
 
-VERSION = '1.6.0'
+VERSION = '1.7.0'
 ABGLEICH_MAX_TAGE = 1000
 ZEITSTEMPEL = re.compile(r'\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{1,6})?Z')
 log = logging.getLogger('ueberzeit')
@@ -562,7 +562,7 @@ def _routen(app):  # noqa: C901
         return render_template(
             'heute.html', datum=datum, form_datum=form_datum, start=start, ende=ende,
             vorschau=aw.vorschau(alle(), werte(), form_datum, start, ende) if start and ende else None,
-            saldo=aw.saldo(alle()), urlaub=aw.urlaub(alle(), werte(), h.year), ziel=aw.ziel(alle(), werte(), h),
+            saldo=aw.saldo(alle()), ziel=aw.ziel(alle(), werte(), h),
             soll=kern.get_target_minutes_for_date(datum, alle(), werte()), auto=werte().get('auto_break', True),
             heute_eintraege=heute_eintraege, tag_saldo=sum(e.minutes for e in heute_eintraege), lauf=lauf,
             bloecke=aw.bloecke(alle(), werte(), None if monat == 'alle' else monat), monate=monate, monat=monat,
@@ -1024,7 +1024,7 @@ def _routen(app):  # noqa: C901
             f = request.form
             roh = {
                 'default_start': _uhrzeit(f.get('default_start')), 'auto_break': bool(f.get('auto_break')),
-                'max_work_hours': f.get('max_work_hours'), 'vacation_entitlement': f.get('vacation_entitlement'),
+                'max_work_hours': f.get('max_work_hours'),
                 'country': f.get('country'), 'state': f.get('state') or None, 'theme': f.get('theme'),
                 'use_login_time': bool(f.get('use_login_time')),
                 'weekday_targets': [(_uhrzeit(f.get(f'soll_{i}')) or '') if f.get(f'tag_{i}') else ''

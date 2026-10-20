@@ -113,7 +113,7 @@ def pruefen(werte):
     for k in ('auto_break', 'goal_active', 'use_login_time'):
         if k in werte:
             sauber[k] = bool(werte[k])
-    for k, unten, oben in (('max_work_hours', 1, 24), ('vacation_entitlement', 0, 366), ('goal_hours', 0, 100000)):
+    for k, unten, oben in (('max_work_hours', 1, 24), ('goal_hours', 0, 100000)):
         try:
             if k in werte:
                 sauber[k] = max(unten, min(oben, int(werte[k])))

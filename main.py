@@ -10,11 +10,11 @@ import sqlite3
 import sys
 import threading
 
-from PyQt6.QtCore import (QDate, QDateTime, QLibraryInfo, QObject, Qt, QTimer, QTranslator, QUrl,
+from PyQt6.QtCore import (QDate, QDateTime, QLibraryInfo, QLockFile, QObject, Qt, QTimer, QTranslator, QUrl,
                           pyqtSignal)
 from PyQt6.QtGui import QColor, QDesktopServices, QIcon, QPalette
 from PyQt6.QtWidgets import (
-    QApplication, QMainWindow, QTabWidget, QMessageBox, QFileDialog, QPushButton, QWidget
+    QApplication, QMainWindow, QTabWidget, QMessageBox, QFileDialog, QPushButton, QWidget, QSystemTrayIcon, QMenu
 )
 
 # Configuration must be imported before matplotlib for MPLCONFIGDIR
@@ -25,6 +25,7 @@ from dialogs import SettingsDialog, WelcomeDialog
 
 from i18n import current_language, setup_i18n, tr
 import abgleich
+import hintergrund
 import server_sync
 import updater
 from tabs.main_tab import MainTab
@@ -196,6 +197,12 @@ class UeberstundenApp(QMainWindow):
         self._update_timer = QTimer(self)
         self._update_timer.timeout.connect(self._update_pruefen)
         self._update_timer.start(6 * 60 * 60 * 1000)
+
+        # Im Hintergrund weiterlaufen: Symbol in der Taskleiste (Wunsch 20.10.2026)
+        self._tray = None
+        self._wirklich_beenden = False
+        self._aufgeraeumt = False
+        self._tray_einrichten()
 
     def _sync_und_melden(self):
         self._sync_system_sessions()
@@ -606,7 +613,6 @@ class UeberstundenApp(QMainWindow):
                 "parental": "#ec4899",
             },
             "workdays": [0, 1, 2, 3, 4],
-            "vacation_entitlement": 30,
             "special_days": [
                 {"month": 12, "day": 24, "target": "04:00"},
                 {"month": 12, "day": 31, "target": "04:00"}
@@ -1279,9 +1285,18 @@ class UeberstundenApp(QMainWindow):
                 self.tab_bereitschaft.set_db(self.db)
                 self.tab_session.set_db(self.db)
 
+            autostart = bool(new_settings.pop("autostart", False))
             self.settings.update(new_settings)
             self.save_settings()
             self.apply_theme()
+            self._tray_anpassen()
+            if autostart != hintergrund.autostart_aktiv():
+                try:
+                    hintergrund.autostart_setzen(autostart, icon=ICON_PATH)
+                except OSError as exc:
+                    logger.warning("Autostart nicht geändert: %s", exc)
+                    QMessageBox.warning(self, tr("Autostart"),
+                                        tr("Autostart konnte nicht geändert werden:\n{e}").format(e=exc))
             self._anwesenheit_melden()
             self._abgleichen()
 
@@ -1296,13 +1311,96 @@ class UeberstundenApp(QMainWindow):
 
     # --- Lebenszyklus ---
 
-    def closeEvent(self, event):  # pylint: disable=invalid-name
-        """Wird beim Schließen der Anwendung aufgerufen. Speichert Einstellungen und DB."""
+    # --- Hintergrund: Symbol in der Taskleiste ---
+    # 🔑 Die Timer (Anwesenheit alle 30 min, Abgleich alle 5 min, Updates) laufen bei verstecktem Fenster weiter --
+    #    die App meldet also auch, wenn niemand sie öffnet. Ohne Infobereich (GNOME ohne AppIndicator-Erweiterung)
+    #    gibt es kein Symbol; dann schließt das Fenster wie früher die App, sonst wäre sie unerreichbar.
+
+    def _hintergrund_an(self):
+        return bool(self._tray is not None and self.settings.get("tray_aktiv", True))
+
+    def _tray_einrichten(self):
+        if not QSystemTrayIcon.isSystemTrayAvailable():
+            logger.info("Kein Infobereich für ein Taskleisten-Symbol – Schließen beendet die App")
+            return
+        self._tray = QSystemTrayIcon(self.windowIcon(), self)
+        menue = QMenu(self)
+        menue.addAction(tr("Öffnen"), self.zeigen)
+        menue.addAction(tr("Jetzt mit dem Server abgleichen"), self._jetzt_melden)
+        menue.addSeparator()
+        menue.addAction(tr("Beenden"), self.beenden)
+        menue.aboutToShow.connect(self._tray_text)
+        self._tray.setContextMenu(menue)
+        self._tray.activated.connect(self._tray_geklickt)
+        self._tray_text()
+        self._tray_anpassen()
+
+    def _tray_anpassen(self):
+        """Symbol zeigen/verstecken nach Einstellung; ohne Symbol beendet das letzte Fenster die App."""
+        if self._tray is not None:
+            self._tray.setVisible(bool(self.settings.get("tray_aktiv", True)))
+        QApplication.instance().setQuitOnLastWindowClosed(not self._hintergrund_an())
+
+    def _tray_text(self):
+        if self._tray is not None:
+            zeilen = ["Überzeit Rechner"] + [t for t in (self.server_status, self.abgleich_status) if t]
+            self._tray.setToolTip("\n".join(zeilen))
+
+    def _tray_geklickt(self, grund):
+        # macOS öffnet beim Klick in der Menüleiste ohnehin das Menü -- dort nicht zusätzlich das Fenster umschalten
+        if sys.platform == "darwin" or grund not in (QSystemTrayIcon.ActivationReason.Trigger,
+                                                    QSystemTrayIcon.ActivationReason.DoubleClick):
+            return
+        if self.isVisible() and not self.isMinimized():
+            self.hide()
+        else:
+            self.zeigen()
+
+    def _jetzt_melden(self):
+        self._sync_und_melden()
+        self._abgleichen()
+
+    def zeigen(self):
+        """Fenster nach vorn holen (Symbol, zweiter Start der App)."""
+        self.showNormal()
+        self.raise_()
+        self.activateWindow()
+
+    def beenden(self):
+        """Wirklich beenden (Menü am Symbol)."""
+        self._wirklich_beenden = True
+        self.close()
+        QApplication.quit()
+
+    def _aufraeumen(self):
+        """Einmal beim Beenden: Einstellungen, Datenbank, ein fertig geladenes Update einspielen.
+
+        Läuft auch bei aboutToQuit (Abmelden/Herunterfahren mit verstecktem Fenster), deshalb nur einmal."""
+        if self._aufgeraeumt:
+            return
+        self._aufgeraeumt = True
         self.save_settings()
         self.db.close()
+        if self._tray is not None:
+            self._tray.hide()
         if self._update_bereit:
             self._update_installieren()
-        super().closeEvent(event)
+
+    def closeEvent(self, event):  # pylint: disable=invalid-name
+        """Fenster schließen: mit Symbol nur verstecken (läuft weiter), sonst beenden."""
+        if self._hintergrund_an() and not self._wirklich_beenden:
+            event.ignore()
+            self.hide()
+            self.save_settings()
+            if not self.settings.get("tray_hinweis_gezeigt"):
+                self._tray.showMessage("Überzeit Rechner", tr(
+                    "Läuft im Hintergrund weiter und meldet die Zeiten an den Server. "
+                    "Beenden über das Symbol in der Taskleiste."), QSystemTrayIcon.MessageIcon.Information, 8000)
+                self.settings["tray_hinweis_gezeigt"] = True
+                self.save_settings()
+            return
+        self._aufraeumen()
+        QMainWindow.closeEvent(self, event)
 
 
 def _preload_stats_modules():
@@ -1356,8 +1454,47 @@ if __name__ == "__main__":
         logger.debug("Qt-Übersetzung für %s nicht gefunden in %s",
                      current_language(), qt_translations_path)
 
+    # Nur eine laufende App je Installation: Ein zweiter Start (Autostart + Doppelklick) holt das vorhandene Fenster
+    # nach vorn, statt doppelt zu melden und dieselbe Datenbank zweimal zu öffnen. QLockFile erkennt verwaiste Sperren
+    # (Absturz) selbst; die Bitte "zeigen" geht über eine Datei, weil QtNetwork nicht im Paket ist.
+    im_hintergrund = hintergrund.HINTERGRUND_ARG in sys.argv[1:]
+    sperre = QLockFile(os.path.join(BASE_DIR, ".laeuft.lock"))
+    sperre.setStaleLockTime(0)
+    zeigen_datei = os.path.join(BASE_DIR, ".zeigen")
+    if not sperre.tryLock(200):
+        if not im_hintergrund:
+            try:
+                with open(zeigen_datei, "w", encoding="utf-8") as _f:
+                    _f.write("1")
+            except OSError:
+                pass
+        logger.info("Läuft schon – %s", "beendet" if im_hintergrund else "vorhandenes Fenster geholt")
+        sys.exit(0)
+    if os.path.exists(zeigen_datei):                 # Rest von früher: nicht gleich das Fenster aufreißen
+        try:
+            os.remove(zeigen_datei)
+        except OSError:
+            pass
+
     window = UeberstundenApp()
-    window.show()
+    if im_hintergrund and window._hintergrund_an() and not window.settings.get("first_run", True):  # pylint: disable=protected-access
+        logger.info("Im Hintergrund gestartet (nur Symbol)")
+    elif im_hintergrund:
+        window.showMinimized()
+    else:
+        window.show()
+    app.aboutToQuit.connect(window._aufraeumen)  # pylint: disable=protected-access
+
+    def _zeigen_pruefen():
+        if os.path.exists(zeigen_datei):
+            try:
+                os.remove(zeigen_datei)
+            except OSError:
+                pass
+            window.zeigen()
+    _zeigen_timer = QTimer()
+    _zeigen_timer.timeout.connect(_zeigen_pruefen)
+    _zeigen_timer.start(1000)
 
     # matplotlib + StatsTab-Modul im Hintergrund vorladen, damit der erste
     # Klick auf den Statistik-Tab nicht durch den matplotlib-Import blockiert.

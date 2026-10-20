@@ -30,7 +30,6 @@ STANDARD = {
     "max_work_hours": 10,
     "workdays": [0, 1, 2, 3, 4],
     "weekday_targets": ["08:00", "08:00", "08:00", "08:00", "08:00", "", ""],
-    "vacation_entitlement": 30,
     "special_days": [{"month": 12, "day": 24, "target": "04:00"},
                      {"month": 12, "day": 31, "target": "04:00"}],
     "goal_active": False,

@@ -104,12 +104,6 @@ def saldo(alle):
     return sum(e.minutes for e in alle)
 
 
-def urlaub(alle, werte, jahr):
-    genommen = sum(1 for e in alle if e.entry_type == kern.TYPE_VACATION and e.date.startswith(str(jahr)))
-    anspruch = int(werte.get('vacation_entitlement', 30) or 0)
-    return {'genommen': genommen, 'anspruch': anspruch, 'rest': anspruch - genommen}
-
-
 def ziel(alle, werte, heute):
     """Spar-Ziel (wie GoalsTab._update_goal_status). None, wenn kein Ziel aktiv ist."""
     if not werte.get('goal_active'):

@@ -17,6 +17,7 @@ from ui_components import COLOR_BEREITSCHAFT
 from config import APP_VERSION, DB_FILE, ICON_PATH, get_country_list, get_subdivisions
 from i18n import available_languages, get_locale, tr
 from models import WorkEntry
+import hintergrund
 import server_sync
 from logic import calculate_timed_entries, is_midnight_shift, \
     TYPE_WORK, TYPE_VACATION, TYPE_SICK, TYPE_FLEXTIME, TYPE_PARENTAL, \
@@ -123,15 +124,6 @@ class SettingsDialog(QDialog):
         tab_days = QWidget()
         layout_days = QVBoxLayout(tab_days)
         self._setup_workdays_ui(layout_days, current_settings)
-        ent_layout = QHBoxLayout()
-        ent_layout.addWidget(QLabel(tr("Urlaubsanspruch:")))
-        self.vacation_spin = QSpinBox()
-        self.vacation_spin.setRange(0, 365)
-        self.vacation_spin.setValue(current_settings.get("vacation_entitlement", 30))
-        ent_layout.addWidget(self.vacation_spin)
-        ent_layout.addWidget(QLabel(tr("Tage / Jahr")))
-        ent_layout.addStretch()
-        layout_days.addLayout(ent_layout)
         layout_days.addSpacing(10)
         layout_days.addStretch()
         self.tabs.addTab(tab_days, tr("Arbeitstage"))
@@ -544,6 +536,14 @@ class SettingsDialog(QDialog):
         self.server_abgleich_cb.setEnabled(self.server_sync_cb.isChecked())
         self.server_sync_cb.toggled.connect(self.server_abgleich_cb.setEnabled)
         layout.addWidget(self.server_abgleich_cb)
+        # Im Hintergrund weiterlaufen und mit dem Rechner starten (Wunsch 20.10.2026): dann meldet die App die
+        # Zeiten auch, wenn niemand sie öffnet. Der Autostart steht im System (hintergrund.py), nicht in den Einstellungen.
+        self.tray_cb = QCheckBox(tr("Beim Schließen im Hintergrund weiterlaufen (Symbol in der Taskleiste)"))
+        self.tray_cb.setChecked(current_settings.get("tray_aktiv", True))
+        layout.addWidget(self.tray_cb)
+        self.autostart_cb = QCheckBox(tr("Mit dem Rechner starten – ohne Fenster, nur als Symbol"))
+        self.autostart_cb.setChecked(hintergrund.autostart_aktiv())
+        layout.addWidget(self.autostart_cb)
 
         form = QGridLayout()
         form.addWidget(QLabel(tr("Adresse:")), 0, 0)
@@ -776,7 +776,6 @@ class SettingsDialog(QDialog):
             "is_primary_device": self.primary_device_cb.isChecked(),
             "workdays": workdays,
             "weekday_targets": weekday_targets,
-            "vacation_entitlement": self.vacation_spin.value(),
             "special_days": special_days,
             "break_rules": break_rules,
             "bereitschaft_color": self.bereitschaft_color,
@@ -786,6 +785,8 @@ class SettingsDialog(QDialog):
             "server_url": self.server_url_edit.text().strip().rstrip("/"),
             "server_token": self.server_token_edit.text().strip(),
             "server_abgleich": self.server_abgleich_cb.isChecked(),
+            "tray_aktiv": self.tray_cb.isChecked(),
+            "autostart": self.autostart_cb.isChecked(),
             "update_auto": self.update_auto_cb.isChecked(),
         }
 

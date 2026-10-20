@@ -151,7 +151,7 @@ class MainTab(QWidget):  # pylint: disable=too-many-public-methods
         btn_add.clicked.connect(self.add_entry)
         input_row1.addWidget(btn_add)
 
-        # Eintragstyp-Auswahl und Urlaubskonto-Anzeige
+        # Eintragstyp-Auswahl (das Urlaubskonto daneben ist seit 1.10.0 weg, Wunsch 20.10.2026)
         input_row2 = QHBoxLayout()
         self.type_combo = QComboBox()
         self.type_combo.addItem(tr("Arbeit"), TYPE_WORK)
@@ -163,9 +163,6 @@ class MainTab(QWidget):  # pylint: disable=too-many-public-methods
         input_row2.addWidget(QLabel(tr("Typ:")))
         input_row2.addWidget(self.type_combo)
         input_row2.addStretch()
-        self.lbl_vacation = QLabel("")
-        self.lbl_vacation.setStyleSheet("color: gray; font-size: 11px;")
-        input_row2.addWidget(self.lbl_vacation)
         frame_layout.addLayout(input_row2)
 
         frame_layout.addLayout(input_row1)
@@ -257,7 +254,6 @@ class MainTab(QWidget):  # pylint: disable=too-many-public-methods
         self.entries = entries
         self.update_ui()
         self.update_live_calc()
-        self._update_vacation_summary()
 
     def set_filter(self, month_str):
         """Setzt den Monatsfilter ohne das filter_changed-Signal auszulösen.
@@ -321,7 +317,6 @@ class MainTab(QWidget):  # pylint: disable=too-many-public-methods
         if not is_work:
             self.date_end_edit.setDate(self.date_edit.date())
         self.update_live_calc()
-        self._update_vacation_summary()
 
     def recalculate_day(self, date_str):
         """Verteilt Pausen und Überstunden für alle Zeiteinträge eines Tages neu.
@@ -761,19 +756,8 @@ class MainTab(QWidget):  # pylint: disable=too-many-public-methods
         for dd in affected_dates:
             self.recalculate_day(dd)
 
-        self._update_vacation_summary()
         self.data_changed.emit()
 
-
-    def _update_vacation_summary(self):
-        """Aktualisiert die Urlaubskonto-Anzeige (verbrauchte/verfügbare Tage)."""
-        current_year = str(QDate.currentDate().year())
-        used = sum(1 for e in self.entries
-                   if e.entry_type == TYPE_VACATION and e.date.startswith(current_year))
-        entitlement = self.settings.get("vacation_entitlement", 30)
-        remaining = entitlement - used
-        self.lbl_vacation.setText(tr("Urlaub: {r}/{e} Tage übrig").format(
-            r=remaining, e=entitlement))
 
     def edit_entry(self, row, _column):
         """Doppelklick: öffnet den passenden Bearbeiten-Dialog für die Zeile."""
@@ -817,7 +801,6 @@ class MainTab(QWidget):  # pylint: disable=too-many-public-methods
         self.entries = self.db.load_all()
         for ds in sorted(set(old_dates + new_dates)):
             self.recalculate_day(ds)
-        self._update_vacation_summary()
         self.data_changed.emit()
 
     def _open_edit_dialog(self, entry):
