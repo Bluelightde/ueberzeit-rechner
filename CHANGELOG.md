@@ -18,6 +18,10 @@ All notable changes to Überzeit Rechner are documented here.
 - **Urlaubskonto entfernt** — Anzeige „Urlaub: x/30 Tage übrig“ und Einstellung „Urlaubsanspruch“ sind weg. Die
   Eintragsart „Urlaub“ bleibt.
 
+## Server-Version 1.9.1 – 2026-10-21
+
+- Werkzeug 3.1.9 (Sicherheitsupdate, CVE-2026-102598: `safe_join()` unter Windows – der Server läuft unter Linux).
+
 ## Server-Version 1.9.0 – 2026-10-21
 
 - **Bereitschaft im Tages-Popup** — eigene Zeile mit Zeitspanne, Uhrzeit (oder „ganztägig“), Notiz und Löschen;
