@@ -18,6 +18,7 @@
   <link rel="stylesheet" href="{{ url_for('static', filename='vendor/bootstrap-icons/bootstrap-icons.min.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/uhr.css') }}?v={{ version }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}?v={{ version }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/frage.css') }}?v={{ version }}">
 </head>
 <body data-csrf="{{ csrf_token() if benutzer else '' }}">
 {% set seite = request.endpoint %}
@@ -54,6 +55,7 @@
 {# Eigene Uhr statt <input type="time"> (wie Notizen/Vorratsliste, geteilt über gemeinsam.py): die Android-Uhr ist
    ein Systemfenster, das sich nicht gestalten lässt und auf dem Pixel über den Rand ragte #}
 <script src="{{ url_for('static', filename='js/uhr.js') }}?v={{ version }}"></script>
+<script src="{{ url_for('static', filename='js/frage.js') }}?v={{ version }}"></script>
 <script src="{{ url_for('static', filename='js/app.js') }}?v={{ version }}"></script>
 </body>
 </html>

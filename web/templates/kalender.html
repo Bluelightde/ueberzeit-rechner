@@ -1,5 +1,5 @@
 {% extends 'base.html' %}
-{% from '_teile.html' import betrag, block_zeile with context %}
+{% from '_teile.html' import betrag, block_zeile, bereitschaft_zeile with context %}
 {% block titel %}Kalender{% endblock %}
 {% block inhalt %}
 <section class="karte">
@@ -43,10 +43,10 @@
 <section class="karte" id="tag">
   <h2>{{ datum_lang(tag_eintraege.datum) }}</h2>
   <p class="leise klein" style="margin-top:-4px">{% if tag_eintraege.feiertag %}{{ tag_eintraege.feiertag }} · {% endif %}Soll {{ zeit(tag_eintraege.soll) if tag_eintraege.soll else 'frei' }}
-    {% if tag_eintraege.anwesenheit %} · Am Rechner {{ tag_eintraege.anwesenheit.start or '—' }}–{{ tag_eintraege.anwesenheit.end or '—' }}{% endif %}
-    {% for b in tag_eintraege.bereitschaft %} · Bereitschaft{% if b.start %} {{ b.start }}–{{ b.end }}{% endif %}{% if b.note %} ({{ b.note }}){% endif %}{% endfor %}</p>
-  {% if tag_eintraege.bloecke %}
-  <ul class="liste">{% for b in tag_eintraege.bloecke %}{{ block_zeile(b, request.full_path) }}{% endfor %}</ul>
+    {% if tag_eintraege.anwesenheit %} · Am Rechner {{ tag_eintraege.anwesenheit.start or '—' }}–{{ tag_eintraege.anwesenheit.end or '—' }}{% endif %}</p>
+  {% if tag_eintraege.bloecke or tag_eintraege.bereitschaft %}
+  <ul class="liste">{% for b in tag_eintraege.bloecke %}{{ block_zeile(b, request.full_path) }}{% endfor %}
+    {%- for b in tag_eintraege.bereitschaft %}{{ bereitschaft_zeile(b, request.full_path) }}{% endfor %}</ul>
   {% else %}<p class="leise">Kein Eintrag.</p>{% endif %}
   <a class="knopf leise breit" href="{{ url_for('heute_seite', datum=tag_eintraege.datum) }}#eintragen" data-datum="{{ tag_eintraege.datum }}"><i class="bi bi-plus"></i> Für diesen Tag eintragen</a>
 </section>

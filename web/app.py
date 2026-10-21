@@ -35,7 +35,7 @@ import speicher  # noqa: E402
 from models import BereitschaftEntry, WorkEntry  # noqa: E402
 from speicher import db  # noqa: E402
 
-VERSION = '1.8.3'
+VERSION = '1.9.0'
 ABGLEICH_MAX_TAGE = 1000
 ZEITSTEMPEL = re.compile(r'\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{1,6})?Z')
 log = logging.getLogger('ueberzeit')
@@ -904,7 +904,7 @@ def _routen(app):  # noqa: C901
     def bereitschaft_loeschen(b_id):
         speicher.bereitschaft_loeschen(bid(), b_id)
         db().commit()
-        return _gespeichert('Bereitschaft gelöscht.', url_for('bereitschaft'))
+        return _gespeichert('Bereitschaft gelöscht.', request.form.get('weiter') or url_for('bereitschaft'))
 
     # --- Mehr, Einstellungen, Austausch ---
 

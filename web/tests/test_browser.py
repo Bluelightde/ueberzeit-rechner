@@ -207,6 +207,30 @@ if __name__ == '__main__':
     unittest.main()
 
 
+    def test_rueckfrage_als_dialog(self):
+        # 21.10.2026 (Wunsch Micha): Rückfrage im Design der App (frage.js) statt Browserfenster
+        s = self.seite
+        fenster = []
+        s.on('dialog', lambda d: (fenster.append(d.message), d.dismiss()))
+        s.goto(self.url + '/bereitschaft')
+        s.fill('#notiz', 'Dialogprobe')
+        s.click('form button[type=submit]:has-text("Eintragen")')
+        s.wait_for_selector('.meldung')
+        knopf = s.locator('li:has-text("Dialogprobe") form[data-frage] button')
+        knopf.click()
+        s.wait_for_selector('dialog.frage[open]')
+        self.assertIn('löschen?', s.inner_text('dialog.frage'))
+        self.assertLessEqual(s.evaluate("document.querySelector('dialog.frage').getBoundingClientRect().right"), 390)
+        s.click('dialog.frage .frage-nein')
+        s.wait_for_selector('dialog.frage', state='hidden')
+        self.assertEqual(s.locator('li:has-text("Dialogprobe")').count(), 1)
+        knopf.click()
+        s.wait_for_selector('dialog.frage[open]')
+        with s.expect_navigation():
+            s.keyboard.press('Enter')
+        self.assertEqual(s.locator('li:has-text("Dialogprobe")').count(), 0)
+        self.assertEqual(fenster, [])
+
     def test_desktop_tag_als_popup(self):
         # Am Rechner öffnet ein angeklickter Tag ein Popover direkt am Tag; der Monat bleibt so groß wie vorher (Wunsch 20.10.2026)
         ctx = self.browser.new_context(viewport={'width': 1440, 'height': 900}, storage_state=self.ctx.storage_state())

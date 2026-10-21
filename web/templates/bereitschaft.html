@@ -1,4 +1,5 @@
 {% extends 'base.html' %}
+{% from '_teile.html' import bereitschaft_zeile with context %}
 {% block titel %}Bereitschaft{% endblock %}
 {% block inhalt %}
 <section class="karte">
@@ -21,13 +22,7 @@
   <h2>Eingetragen</h2>
   {% if liste %}
   <ul class="liste">
-    {% for b in liste %}
-    <li><span class="symbol" style="background:rgba(234,179,8,.18);color:#b58500"><i class="bi bi-telephone"></i></span>
-      <span class="mitte"><span class="oben">{{ datum_kurz(b.date) }}{% if b.end_date and b.end_date != b.date %} – {{ datum_kurz(b.end_date) }}{% endif %}</span><br>
-        <span class="unten">{% if b.start %}{{ b.start }}–{{ b.end }}{% else %}ganztägig{% endif %}{% if b.note %} · {{ b.note }}{% endif %}</span></span>
-      <form method="post" action="{{ url_for('bereitschaft_loeschen', b_id=b.id) }}" data-frage="Bereitschaft vom {{ datum_kurz(b.date) }} löschen?">
-        <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
-        <button class="symbolknopf" type="submit" aria-label="Löschen"><i class="bi bi-trash"></i></button></form></li>
+    {% for b in liste %}{{ bereitschaft_zeile(b) }}
     {% endfor %}
   </ul>
   {% else %}<div class="leer"><i class="bi bi-telephone"></i>Noch keine Bereitschaft eingetragen.</div>{% endif %}

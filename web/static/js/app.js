@@ -32,11 +32,8 @@
   }
 
   // --- Rückfragen vor dem Absenden (Löschen, Abmelden überall) ---
-  // (am Dokument statt je Formular: auch für nachgeladene Formulare, z. B. im Tages-Popup des Kalenders)
-  document.addEventListener('submit', function (ev) {
-    var f = ev.target;
-    if (f.matches && f.matches('form[data-frage]') && !window.confirm(f.getAttribute('data-frage'))) ev.preventDefault();
-  });
+  // macht frage.js am Dokument (form[data-frage]) -- auch für nachgeladene Formulare, z. B. im Tages-Popup des
+  // Kalenders; als Dialog im Design der App statt Browserfenster (21.10.2026)
   // Auswahlfelder, die sofort umschalten (Monat, Jahr)
   document.querySelectorAll('form[data-sofort] select').forEach(function (s) {
     s.addEventListener('change', function () { s.form.submit(); });

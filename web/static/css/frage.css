@@ -1,0 +1,48 @@
+/* Gemeinsame Rückfrage der Homelab-Apps (21.10.2026) -- gehört zu frage.js, geteilt über ~/bin/gemeinsam.py.
+   Farben: --frage-* der App, sonst die Uhr-Farben (--uhr-*), sonst neutrale Vorgaben für hell/dunkel.
+   🔑 Am Dialog aufgelöst, nicht an :root -- die Apps schalten Dunkel per Attribut (data-bs-theme/data-theme);
+      an :root berechnet, blieben die hellen Werte stehen, wenn das Attribut tiefer im Baum sitzt. */
+dialog.frage {
+  --frage-u-flaeche: var(--frage-flaeche, var(--uhr-flaeche, #ffffff));
+  --frage-u-text: var(--frage-text, var(--uhr-text, #1f2328));
+  --frage-u-linie: var(--frage-linie, var(--uhr-linie, #d8dde3));
+  --frage-u-akzent: var(--frage-akzent, var(--uhr-akzent, #2563eb));
+  --frage-u-akzent-text: var(--frage-akzent-text, var(--uhr-akzent-text, #ffffff));
+  --frage-u-radius: var(--frage-radius, 16px);
+  --frage-u-knopf-radius: var(--frage-knopf-radius, 10px);
+}
+@media (prefers-color-scheme: dark) {
+  dialog.frage {
+    --frage-u-flaeche: var(--frage-flaeche, var(--uhr-flaeche, #1f2428));
+    --frage-u-text: var(--frage-text, var(--uhr-text, #e8eaed));
+    --frage-u-linie: var(--frage-linie, var(--uhr-linie, #3a4148));
+    --frage-u-akzent: var(--frage-akzent, var(--uhr-akzent, #60a5fa));
+    --frage-u-akzent-text: var(--frage-akzent-text, var(--uhr-akzent-text, #0b1220));
+  }
+}
+
+dialog.frage {
+  box-sizing: border-box; width: min(26rem, calc(100vw - 32px)); margin: auto; padding: 20px 20px 16px;
+  border: 1px solid var(--frage-u-linie); border-radius: var(--frage-u-radius);
+  background: var(--frage-u-flaeche); color: var(--frage-u-text);
+  font: inherit; box-shadow: 0 18px 50px rgba(0, 0, 0, .28);
+}
+dialog.frage::backdrop { background: rgba(0, 0, 0, .45); }
+dialog.frage[open] { animation: frage-auf .16s ease-out; }
+@keyframes frage-auf { from { opacity: 0; transform: translateY(6px) scale(.98); } }
+@media (prefers-reduced-motion: reduce) { dialog.frage[open] { animation: none; } }
+
+.frage-text { margin: 0 0 16px; font-size: 1rem; line-height: 1.45; white-space: pre-line; overflow-wrap: anywhere; }
+.frage-feld {
+  box-sizing: border-box; width: 100%; margin: 0 0 16px; padding: 10px 12px; font: inherit; font-size: .9rem;
+  border: 1px solid var(--frage-u-linie); border-radius: 10px; background: transparent; color: inherit;
+}
+.frage-knoepfe { display: flex; justify-content: flex-end; gap: 8px; flex-wrap: wrap; }
+.frage-knoepfe button {
+  min-height: 44px; padding: 0 18px; border-radius: var(--frage-u-knopf-radius); font: inherit; font-weight: 600; cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.frage-nein { background: transparent; color: var(--frage-u-text); border: 1px solid var(--frage-u-linie); }
+.frage-ja { /* --frage-akzent-hintergrund: z. B. der Verlauf der Hauptknöpfe einer App */
+  background: var(--frage-akzent-hintergrund, var(--frage-u-akzent)); color: var(--frage-u-akzent-text); border: 1px solid transparent; }
+.frage-knoepfe button:focus-visible { outline: 2px solid var(--frage-u-akzent); outline-offset: 2px; }

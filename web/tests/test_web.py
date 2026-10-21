@@ -171,6 +171,20 @@ class EintragenTest(Grundlage):
         tage = {t['tag']: t for w in k['wochen'] for t in w if t}
         self.assertFalse(tage[1]['bereit_vorher'])     # Monatsanfang
 
+    def test_kalendertag_zeigt_bereitschaft_als_zeile(self):
+        # Wunsch 20.10.2026: Bereitschaft im Tag (Popup) als eigene Zeile mit Zeitspanne und Löschen
+        self.post('/bereitschaft', von='2026-10-15', bis='2026-10-18', start='18:00', ende='07:00', notiz='Netz')
+        text = self.c.get('/kalender?monat=2026-10&tag=2026-10-16').text
+        tag = text[text.index('id="tag"'):]
+        self.assertIn('Bereitschaft · 15.10. – 18.10.2026', tag)
+        self.assertIn('18:00–07:00 · Netz', tag)
+        self.assertNotIn('Kein Eintrag.', tag)
+        b_id = re.search(r'/bereitschaft/(\d+)/loeschen', tag).group(1)
+        r = self.post(f'/bereitschaft/{b_id}/loeschen', weiter='/kalender?monat=2026-10&tag=2026-10-16')
+        self.assertEqual(r.headers['Location'], '/kalender?monat=2026-10&tag=2026-10-16')   # zurück zum Tag
+        tag = self.c.get('/kalender?monat=2026-10&tag=2026-10-16').text
+        self.assertIn('Kein Eintrag.', tag[tag.index('id="tag"'):])
+
     def test_kalendertag_zeigt_ganze_zeitspanne(self):
         # Wunsch 20.10.2026: ein Tag aus einer mehrtägigen Abwesenheit zeigt im Kalender die ganze Zeitspanne
         self.post('/eintragen', art='parental', datum='2026-10-05', bis='2026-10-16')
