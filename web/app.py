@@ -35,7 +35,7 @@ import speicher  # noqa: E402
 from models import BereitschaftEntry, WorkEntry  # noqa: E402
 from speicher import db  # noqa: E402
 
-VERSION = '1.9.3'
+VERSION = '1.9.4'
 ABGLEICH_MAX_TAGE = 1000
 ZEITSTEMPEL = re.compile(r'\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{1,6})?Z')
 log = logging.getLogger('ueberzeit')
@@ -307,7 +307,7 @@ def _sicheres_ziel(ziel):
     return url_for('heute_seite') if teile.scheme or teile.netloc else ziel
 
 
-CSP = ("default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; "
+CSP = ("default-src 'self'; script-src 'self' 'inline-speculation-rules'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; "
        "connect-src 'self'; font-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'; "
        "manifest-src 'self'; form-action 'self'")
 
@@ -437,8 +437,8 @@ def _routen(app):  # noqa: C901
     def service_worker():
         js = render_template('sw.js', version=VERSION,
                              vorab=[url_for('static', filename=f) + f'?v={VERSION}'
-                                    for f in ('css/app.css', 'js/app.js', 'js/thema.js', 'icons/icon.svg')]
-                                   + [url_for('static', filename='vendor/bootstrap-icons/bootstrap-icons.min.css')],
+                                    for f in ('css/app.css', 'js/app.js', 'js/thema.js', 'icons/icon.svg',
+                                              'vendor/bootstrap-icons/bootstrap-icons.min.css')],
                              nie=['/anmelden', '/abmelden', '/ueberall-abmelden', '/version', '/sw.js', '/api',
                                   '/export'])
         return app.response_class(js, mimetype='application/javascript', headers={'Cache-Control': 'no-cache'})
