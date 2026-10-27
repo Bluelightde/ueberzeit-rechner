@@ -18,6 +18,13 @@ All notable changes to Überzeit Rechner are documented here.
 - **Urlaubskonto entfernt** — Anzeige „Urlaub: x/30 Tage übrig“ und Einstellung „Urlaubsanspruch“ sind weg. Die
   Eintragsart „Urlaub“ bleibt.
 
+## Server-Version 1.9.2 – 2026-10-27
+
+- **Kalender am Handy ohne Sprung** — ein angetippter Tag kommt als Blatt von unten, statt die Seite neu zu laden und
+  zum Abschnitt unter dem Monat zu springen. Schließen mit ✕, Tippen daneben oder Zurück. Am Rechner bleibt das
+  Popover am Tag.
+- Browsertests: zwei Tests (Rückfrage-Dialog, Tages-Popover) standen hinter `if __name__ == '__main__'` und liefen nie.
+
 ## Server-Version 1.9.1 – 2026-10-21
 
 - Werkzeug 3.1.9 (Sicherheitsupdate, CVE-2026-102598: `safe_join()` unter Windows – der Server läuft unter Linux).

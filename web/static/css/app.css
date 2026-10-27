@@ -316,7 +316,7 @@ input[type=time]::-webkit-calendar-picker-indicator, input[type=date]::-webkit-c
 .tag-popover.links { transform-origin: right var(--pfeil, 40px); }
 .tag-popover[open] { opacity: 1; transform: none; }
 @starting-style { .tag-popover[open] { opacity: 0; transform: scale(.97); } }
-@media (prefers-reduced-motion: reduce) { .tag-popover { transition: none; } }
+@media (prefers-reduced-motion: reduce) { .tag-popover, .tag-popover.blatt { transition: none; } }
 .tag-popover::before { content: ''; position: absolute; top: calc(var(--pfeil, 40px) - 7px); left: -8px; width: 14px;
   height: 14px; background: var(--panel); border-left: 1px solid var(--line); border-bottom: 1px solid var(--line);
   transform: rotate(45deg); }
@@ -325,6 +325,20 @@ input[type=time]::-webkit-calendar-picker-indicator, input[type=date]::-webkit-c
   max-height: min(70vh, 560px); overflow: auto; border-radius: 14px; }
 .tag-popover > .karte > h2:first-child { padding-right: 36px; }
 .tag-popover-zu { position: absolute; top: 6px; right: 6px; z-index: 1; }
+/* Am Handy dasselbe als Blatt von unten (app.js setzt .blatt und öffnet modal); kein Pfeil, Seite dahinter steht still */
+.tag-popover.blatt { position: fixed; inset: auto 0 0 0; width: 100%; max-width: 640px; margin: 0 auto;
+  max-height: 85dvh; border-radius: 18px 18px 0 0; border-bottom: 0; overflow: hidden;
+  padding-bottom: env(safe-area-inset-bottom); transform: translateY(100%); opacity: 1;
+  transition: transform .22s ease-out, overlay .22s allow-discrete, display .22s allow-discrete; }
+.tag-popover.blatt[open] { transform: none; }
+@starting-style { .tag-popover.blatt[open] { transform: translateY(100%); opacity: 1; } }
+.tag-popover.blatt::before { content: ''; position: static; display: block; width: 40px; height: 4px; margin: 8px auto 0;
+  border: 0; border-radius: 2px; background: var(--line); transform: none; }
+.tag-popover.blatt::backdrop { background: rgba(0, 0, 0, .4); }
+.tag-popover.blatt > .karte { max-height: calc(85dvh - 12px); padding-top: 10px; }
+.tag-popover.blatt > .karte > h2:first-child { padding-right: 0; margin-right: 52px; }   /* Linie endet vor dem ✕ */
+.tag-popover.blatt .tag-popover-zu { top: 12px; right: 10px; }
+html:has(.tag-popover.blatt[open]) { overflow: hidden; }
 .legende { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: .8rem; color: var(--dim); margin-top: 10px; }
 .legende span { display: inline-flex; align-items: center; gap: 5px; }
 .legende i.farbe { width: 12px; height: 12px; border-radius: 3px; display: inline-block; }

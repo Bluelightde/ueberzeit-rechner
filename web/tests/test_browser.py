@@ -203,9 +203,6 @@ class Browser(unittest.TestCase):
             ctx.close()
 
 
-if __name__ == '__main__':
-    unittest.main()
-
 
     def test_rueckfrage_als_dialog(self):
         # 21.10.2026 (Wunsch Micha): Rückfrage im Design der App (frage.js) statt Browserfenster
@@ -231,6 +228,29 @@ if __name__ == '__main__':
         self.assertEqual(s.locator('li:has-text("Dialogprobe")').count(), 0)
         self.assertEqual(fenster, [])
 
+    def test_handy_tag_als_blatt_ohne_sprung(self):
+        # Am Handy kein Neuladen und kein Sprung zum Abschnitt unter dem Monat, sondern ein Blatt von unten (27.10.2026)
+        s = self.seite
+        s.goto(self.url + '/kalender?monat=2026-10')
+        s.evaluate('window.scrollTo(0, 120); window.geladen = 1')
+        oben = s.evaluate('window.scrollY')
+        s.click('.kal a[href*="tag=2026-10-14"]')
+        s.wait_for_selector('dialog.tag-popover.blatt[open]')
+        self.assertEqual(s.evaluate('window.geladen'), 1, 'Seite neu geladen')
+        self.assertEqual(s.evaluate('window.scrollY'), oben, 'Seite gesprungen')
+        self.assertIn('14. Oktober 2026', s.text_content('dialog.tag-popover h2'))
+        s.wait_for_function("() => document.querySelector('dialog.tag-popover').getAnimations().length === 0")
+        box = s.locator('dialog.tag-popover').bounding_box()
+        self.assertAlmostEqual(box['y'] + box['height'], HANDY['height'], delta=2)   # unten angesetzt
+        self.assertIn('tag=2026-10-14', s.evaluate('location.search'))
+        s.mouse.click(HANDY['width'] / 2, 40)                                       # auf den abgedunkelten Rest
+        s.wait_for_selector('dialog.tag-popover[open]', state='hidden')
+        s.wait_for_function("() => !location.search.includes('tag=')")       # close-Ereignis kommt danach
+        s.goto(self.url + '/kalender?monat=2026-10&tag=2026-10-07#tag')            # direkt (z. B. nach dem Bearbeiten)
+        s.wait_for_selector('dialog.tag-popover.blatt[open]')
+        self.assertIn('7. Oktober', s.text_content('dialog.tag-popover h2'))
+        self.assertEqual(s.evaluate('window.scrollY'), 0)
+
     def test_desktop_tag_als_popup(self):
         # Am Rechner öffnet ein angeklickter Tag ein Popover direkt am Tag; der Monat bleibt so groß wie vorher (Wunsch 20.10.2026)
         ctx = self.browser.new_context(viewport={'width': 1440, 'height': 900}, storage_state=self.ctx.storage_state())
@@ -242,14 +262,18 @@ if __name__ == '__main__':
             vorher = groesse()
             s.click('.kal a[href*="tag=2026-10-14"]')
             s.wait_for_selector('dialog.tag-popover[open]')
-            self.assertIn('14. Oktober 2026', s.inner_text('dialog.tag-popover h2'))
+            self.assertIn('14. Oktober 2026', s.text_content('dialog.tag-popover h2'))
             self.assertEqual(groesse(), vorher)
             self.assertIn('tag=2026-10-14', s.evaluate('location.search'))
             s.click('.tag-popover-zu')
             s.wait_for_selector('dialog.tag-popover[open]', state='hidden')
-            self.assertNotIn('tag=', s.evaluate('location.search'))
+            s.wait_for_function("() => !location.search.includes('tag=')")   # close-Ereignis kommt danach
             s.goto(self.url + '/kalender?monat=2026-10&tag=2026-10-07#tag')    # direkt (z. B. nach dem Bearbeiten)
             s.wait_for_selector('dialog.tag-popover[open]')
-            self.assertIn('7. Oktober', s.inner_text('dialog.tag-popover h2'))
+            self.assertIn('7. Oktober', s.text_content('dialog.tag-popover h2'))
         finally:
             ctx.close()
+
+
+if __name__ == '__main__':
+    unittest.main()

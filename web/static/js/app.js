@@ -45,6 +45,8 @@
   // mit ?tag=), sein Abschnitt kommt in einen nicht-modalen <dialog> neben dem Kästchen, mit Pfeil zum Tag. Die
   // Adresse zeigt den Tag, damit Bearbeiten/Löschen (weiter=…) zurück zum offenen Tag führen; beim Schließen fällt
   // ?tag= weg. Schließen: ✕, Esc, Klick daneben.
+  // Am Handy (27.10.2026): statt neu zu laden und zum Abschnitt unter dem Monat zu springen, kommt der Tag als Blatt
+  // von unten (modaler <dialog>, Klasse .blatt) -- der Monat bleibt stehen, wie in der Android-App.
   var kal = document.querySelector('.kal'), breit = window.matchMedia('(min-width: 900px)');
   if (kal && window.HTMLDialogElement) {
     var pop = document.createElement('dialog'), popAn = null, popNr = 0;   // popNr: nur die letzte Anfrage zählt
@@ -52,7 +54,7 @@
     pop.setAttribute('aria-labelledby', 'tag-popover-titel');
     document.body.appendChild(pop);
     var popSetzen = function () {                  // neben das Kästchen: rechts, sonst links; Pfeil zeigt auf den Tag
-      if (!popAn || !pop.open) return;
+      if (!popAn || !pop.open || pop.classList.contains('blatt')) return;
       var z = popAn.getBoundingClientRect(), w = pop.offsetWidth, h = pop.offsetHeight, abstand = 12, rand = 12;
       var rechts = z.right + abstand + w <= window.innerWidth - rand;
       var x = rechts ? z.right + abstand : Math.max(rand, z.left - abstand - w);
@@ -71,14 +73,16 @@
       kal.querySelectorAll('a.gewaehlt').forEach(function (x) { x.classList.remove('gewaehlt'); });
       zelle.classList.add('gewaehlt');
       popAn = zelle;
-      if (!pop.open) pop.show();
+      if (pop.open && pop.classList.contains('blatt') === breit.matches) pop.close();   // Art gewechselt
+      pop.classList.toggle('blatt', !breit.matches);
+      if (!pop.open) { if (breit.matches) pop.show(); else pop.showModal(); }
       popSetzen();
     };
     var direkt = document.getElementById('tag'), direktZelle = kal.querySelector('a.gewaehlt');
-    if (direkt && direktZelle && breit.matches) { window.scrollTo(0, 0); popZeigen(direkt, direktZelle); }
+    if (direkt && direktZelle) { window.scrollTo(0, 0); popZeigen(direkt, direktZelle); }
     kal.addEventListener('click', function (ev) {
       var a = ev.target.closest('a');
-      if (!a || !breit.matches || ev.ctrlKey || ev.metaKey || ev.shiftKey || ev.button) return;
+      if (!a || ev.ctrlKey || ev.metaKey || ev.shiftKey || ev.button) return;
       ev.preventDefault();
       if (pop.open && popAn === a) { pop.close(); return; }   // derselbe Tag nochmal: zu
       var nr = ++popNr;
@@ -93,12 +97,17 @@
         history.replaceState(null, '', a.href.split('#')[0]);
       }).catch(function () { location.href = a.href; });
     });
-    pop.addEventListener('click', function (ev) { if (ev.target.closest('.tag-popover-zu')) pop.close(); });
+    pop.addEventListener('click', function (ev) {
+      // ✕, oder beim Blatt auf den abgedunkelten Rest getippt (der Klick trifft dann den <dialog> selbst)
+      if (ev.target.closest('.tag-popover-zu') || (ev.target === pop && pop.classList.contains('blatt'))) pop.close();
+    });
     document.addEventListener('mousedown', function (ev) {          // daneben geklickt (nicht auf einen anderen Tag)
       if (pop.open && !pop.contains(ev.target) && !(ev.target.closest && ev.target.closest('.kal a'))) pop.close();
     });
     document.addEventListener('keydown', function (ev) { if (ev.key === 'Escape' && pop.open) pop.close(); });
-    window.addEventListener('resize', function () { if (!breit.matches && pop.open) pop.close(); else popSetzen(); });
+    window.addEventListener('resize', function () {
+      if (pop.open && pop.classList.contains('blatt') === breit.matches) pop.close(); else popSetzen();
+    });
     pop.addEventListener('close', function () {
       kal.querySelectorAll('a.gewaehlt').forEach(function (x) { x.classList.remove('gewaehlt'); });
       popAn = null;
