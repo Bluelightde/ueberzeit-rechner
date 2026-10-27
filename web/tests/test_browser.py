@@ -228,6 +228,19 @@ class Browser(unittest.TestCase):
         self.assertEqual(s.locator('li:has-text("Dialogprobe")').count(), 0)
         self.assertEqual(fenster, [])
 
+    def test_kalender_immer_gleich_gross_und_heute_knopf(self):
+        # Wunsch Micha 27.10.2026: Größe springt nicht mehr (4/5/6 Wochen, umbrechender Saldo); Heute-Knopf
+        s = self.seite
+        hoehen = set()
+        for monat in ('2026-08', '2026-10', '2027-02'):                          # 6, 5 und 4 Wochen
+            s.goto(self.url + '/kalender?monat=' + monat)
+            hoehen.add(s.evaluate("() => Math.round(document.querySelector('.kal').getBoundingClientRect().height)"))
+        self.assertEqual(len(hoehen), 1, hoehen)
+        s.click('.heute-knopf')
+        s.wait_for_url(re.compile(r'.*/kalender$'))
+        self.assertIn('Oktober 2026', s.inner_text('.kal-kopf h2'))
+        self.assertEqual(s.locator('.kal a.heute').count(), 1)
+
     def test_handy_tag_als_blatt_ohne_sprung(self):
         # Am Handy kein Neuladen und kein Sprung zum Abschnitt unter dem Monat, sondern ein Blatt von unten (27.10.2026)
         s = self.seite

@@ -7,8 +7,10 @@
     <a class="symbolknopf" style="display:grid;place-items:center" href="{{ url_for('kalender', monat=vor) }}" aria-label="Vormonat"><i class="bi bi-chevron-left"></i></a>
     <h2>{{ k.name }}</h2>
     <a class="symbolknopf" style="display:grid;place-items:center" href="{{ url_for('kalender', monat=nach) }}" aria-label="Nächster Monat"><i class="bi bi-chevron-right"></i></a>
+    <a class="symbolknopf heute-knopf" href="{{ url_for('kalender') }}">Heute</a>
   </div>
-  <div class="kal" style="--wochen: {{ k.wochen|length }}">
+  {# immer 6 Wochenzeilen: der Kalender bleibt von Monat zu Monat gleich groß (Wunsch Micha 27.10.2026) #}
+  <div class="kal" style="--wochen: 6">
     {% for w in wochentage %}<div class="wt">{{ w }}</div>{% endfor %}
     {% for woche in k.wochen %}{% for t in woche %}
       {% if t %}
@@ -28,6 +30,7 @@
         </a>
       {% else %}<span class="leer-tag"></span>{% endif %}
     {% endfor %}{% endfor %}
+    {% for _ in range((6 - k.wochen|length) * 7) %}<span class="leer-tag"></span>{% endfor %}
   </div>
   <div class="legende">
     {% for wert, name in arten if wert != 'work' %}<span><i class="farbe" style="background: {{ art_farbe[wert] }}"></i>{{ name }}</span>{% endfor %}

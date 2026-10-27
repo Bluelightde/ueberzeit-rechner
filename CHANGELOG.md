@@ -18,6 +18,12 @@ All notable changes to Überzeit Rechner are documented here.
 - **Urlaubskonto entfernt** — Anzeige „Urlaub: x/30 Tage übrig“ und Einstellung „Urlaubsanspruch“ sind weg. Die
   Eintragsart „Urlaub“ bleibt.
 
+## Server-Version 1.9.3 – 2026-10-27
+
+- **Kalender bleibt gleich groß** — immer sechs Wochenzeilen und feste Kästchenhöhe; vorher wuchs und schrumpfte er
+  mit 4/5/6 Wochen und mit umbrechenden Salden wie „(-1h 1m)“.
+- **Heute-Knopf** im Kalender, springt zum aktuellen Monat.
+
 ## Server-Version 1.9.2 – 2026-10-27
 
 - **Kalender am Handy ohne Sprung** — ein angetippter Tag kommt als Blatt von unten, statt die Seite neu zu laden und

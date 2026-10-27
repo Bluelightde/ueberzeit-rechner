@@ -35,7 +35,7 @@ import speicher  # noqa: E402
 from models import BereitschaftEntry, WorkEntry  # noqa: E402
 from speicher import db  # noqa: E402
 
-VERSION = '1.9.2'
+VERSION = '1.9.3'
 ABGLEICH_MAX_TAGE = 1000
 ZEITSTEMPEL = re.compile(r'\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{1,6})?Z')
 log = logging.getLogger('ueberzeit')
