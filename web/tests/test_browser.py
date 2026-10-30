@@ -156,7 +156,11 @@ class Browser(unittest.TestCase):
         s.locator('input[name=eigenes_soll]').tap()
         self.assertEqual(s.evaluate("getComputedStyle(document.querySelector('input[name=eigenes_soll]')).outlineStyle"),
                          'none')
-        s.locator('#datum').fill('2026-10-13')
+        s.locator('#datum-knopf').tap()                          # eigener Kalender (datum.js) statt Browserfenster
+        tag = s.locator('dialog.datum-blatt .datum-tag:not(.fremd)').first          # der 1. des angezeigten Monats
+        wert = tag.get_attribute('data-tag')
+        tag.tap()
+        self.assertEqual(s.input_value('#datum'), wert)
         self.assertEqual(s.evaluate('document.activeElement.id'), '', 'Datum behält den Fokus')
 
     def test_desktop_kopf_einzeilig_und_woche_links(self):

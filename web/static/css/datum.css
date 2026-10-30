@@ -1,0 +1,63 @@
+/* Eigener Kalender (datum.js) statt des Datumsfensters des Browsers -- geteilt über ~/bin/gemeinsam.py (wie uhr.css).
+   Bringt sein Aussehen mit; Farben aus den Uhr-Farben der App (--uhr-*), sonst diese Vorgaben. */
+:root {
+  --datum-flaeche: var(--uhr-flaeche, #fffcf6); --datum-text: var(--uhr-text, #28231c); --datum-leise: var(--uhr-leise, #877e70);
+  --datum-linie: var(--uhr-linie, #e4dccd); --datum-akzent: var(--uhr-akzent, #1f6f6a);
+  --datum-akzent-text: var(--uhr-akzent-text, #ffffff); --datum-weich: var(--uhr-weich, rgba(31, 111, 106, .12));
+}
+[data-bs-theme="dark"], [data-thema="dark"] {
+  --datum-flaeche: var(--uhr-flaeche, #1f2426); --datum-text: var(--uhr-text, #ece6da); --datum-leise: var(--uhr-leise, #9d968a);
+  --datum-linie: var(--uhr-linie, #3a4245); --datum-akzent: var(--uhr-akzent, #5cb8ad);
+  --datum-akzent-text: var(--uhr-akzent-text, #0f2523); --datum-weich: var(--uhr-weich, rgba(92, 184, 173, .16));
+}
+
+/* Handy: Knopf an Stelle von <input type="date"> (übernimmt die Klassen des Feldes, z. B. form-control) */
+.datum-feld { font: inherit; cursor: pointer; text-align: left; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  -webkit-tap-highlight-color: transparent; }
+.datum-feld:not(.form-control) { color: var(--datum-text); background: var(--feld, var(--datum-flaeche));
+  border: 1px solid var(--feld-rand, var(--datum-linie)); border-radius: 12px; padding: 10px 12px; min-height: 46px; width: 100%; }
+.datum-feld:active { background: var(--datum-weich); }
+.datum-feld.ohne-datum, .datum-feld.aus { color: var(--datum-leise); }
+.datum-feld.aus { opacity: .45; }
+.radio-zeile .datum-feld { flex: 1; width: auto; max-width: 220px; }
+
+/* Rechner: Feld bleibt zum Tippen; sein Kalendersymbol öffnet den eigenen Kalender */
+input.datum-getippt::-webkit-calendar-picker-indicator { cursor: pointer; opacity: .55; }
+input.datum-getippt::-webkit-calendar-picker-indicator:hover { opacity: 1; }
+
+/* Das Blatt */
+.datum-blatt { width: min(340px, 94vw); max-width: none; padding: 0; border: 1px solid var(--datum-linie); border-radius: 18px;
+  background: var(--datum-flaeche); color: var(--datum-text); box-shadow: 0 18px 40px -12px rgba(0, 0, 0, .35);
+  opacity: 0; transform: translateY(10px) scale(.94);
+  transition: opacity .18s ease, transform .24s cubic-bezier(.2, 0, 0, 1), overlay .24s allow-discrete, display .24s allow-discrete; }
+.datum-blatt[open] { opacity: 1; transform: none; }
+@starting-style { .datum-blatt[open] { opacity: 0; transform: translateY(10px) scale(.94); } }
+.datum-blatt::backdrop { background: rgba(20, 18, 14, 0); transition: background-color .24s ease, overlay .24s allow-discrete, display .24s allow-discrete; }
+.datum-blatt[open]::backdrop { background: rgba(20, 18, 14, .4); }
+@starting-style { .datum-blatt[open]::backdrop { background: rgba(20, 18, 14, 0); } }
+@media (prefers-reduced-motion: reduce) { .datum-blatt, .datum-blatt::backdrop { transition: none; } }
+.datum-blatt form { padding: 14px 14px 12px; margin: 0; }
+.datum-blatt button { font: inherit; -webkit-tap-highlight-color: transparent; }
+.datum-kopf { display: flex; align-items: center; gap: 6px; margin-bottom: 8px; }
+.datum-titel { flex: 1; text-align: center; font-weight: 800; font-size: 1.05rem; }
+.datum-pfeil { width: 40px; height: 40px; display: grid; place-items: center; border: 1px solid var(--datum-linie); border-radius: 50%;
+  background: transparent; color: var(--datum-text); cursor: pointer; padding: 0; }
+.datum-wt, .datum-raster { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; }
+.datum-wt span { text-align: center; font-size: .72rem; font-weight: 800; text-transform: uppercase; letter-spacing: .05em;
+  color: var(--datum-leise); padding: 4px 0; }
+.datum-tag { aspect-ratio: 1; min-height: 38px; border: 0; border-radius: 50%; background: transparent; color: var(--datum-text);
+  font-weight: 700; font-variant-numeric: tabular-nums; cursor: pointer; padding: 0; }
+.datum-tag.wochenende { color: var(--datum-leise); }
+.datum-tag.fremd { opacity: .4; }
+.datum-tag.heute { box-shadow: inset 0 0 0 1.5px var(--datum-akzent); color: var(--datum-akzent); }
+.datum-tag.gewaehlt { background: var(--datum-akzent); color: var(--datum-akzent-text); box-shadow: none; }
+.datum-tag:disabled { opacity: .25; cursor: default; background: transparent; }
+.datum-tag:focus-visible { outline: 2px solid var(--datum-akzent); outline-offset: 1px; }
+.datum-tag:active:not(:disabled) { filter: brightness(.92); }
+.datum-knoepfe { display: flex; justify-content: space-between; gap: 8px; margin-top: 10px; }
+.datum-knopf { border: 0; border-radius: 999px; padding: 8px 16px; font-weight: 700; cursor: pointer;
+  background: transparent; color: var(--datum-akzent); }
+/* Hover nur mit Maus -- am Handy bliebe der zuletzt getippte Tag sonst grau markiert */
+@media (hover: hover) {
+  .datum-pfeil:hover, .datum-tag:not(:disabled):not(.gewaehlt):hover, .datum-knopf:hover { background: var(--datum-weich); }
+}
