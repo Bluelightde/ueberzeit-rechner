@@ -15,12 +15,15 @@
 //   - beforeunload und pagehide werden beim Verlassen nachgestellt (ungespeichert? -> Rückfrage; Stelle merken).
 //   - Ereignis „seite-weg“ am document kurz vor dem Austausch, „seite-da“ danach.
 //   - Ausnahmen: data-voll an Link, Formular oder einem Vorfahren (z. B. Abmelden, Wechsel zu anderen Diensten),
-//     <body data-weich="aus"> für Seiten, die nur echt geladen werden dürfen. Downloads (Content-Disposition:
-//     attachment) speichert das Skript selbst.
+//     <body data-weich="aus"> für Seiten, die nur echt geladen werden dürfen. Kommt kein HTML zurück (PDF, Bild,
+//     Download), lädt der Browser die Datei selbst; nach einem Formular (POST) speichert das Skript sie.
 //   - Umleitungen mit #Anker: fetch verliert den Anker. Der Server hängt ihn bei Anfragen mit „X-Weich: 1“ als
 //     ?weich_anker=… an (siehe weich_anker() in app.py); hier wird er wieder zum Anker.
 (function () {
   'use strict';
+  // Für Skripte der Apps statt location.href = … / location.reload(): ohne weich.js (alter Browser) das Übliche
+  window.weichGehen = window.weichGehen || function (url) { location.href = url; };
+  window.weichNeu = window.weichNeu || function () { location.reload(); };
   if (window.__weich || !window.fetch || !window.DOMParser || !history.pushState || !window.FormData
       || !document.currentScript) return;
   window.__weich = true;
@@ -108,7 +111,10 @@
     // beim nachgestellten Ereignis ist returnValue von Haus aus true; returnValue = '' setzt defaultPrevented mit
     if (!e.defaultPrevented) return Promise.resolve(true);
     var text = 'Diese Seite hat ungespeicherte Änderungen. Trotzdem verlassen?';
-    return W.frage ? W.frage(text, { ja: 'Verlassen' }) : Promise.resolve(W.confirm(text));
+    // Rückfrage im Stil der App: frage.js (die meisten Apps) oder rueckfrage() (Notizen), sonst das Browserfenster
+    if (W.frage) return W.frage(text, { ja: 'Verlassen' });
+    if (W.rueckfrage) return W.rueckfrage('Nicht gespeichert', text, 'Verlassen', 'bi-box-arrow-left');
+    return Promise.resolve(W.confirm(text));
   }
   function verlassen() {
     try { W.dispatchEvent(new PageTransitionEvent('pagehide', { persisted: false })); } catch (e) { /* alt */ }
@@ -117,9 +123,17 @@
 
   // --- Seite holen ---
   var vorab = {}, nr = 0, aktuell = location.pathname + location.search;
+  // Jeder Verlaufseintrag bekommt eine Kennung (history.state.weich), unter der seine Scrollstelle gemerkt wird
+  var stellen = {}, idZaehler = 0, idStart = Date.now().toString(36);
+  function neueId() { return idStart + '-' + (++idZaehler); }
+  function eintragId() { return (history.state && history.state.weich) || ''; }
+  function istHtml(r) { return /text\/html/.test(r.headers.get('content-type') || ''); }
   function vorladen(url) {          // GET schon beim Antippen; kurz merken fürs gleich folgende Loslassen
     if (!vorab[url]) {
-      vorab[url] = fetch(url, { credentials: 'same-origin', headers: { 'X-Weich': '1' } });
+      // Kein HTML (PDF, Bild, Download): nach den Kopfzeilen abbrechen, die Datei holt dann der Browser selbst
+      var ab = W.AbortController ? new AbortController() : null;
+      vorab[url] = fetch(url, { credentials: 'same-origin', headers: { 'X-Weich': '1' }, signal: ab && ab.signal })
+        .then(function (r) { if (!istHtml(r) && ab) ab.abort(); return r; });
       vorab[url].catch(function () {});
       orig.tO(function () { delete vorab[url]; }, 4000);
     }
@@ -159,11 +173,10 @@
     warten(ausloeser);
     return holen(url, opt).then(function (r) {
       if (meine !== nr) return;
-      var typ = r.headers.get('content-type') || '';
-      if (!/text\/html/.test(typ)) {
+      if (!istHtml(r)) {
         fertig();
-        if (post || /attachment/i.test(r.headers.get('content-disposition') || '')) return speichern(r);
-        location.href = url;                     // Bild, PDF … zeigt der Browser selbst
+        if (post) return speichern(r);           // Export per Formular: hier speichern (nochmal schicken ginge nicht)
+        location.href = url + hash;              // Bild, PDF, Download: macht der Browser selbst
         return;
       }
       if (!r.ok && !post && art !== 'zurueck' && r.status >= 500) { location.href = url; return; }
@@ -201,10 +214,10 @@
     Promise.all(neueCss.map(function (n) {
       return new Promise(function (ok) { n.onload = n.onerror = ok; D.head.appendChild(n); });
     })).then(function () {
-      if (art !== 'zurueck') {
-        // Stelle der alten Seite für „Zurück“ merken
-        history.replaceState(Object.assign({}, history.state, { weichY: W.scrollY }), '');
-      }
+      // Stelle der alten Seite für „Zurück“ merken -- im Speicher, nicht per replaceState (das gälte selbst schon als
+      // Navigation, und wer darauf wartet, sähe noch die alte Seite)
+      if (art !== 'zurueck') stellen[eintragId()] = W.scrollY;
+      var yVorher = W.scrollY;
       verlassen();
       abraeumen();
       var tauschen = function () {
@@ -223,18 +236,24 @@
         var skripte = [].slice.call(body.querySelectorAll('script'));
         D.documentElement.replaceChild(body, D.body);
         if (art === 'zurueck') { /* Adresse steht schon */ }
-        else if (gleich && (post || u.hash === location.hash)) history.replaceState({ weich: 1 }, '', ziel);
-        else history.pushState({ weich: 1 }, '', ziel);
+        else if (art === 'neuladen' || (gleich && (post || u.hash === location.hash))) history.replaceState({ weich: eintragId() }, '', ziel);
+        else history.pushState({ weich: neueId() }, '', ziel);
         aktuell = location.pathname + location.search;
-        if (art === 'zurueck' && history.state && typeof history.state.weichY === 'number') W.scrollTo(0, history.state.weichY);
+        if (art === 'neuladen') W.scrollTo(0, yVorher);
+        else if (art === 'zurueck' && typeof stellen[eintragId()] === 'number') W.scrollTo(0, stellen[eintragId()]);
         else if (u.hash && D.getElementById(decodeURIComponent(u.hash.slice(1)))) D.getElementById(decodeURIComponent(u.hash.slice(1))).scrollIntoView();
         else W.scrollTo(0, 0);
         // Erst zeigen, wenn die Skripte der neuen Seite gelaufen sind (Uhr-Felder, gemerkte Stelle …), sonst
         // blitzt sie kurz ungefertigt auf; höchstens 1,5 s warten
         return Promise.race([neuLaufen(skripte), new Promise(function (ok) { orig.tO(ok, 1500); })]);
       };
-      if (D.startViewTransition && !W.matchMedia('(prefers-reduced-motion: reduce)').matches) D.startViewTransition(tauschen);
-      else tauschen();   // ohne Übergang ist die Seite ohnehin sofort zu sehen
+      if (D.startViewTransition && !W.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+        // Bricht der Browser den Übergang ab (z. B. Tastatur geht auf, Fenstergröße ändert sich), wird trotzdem
+        // getauscht -- nur die Zusagen dazu nicht als Fehler melden
+        var vt = D.startViewTransition(tauschen), still = function () {};
+        vt.ready.catch(still); vt.finished.catch(still);
+        vt.updateCallbackDone.catch(function (e) { console.error(e); });
+      } else tauschen();   // ohne Übergang ist die Seite ohnehin sofort zu sehen
     });
   }
 
@@ -277,7 +296,6 @@
   }
 
   // --- Was läuft weich? ---
-  var DATEI = /\.(pdf|ics|vcf|csv|zip|gz|png|jpe?g|gif|webp|avif|svg|ico|json|txt|xml|xlsx?|docx?|odt|ods|mp3|mp4|webm|webmanifest)$/i;
   function aus(el) {
     return el.closest('[data-voll]') || (D.body && D.body.getAttribute('data-weich') === 'aus');
   }
@@ -285,7 +303,7 @@
     var a = ev.target.closest && ev.target.closest('a[href]');
     if (!a || aus(a) || a.target && a.target !== '_self' || a.hasAttribute('download')) return null;
     if (a.origin !== location.origin || /^(mailto|tel|javascript):/i.test(a.getAttribute('href'))) return null;
-    if (a.pathname.indexOf('/static/') === 0 || DATEI.test(a.pathname)) return null;
+    if (a.pathname.indexOf('/static/') === 0) return null;   // sonst entscheidet die Antwort (HTML oder Datei)
     // nur ein Anker auf derselben Seite: das macht der Browser
     if (a.pathname === location.pathname && a.search === location.search && a.hash) return null;
     return a;
@@ -340,10 +358,21 @@
     if (location.pathname + location.search === aktuell) return;   // nur der #Anker hat sich geändert
     gehen(location.href, null, 'zurueck', null);
   });
+  // Öffentlich: weichGehen(url) wie ein Link, weichNeu() lädt die Seite neu und bleibt an der Stelle
+  W.weichGehen = function (url) {
+    var u = new URL(url, location.href);
+    if (u.origin !== location.origin || u.pathname.indexOf('/static/') === 0) { location.href = u.href; return; }
+    darfGehen().then(function (ja) { if (ja) gehen(u.href, null, 'neu', null); });
+  };
+  W.weichNeu = function () {
+    delete vorab[location.href.split('#')[0]];   // frisch vom Server, nicht aus dem Vorladen
+    gehen(location.href, null, 'neuladen', null);
+  };
+
   // Beginnt eine echte Navigation (data-voll, Adresse getippt), gilt nichts Halbfertiges mehr: sonst bricht ein
   // pushState der weich geholten Seite die echte ab
   orig.an.call(W, 'beforeunload', function (ev) { if (ev.isTrusted) { nr++; fertig(); } });
   history.scrollRestoration = 'manual';
-  history.replaceState(Object.assign({}, history.state, { weich: 1 }), '');
+  history.replaceState(Object.assign({}, history.state, { weich: neueId() }), '');
   // Aus dem Zwischenspeicher zurück (bfcache): nichts zu tun, die Seite ist so, wie sie war
 })();

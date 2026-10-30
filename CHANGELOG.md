@@ -18,6 +18,10 @@ All notable changes to Überzeit Rechner are documented here.
 - **Urlaubskonto entfernt** — Anzeige „Urlaub: x/30 Tage übrig“ und Einstellung „Urlaubsanspruch“ sind weg. Die
   Eintragsart „Urlaub“ bleibt.
 
+## Server-Version 1.10.1 – 2026-10-30
+
+- **Seitenwechsel ruhiger** — die neue Seite erscheint erst, wenn ihre Skripte gelaufen sind; Zurück merkt sich die Stelle, ohne den Verlauf anzufassen.
+
 ## Server-Version 1.10.0 – 2026-10-30
 
 - **Kein Ladebalken mehr** — Links und Formulare wechseln die Seite ohne Neuladen (gemeinsames `weich.js` der
