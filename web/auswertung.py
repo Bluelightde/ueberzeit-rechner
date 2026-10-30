@@ -190,38 +190,43 @@ def bereitschaft_tage(bereitschaften):
 
 
 def kalender(alle, bereitschaften, werte, jahr, monat, heute):
-    """Monatsraster (Wochen x 7 Tage) mit Tagessaldo, Feiertag, Abwesenheit und Bereitschaft."""
+    """Monatsraster (immer 6 Wochen x 7 Tage) mit Tagessaldo, Feiertag, Abwesenheit und Bereitschaft. Die Tage des
+    vorigen und nächsten Monats stehen mit drin (`fremd`, blass; Wunsch Micha 30.10.2026 wie in Betreuung); der
+    Monatssaldo zählt nur den Monat selbst."""
+    erster = dt.date(jahr, monat, 1)
+    start = erster - dt.timedelta(days=erster.weekday())
+    tage = [start + dt.timedelta(days=i) for i in range(42)]
+    von, bis = tage[0].isoformat(), tage[-1].isoformat()
     prefix = f'{jahr:04d}-{monat:02d}'
-    feiertage = kern.get_holidays(jahr, werte.get('country', 'DE'), werte.get('state'))
-    tag_min, tag_typ = defaultdict(int), {}
+    feiertage = {}
+    for j in sorted({tage[0].year, tage[-1].year}):
+        feiertage.update(kern.get_holidays(j, werte.get('country', 'DE'), werte.get('state')))
+    tag_min, tag_typ, hat_eintrag = defaultdict(int), {}, set()
     for e in alle:
-        if e.date.startswith(prefix):
+        if e.date and von <= e.date <= bis:
             tag_min[e.date] += e.minutes
+            hat_eintrag.add(e.date)
             if e.entry_type != kern.TYPE_WORK:
                 tag_typ.setdefault(e.date, e.entry_type)
-    hat_eintrag = {e.date for e in alle if e.date.startswith(prefix)}
     bereit = bereitschaft_tage(bereitschaften)
     wochen = []
-    for woche in calendar.monthcalendar(jahr, monat):
+    for w in range(6):
         zeile = []
-        for spalte, tag in enumerate(woche):
-            if not tag:
-                zeile.append(None)
-                continue
-            datum = dt.date(jahr, monat, tag)
+        for spalte in range(7):
+            datum = tage[w * 7 + spalte]
             ds = datum.isoformat()
-            zeile.append({'tag': tag, 'datum': ds, 'minuten': tag_min.get(ds, 0), 'erfasst': ds in hat_eintrag,
+            zeile.append({'tag': datum.day, 'datum': ds, 'monat': ds[:7], 'fremd': datum.month != monat,
+                          'minuten': tag_min.get(ds, 0), 'erfasst': ds in hat_eintrag,
                           'typ': tag_typ.get(ds), 'feiertag': feiertage.get(ds),
                           'frei': kern.get_target_minutes_for_date(ds, alle, werte) == 0, 'heute': datum == heute,
                           'bereitschaft': ds in bereit, 'wochenende': spalte >= 5,
                           # Linie läuft durch, wenn der Nachbartag auch Bereitschaft hat (Wunsch 20.10.2026),
                           # aber nur zu einem Kästchen in derselben Zeile – sonst ragt sie über den Rand
-                          'bereit_vorher': spalte > 0 and tag > 1
-                                           and (datum - dt.timedelta(days=1)).isoformat() in bereit,
-                          'bereit_nachher': spalte < 6 and bool(woche[spalte + 1])
-                                            and (datum + dt.timedelta(days=1)).isoformat() in bereit})
+                          'bereit_vorher': spalte > 0 and (datum - dt.timedelta(days=1)).isoformat() in bereit,
+                          'bereit_nachher': spalte < 6 and (datum + dt.timedelta(days=1)).isoformat() in bereit})
         wochen.append(zeile)
-    return {'wochen': wochen, 'summe': sum(tag_min.values()), 'name': f'{MONATE[monat - 1]} {jahr}'}
+    return {'wochen': wochen, 'summe': sum(m for d, m in tag_min.items() if d.startswith(prefix)),
+            'name': f'{MONATE[monat - 1]} {jahr}'}
 
 
 def statistik(alle, jahr=None):

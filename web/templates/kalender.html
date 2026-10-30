@@ -17,12 +17,13 @@
         {# Farben wie die Desktop-Heatmap (tabs/calendar_tab.py): Feiertag blau, freier Tag grau,
            Abwesenheit in der Farbe der Art, sonst Grün/Rot – je mehr Minuten, desto kräftiger #}
         {% set klasse = ['heute' if t.heute, 'gewaehlt' if t.datum == tag, 'feiertag' if t.feiertag,
-                         'frei' if (not t.feiertag and not t.minuten and t.frei)]|select|join(' ') %}
+                         'frei' if (not t.feiertag and not t.minuten and t.frei), 'fremd' if t.fremd]|select|join(' ') %}
         {% if t.feiertag %}{% set farbe = '' %}
         {% elif t.minuten %}{% set farbe = ('rgba(16,185,129,' if t.minuten > 0 else 'rgba(239,68,68,') ~ ([255, 60 + (t.minuten|abs) * 2]|min / 255)|round(2) ~ ')' %}
         {% elif t.typ and t.typ != 'work' %}{% set farbe = art_farbe[t.typ] %}
         {% else %}{% set farbe = '' %}{% endif %}
-        <a href="{{ url_for('kalender', monat=monat, tag=t.datum) }}#tag" class="{{ klasse }}" title="{{ t.feiertag or (art_name[t.typ] if t.typ and t.typ != 'work' else '') }}"{% if farbe %} style="background: {{ farbe }}"{% endif %}>
+        {# Tage des Nachbarmonats (blass): Antippen wechselt in deren Monat und öffnet dort den Tag #}
+        <a href="{{ url_for('kalender', monat=t.monat, tag=t.datum) }}#tag" class="{{ klasse }}" title="{{ t.feiertag or (art_name[t.typ] if t.typ and t.typ != 'work' else '') }}"{% if farbe %} style="background: {{ farbe }}"{% endif %}>
           <span class="t">{{ t.tag }}</span>
           {% if t.feiertag %}<span class="fname">{{ t.feiertag }}</span>{% endif %}
           {% if t.erfasst and t.minuten %}<span class="m">({{ zeit(t.minuten, true) }})</span>{% endif %}
@@ -30,7 +31,6 @@
         </a>
       {% else %}<span class="leer-tag"></span>{% endif %}
     {% endfor %}{% endfor %}
-    {% for _ in range((6 - k.wochen|length) * 7) %}<span class="leer-tag"></span>{% endfor %}
   </div>
   <div class="legende">
     {% for wert, name in arten if wert != 'work' %}<span><i class="farbe" style="background: {{ art_farbe[wert] }}"></i>{{ name }}</span>{% endfor %}

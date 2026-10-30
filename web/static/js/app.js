@@ -87,6 +87,7 @@
     kal.addEventListener('click', function (ev) {
       var a = ev.target.closest('a');
       if (!a || ev.ctrlKey || ev.metaKey || ev.shiftKey || ev.button) return;
+      if (a.classList.contains('fremd')) return;       // Tag im Nachbarmonat: ganz in dessen Monat wechseln (weich.js)
       ev.preventDefault();
       if (pop.open && popAn === a) { pop.close(); return; }   // derselbe Tag nochmal: zu
       var nr = ++popNr;

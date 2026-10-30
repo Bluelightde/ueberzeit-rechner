@@ -161,15 +161,20 @@ class EintragenTest(Grundlage):
         import auswertung as aw  # pylint: disable=import-outside-toplevel
         b = types.SimpleNamespace(date='2026-10-24', effective_end_date='2026-11-02')
         k = aw.kalender([], [b], {}, 2026, 10, dt.date(2026, 10, 12))
-        tage = {t['tag']: t for w in k['wochen'] for t in w if t}
-        self.assertTrue(tage[24]['bereit_nachher'])
-        self.assertFalse(tage[25]['bereit_nachher'])   # Sonntag: nächster Tag steht in der nächsten Zeile
-        self.assertFalse(tage[26]['bereit_vorher'])    # Montag: Vortag in der Zeile darüber
-        self.assertTrue(tage[30]['bereit_nachher'])
-        self.assertFalse(tage[31]['bereit_nachher'])   # Monatsende: rechts daneben kein Kästchen
+        tage = {t['datum']: t for w in k['wochen'] for t in w}
+        self.assertEqual(len(tage), 42, 'immer 6 volle Wochen, mit den Tagen der Nachbarmonate')
+        self.assertTrue(tage['2026-10-24']['bereit_nachher'])
+        self.assertFalse(tage['2026-10-25']['bereit_nachher'])   # Sonntag: nächster Tag steht in der nächsten Zeile
+        self.assertFalse(tage['2026-10-26']['bereit_vorher'])    # Montag: Vortag in der Zeile darüber
+        self.assertTrue(tage['2026-10-30']['bereit_nachher'])
+        # Monatsende Sa 31.10.: rechts steht jetzt der 1.11. (blass) -- die Linie läuft hinüber
+        self.assertTrue(tage['2026-10-31']['bereit_nachher'])
+        self.assertTrue(tage['2026-11-01']['fremd'] and tage['2026-11-01']['bereitschaft'])
+        self.assertFalse(tage['2026-11-01']['bereit_nachher'])   # Sonntag
         k = aw.kalender([], [b], {}, 2026, 11, dt.date(2026, 10, 12))
-        tage = {t['tag']: t for w in k['wochen'] for t in w if t}
-        self.assertFalse(tage[1]['bereit_vorher'])     # Monatsanfang
+        tage = {t['datum']: t for w in k['wochen'] for t in w}
+        self.assertTrue(tage['2026-11-01']['bereit_vorher'])     # Sa 31.10. steht links daneben
+        self.assertTrue(tage['2026-10-31']['fremd'])
 
     def test_kalendertag_zeigt_bereitschaft_als_zeile(self):
         # Wunsch 20.10.2026: Bereitschaft im Tag (Popup) als eigene Zeile mit Zeitspanne und Löschen
