@@ -9,12 +9,16 @@
 // Aussehen: frage.css, Farben aus --frage-* bzw. den Uhr-Farben der App (--uhr-*).
 (function () {
   'use strict';
-  if (window.frage) return;
+  // Darf mehrfach laufen (weich.js führt die Skripte nach jedem Seitenwechsel neu aus): die Listener des vorigen
+  // Laufs gehen über das AbortController weg, der Dialog wird neu gebaut, wenn er nicht mehr im Dokument hängt.
+  if (window.__frageAus) window.__frageAus.abort();
+  var aus = window.__frageAus = typeof AbortController === 'function' ? new AbortController() : null;
+  var mit = function (capture) { return aus ? { capture: capture, signal: aus.signal } : capture; };
 
   var dlg, textEl, jaKnopf, neinKnopf, feld;
 
   function bauen() {
-    if (dlg) return;
+    if (dlg && dlg.isConnected) return;
     dlg = document.createElement('dialog');
     dlg.className = 'frage';
     dlg.setAttribute('aria-labelledby', 'frage-text');
@@ -89,7 +93,7 @@
       el.dataset.gefragt = '1';
       el.click();
     });
-  }, true);
+  }, mit(true));
 
   document.addEventListener('submit', function (e) {
     var form = e.target, text = form.getAttribute && (form.getAttribute('data-bestaetigen') || form.getAttribute('data-frage'));
@@ -103,5 +107,5 @@
       form.dataset.gefragt = '1';
       if (form.requestSubmit) form.requestSubmit(knopf || undefined); else form.submit();
     });
-  }, true);
+  }, mit(true));
 })();

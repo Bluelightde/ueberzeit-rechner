@@ -18,6 +18,12 @@ All notable changes to Überzeit Rechner are documented here.
 - **Urlaubskonto entfernt** — Anzeige „Urlaub: x/30 Tage übrig“ und Einstellung „Urlaubsanspruch“ sind weg. Die
   Eintragsart „Urlaub“ bleibt.
 
+## Server-Version 1.10.0 – 2026-10-30
+
+- **Kein Ladebalken mehr** — Links und Formulare wechseln die Seite ohne Neuladen (gemeinsames `weich.js` der
+  Homelab-Apps); Chrome zeigt oben keinen Balken mehr. Anker nach Umleitungen kommen über `weich_anker` an.
+  Abmelden lädt weiter echt.
+
 ## Server-Version 1.9.4 – 2026-10-27
 
 - **Menüwechsel schneller** — Symbol-Dateien tragen die Version in der Adresse und werden zwischengespeichert (vorher fragte jede Seite erst beim Server nach); Menüseiten werden beim Antippen vorgeladen (Speculation Rules), wie Bilderrahmen 1.3.1.

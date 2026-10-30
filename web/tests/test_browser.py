@@ -223,9 +223,9 @@ class Browser(unittest.TestCase):
         self.assertEqual(s.locator('li:has-text("Dialogprobe")').count(), 1)
         knopf.click()
         s.wait_for_selector('dialog.frage[open]')
-        with s.expect_navigation():
-            s.keyboard.press('Enter')
-        self.assertEqual(s.locator('li:has-text("Dialogprobe")').count(), 0)
+        s.keyboard.press('Enter')
+        # weich.js: kein Neuladen, die Seite wird getauscht -> warten, bis der Eintrag verschwunden ist
+        s.wait_for_selector('li:has-text("Dialogprobe")', state='detached')
         self.assertEqual(fenster, [])
 
     def test_kalender_immer_gleich_gross_und_heute_knopf(self):

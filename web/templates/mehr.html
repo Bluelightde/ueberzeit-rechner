@@ -10,9 +10,9 @@
 </section>
 <section class="karte menue">
   <div class="leise klein" style="padding:4px">Angemeldet als <b>{{ benutzer.name }}</b>{{ ' über ' ~ oidc_name if per_oidc }} · {{ anzahl }} Einträge</div>
-  <form method="post" action="{{ url_for('abmelden') }}"><input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+  <form method="post" action="{{ url_for('abmelden') }}" data-voll><input type="hidden" name="_csrf" value="{{ csrf_token() }}">
     <button type="submit"><i class="bi bi-box-arrow-right"></i> Abmelden</button></form>
-  <form method="post" action="{{ url_for('ueberall_abmelden') }}" data-frage="Auf allen Geräten abmelden?"><input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+  <form method="post" action="{{ url_for('ueberall_abmelden') }}" data-voll data-frage="Auf allen Geräten abmelden?"><input type="hidden" name="_csrf" value="{{ csrf_token() }}">
     <button type="submit"><i class="bi bi-phone"></i> Auf allen Geräten abmelden</button></form>
 </section>
 <p class="leise klein" style="text-align:center">Als App installieren: im Browser-Menü „Zum Startbildschirm hinzufügen“ bzw. „App installieren“.</p>

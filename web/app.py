@@ -35,7 +35,7 @@ import speicher  # noqa: E402
 from models import BereitschaftEntry, WorkEntry  # noqa: E402
 from speicher import db  # noqa: E402
 
-VERSION = '1.9.4'
+VERSION = '1.10.0'
 ABGLEICH_MAX_TAGE = 1000
 ZEITSTEMPEL = re.compile(r'\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{1,6})?Z')
 log = logging.getLogger('ueberzeit')
@@ -312,7 +312,18 @@ CSP = ("default-src 'self'; script-src 'self' 'inline-speculation-rules'; style-
        "manifest-src 'self'; form-action 'self'")
 
 
+def weich_anker(antwort):
+    """weich.js holt Seiten per fetch, und fetch verliert den #Anker einer Umleitung. Bei solchen Anfragen
+    (X-Weich: 1) wandert der Anker deshalb als ?weich_anker=… in die Adresse; weich.js macht wieder #… daraus."""
+    ziel = antwort.headers.get('Location', '')
+    if request.headers.get('X-Weich') == '1' and 300 <= antwort.status_code < 400 and '#' in ziel:
+        adresse, anker = ziel.split('#', 1)
+        antwort.headers['Location'] = adresse + ('&' if '?' in adresse else '?') + 'weich_anker=' + urllib.parse.quote(anker)
+    return antwort
+
+
 def _sicherheitskopf(antwort):
+    weich_anker(antwort)
     kopf = antwort.headers
     kopf.setdefault('Content-Security-Policy', CSP)
     kopf.setdefault('X-Content-Type-Options', 'nosniff')

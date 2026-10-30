@@ -2,6 +2,7 @@
 <html lang="de" data-wahl="{{ thema }}" data-thema="light">
 <head>
   <meta charset="utf-8">
+  <script src="{{ url_for('static', filename='js/weich.js') }}?v={{ version }}"></script>
   <meta name="color-scheme" content="light dark">
   <style>html{background:#f6f7f9}@media (prefers-color-scheme: dark){html:not([data-wahl=light]){background:#0e1116}}</style>
   <link rel="preload" href="{{ url_for('static', filename='vendor/bootstrap-icons/fonts/bootstrap-icons.woff2') }}?e34853135f9e39acf64315236852cd5a" as="font" type="font/woff2" crossorigin>
@@ -58,6 +59,5 @@
 <script src="{{ url_for('static', filename='js/frage.js') }}?v={{ version }}"></script>
 <script src="{{ url_for('static', filename='js/app.js') }}?v={{ version }}"></script>
 <!-- Menüseiten beim Antippen vorladen (wie Bilderrahmen 1.3.1) -->
-<script type="speculationrules">{"prefetch": [{"where": {"selector_matches": ".reiter a, .unten-nav a"}, "eagerness": "moderate"}]}</script>
 </body>
 </html>
