@@ -372,7 +372,8 @@
   // Beginnt eine echte Navigation (data-voll, Adresse getippt), gilt nichts Halbfertiges mehr: sonst bricht ein
   // pushState der weich geholten Seite die echte ab
   orig.an.call(W, 'beforeunload', function (ev) { if (ev.isTrusted) { nr++; fertig(); } });
-  history.scrollRestoration = 'manual';
+  // scrollRestoration bleibt 'auto': so bleibt die Seite beim Neuladen an ihrer Stelle (mit 'manual' sprang sie
+  // beim Neuladen weg, Micha 30.10.2026); für weiche Zurück-Schritte merkt sich dieses Skript die Stelle selbst
   history.replaceState(Object.assign({}, history.state, { weich: neueId() }), '');
   // Aus dem Zwischenspeicher zurück (bfcache): nichts zu tun, die Seite ist so, wie sie war
 })();
