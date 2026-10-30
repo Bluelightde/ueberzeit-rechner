@@ -398,3 +398,7 @@ html:has(.tag-popover.blatt[open]) { overflow: hidden; }
 .trenner { display: flex; align-items: center; gap: 10px; color: var(--dim); font-size: .85rem; margin: 16px 0 4px; }
 .trenner::before, .trenner::after { content: ''; flex: 1; height: 1px; background: var(--line); }
 details summary { cursor: pointer; font-weight: 600; color: var(--accent); padding: 4px 0; }
+
+/* Platz für die Bildlaufleiste immer freihalten: sonst springt am Rechner alles Zentrierte um eine halbe Leistenbreite,
+   wenn eine Seite kurz genug ist, um ohne Leiste auszukommen (Micha 30.10.2026) */
+html { scrollbar-gutter: stable; }

@@ -18,6 +18,10 @@ All notable changes to Überzeit Rechner are documented here.
 - **Urlaubskonto entfernt** — Anzeige „Urlaub: x/30 Tage übrig“ und Einstellung „Urlaubsanspruch“ sind weg. Die
   Eintragsart „Urlaub“ bleibt.
 
+## Server-Version 1.12.1 – 2026-10-30
+
+- **Kein Sprung zwischen den Seiten** — der Platz für die Bildlaufleiste bleibt am Rechner immer frei.
+
 ## Server-Version 1.12.0 – 2026-10-30
 
 - **Kalender zeigt die Nachbartage** — die Tage des vorigen und nächsten Monats stehen blass im Raster (mit ihren Farben und Salden); Antippen wechselt in deren Monat und öffnet den Tag. Bereitschaftslinien laufen über den Monatswechsel. Der Monatssaldo zählt weiter nur den Monat.
