@@ -18,6 +18,10 @@ All notable changes to Überzeit Rechner are documented here.
 - **Urlaubskonto entfernt** — Anzeige „Urlaub: x/30 Tage übrig“ und Einstellung „Urlaubsanspruch“ sind weg. Die
   Eintragsart „Urlaub“ bleibt.
 
+## Server-Version 1.11.1 – 2026-10-30
+
+- **Monat blättern springt nicht mehr** — die Seite bleibt beim Wechsel des Monats an ihrer Stelle.
+
 ## Server-Version 1.11.0 – 2026-10-30
 
 - **Eigener Kalender** — Eigener Kalender statt des grauen Datumsfensters des Browsers (gemeinsames `datum.js`): am Handy als Knopf mit Kalenderblatt, am Rechner Feld zum Tippen, dessen Kalendersymbol das Blatt öffnet.

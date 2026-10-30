@@ -17,6 +17,8 @@
 //   - Ausnahmen: data-voll an Link, Formular oder einem Vorfahren (z. B. Abmelden, Wechsel zu anderen Diensten),
 //     <body data-weich="aus"> für Seiten, die nur echt geladen werden dürfen. Kommt kein HTML zurück (PDF, Bild,
 //     Download), lädt der Browser die Datei selbst; nach einem Formular (POST) speichert das Skript sie.
+//   - data-stelle-bleibt an einem Link (oder Vorfahren): die neue Seite bleibt an derselben Scrollstelle (Monat blättern:
+//     der Kalender steht an derselben Stelle, Micha 30.10.2026 „wenn ich den Monat wechsle, springt der Browser“).
 //   - Umleitungen mit #Anker: fetch verliert den Anker. Der Server hängt ihn bei Anfragen mit „X-Weich: 1“ als
 //     ?weich_anker=… an (siehe weich_anker() in app.py); hier wird er wieder zum Anker.
 (function () {
@@ -183,7 +185,8 @@
       return r.text().then(function (html) {
         if (meine !== nr) return;
         fertig();
-        zeigen(html, r.url + (hash && r.url.indexOf('#') < 0 ? hash : ''), art, post);
+        zeigen(html, r.url + (hash && r.url.indexOf('#') < 0 ? hash : ''), art, post,
+               !!(ausloeser && ausloeser.closest && ausloeser.closest('[data-stelle-bleibt]')));
       });
     }).catch(function () {
       fertig();
@@ -193,7 +196,7 @@
     });
   }
 
-  function zeigen(html, url, art, post) {
+  function zeigen(html, url, art, post, stelleBleibt) {
     var neu = new DOMParser().parseFromString(html, 'text/html');
     if (!neu.body || neu.body.getAttribute('data-weich') === 'aus') { location.href = url; return; }
     // ?weich_anker=x (vom Server, siehe oben) wird wieder zu #x
@@ -239,7 +242,7 @@
         else if (art === 'neuladen' || (gleich && (post || u.hash === location.hash))) history.replaceState({ weich: eintragId() }, '', ziel);
         else history.pushState({ weich: neueId() }, '', ziel);
         aktuell = location.pathname + location.search;
-        if (art === 'neuladen') W.scrollTo(0, yVorher);
+        if (art === 'neuladen' || stelleBleibt) W.scrollTo(0, yVorher);
         else if (art === 'zurueck' && typeof stellen[eintragId()] === 'number') W.scrollTo(0, stellen[eintragId()]);
         else if (u.hash && D.getElementById(decodeURIComponent(u.hash.slice(1)))) D.getElementById(decodeURIComponent(u.hash.slice(1))).scrollIntoView();
         else W.scrollTo(0, 0);

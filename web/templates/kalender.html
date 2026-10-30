@@ -3,7 +3,7 @@
 {% block titel %}Kalender{% endblock %}
 {% block inhalt %}
 <section class="karte">
-  <div class="kal-kopf">
+  <div class="kal-kopf" data-stelle-bleibt>
     <a class="symbolknopf" style="display:grid;place-items:center" href="{{ url_for('kalender', monat=vor) }}" aria-label="Vormonat"><i class="bi bi-chevron-left"></i></a>
     <h2>{{ k.name }}</h2>
     <a class="symbolknopf" style="display:grid;place-items:center" href="{{ url_for('kalender', monat=nach) }}" aria-label="Nächster Monat"><i class="bi bi-chevron-right"></i></a>
