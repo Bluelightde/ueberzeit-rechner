@@ -18,6 +18,10 @@ All notable changes to Überzeit Rechner are documented here.
 - **Urlaubskonto entfernt** — Anzeige „Urlaub: x/30 Tage übrig“ und Einstellung „Urlaubsanspruch“ sind weg. Die
   Eintragsart „Urlaub“ bleibt.
 
+## Server-Version 1.10.4 – 2026-10-30
+
+- **Kalender springt nicht mehr** — beim Antippen eines Tages am Rechner scrollte die Seite zum Tages-Fenster, bevor es neben dem Tag saß.
+
 ## Server-Version 1.10.3 – 2026-10-30
 
 - **Neuladen bleibt an der Stelle** — die Scroll-Wiederherstellung des Browsers ist wieder an.

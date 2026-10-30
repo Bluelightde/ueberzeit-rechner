@@ -75,8 +75,12 @@
       popAn = zelle;
       if (pop.open && pop.classList.contains('blatt') === breit.matches) pop.close();   // Art gewechselt
       pop.classList.toggle('blatt', !breit.matches);
+      // Beim Öffnen scrollt der Browser zum Dialog, solange er noch unten am Seitenende steht -- die Seite sprang
+      // (Micha 30.10.2026). Stelle merken und nach dem Setzen neben den Tag wiederherstellen.
+      var sx = window.scrollX, sy = window.scrollY;
       if (!pop.open) { if (breit.matches) pop.show(); else pop.showModal(); }
       popSetzen();
+      window.scrollTo(sx, sy);
     };
     var direkt = document.getElementById('tag'), direktZelle = kal.querySelector('a.gewaehlt');
     if (direkt && direktZelle) { window.scrollTo(0, 0); popZeigen(direkt, direktZelle); }
