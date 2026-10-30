@@ -18,6 +18,10 @@ All notable changes to Überzeit Rechner are documented here.
 - **Urlaubskonto entfernt** — Anzeige „Urlaub: x/30 Tage übrig“ und Einstellung „Urlaubsanspruch“ sind weg. Die
   Eintragsart „Urlaub“ bleibt.
 
+## Server-Version 1.10.2 – 2026-10-30
+
+- **Statusleiste oben wieder dunkel** — der Seitenwechsel ohne Neuladen übernahm die helle Vorgabefarbe der neuen Seite und überschrieb die Farbe des Dunkelmodus.
+
 ## Server-Version 1.10.1 – 2026-10-30
 
 - **Seitenwechsel ruhiger** — die neue Seite erscheint erst, wenn ihre Skripte gelaufen sind; Zurück merkt sich die Stelle, ohne den Verlauf anzufassen.

@@ -223,8 +223,8 @@
       var tauschen = function () {
         Object.keys(hrefs).forEach(function (h) { if (!behalten[h]) hrefs[h].remove(); });
         D.title = neu.title;
-        var tc = neu.querySelector('meta[name=theme-color]:not([media])'), tcAlt = D.querySelector('meta[name=theme-color]:not([media])');
-        if (tc && tcAlt) tcAlt.content = tc.content;
+        // theme-color NICHT übernehmen: die Apps setzen sie selbst passend zu Hell/Dunkel (thema.js), die Fassung
+        // vom Server ist nur die helle Vorgabe -> sonst wird die Statusleiste im Dunkelmodus weiß (Überzeit 30.10.2026)
         // Skripte im <head> der neuen Seite, die hier noch fehlen: einmal ausführen
         var srcs = {};
         D.querySelectorAll('head script[src]').forEach(function (s) { srcs[s.src] = true; });
