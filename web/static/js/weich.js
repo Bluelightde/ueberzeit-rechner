@@ -113,9 +113,12 @@
     // beim nachgestellten Ereignis ist returnValue von Haus aus true; returnValue = '' setzt defaultPrevented mit
     if (!e.defaultPrevented) return Promise.resolve(true);
     var text = 'Diese Seite hat ungespeicherte Änderungen. Trotzdem verlassen?';
-    // Rückfrage im Stil der App: frage.js (die meisten Apps) oder rueckfrage() (Notizen), sonst das Browserfenster
-    if (W.frage) return W.frage(text, { ja: 'Verlassen' });
-    if (W.rueckfrage) return W.rueckfrage('Nicht gespeichert', text, 'Verlassen', 'bi-box-arrow-left');
+    // Rückfrage im Stil der App: frage.js (die meisten Apps), rueckfrage() (Notizen), bcFragen() (Buchungscheckliste),
+    // sonst das Browserfenster
+    // 🔑 typeof prüfen: ein Element mit id="rueckfrage" steht auch als window.rueckfrage da (Buchungscheckliste)
+    if (typeof W.frage === 'function') return W.frage(text, { ja: 'Verlassen' });
+    if (typeof W.rueckfrage === 'function') return W.rueckfrage('Nicht gespeichert', text, 'Verlassen', 'bi-box-arrow-left');
+    if (typeof W.bcFragen === 'function') return W.bcFragen(text);
     return Promise.resolve(W.confirm(text));
   }
   function verlassen() {
