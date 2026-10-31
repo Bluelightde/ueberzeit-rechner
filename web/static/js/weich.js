@@ -199,7 +199,7 @@
     });
   }
 
-  function zeigen(html, url, art, post, stelleBleibt) {
+  function zeigen(html, url, art, post, stelleBleibt, ohneUebergang) {
     var neu = new DOMParser().parseFromString(html, 'text/html');
     if (!neu.body || neu.body.getAttribute('data-weich') === 'aus') { location.href = url; return; }
     // ?weich_anker=x (vom Server, siehe oben) wird wieder zu #x
@@ -253,7 +253,7 @@
         // blitzt sie kurz ungefertigt auf; höchstens 1,5 s warten
         return Promise.race([neuLaufen(skripte), new Promise(function (ok) { orig.tO(ok, 1500); })]);
       };
-      if (D.startViewTransition && !W.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      if (D.startViewTransition && !ohneUebergang && !W.matchMedia('(prefers-reduced-motion: reduce)').matches) {
         // Bricht der Browser den Übergang ab (z. B. Tastatur geht auf, Fenstergröße ändert sich), wird trotzdem
         // getauscht -- nur die Zusagen dazu nicht als Fehler melden
         var vt = D.startViewTransition(tauschen), still = function () {};
@@ -369,6 +369,13 @@
     var u = new URL(url, location.href);
     if (u.origin !== location.origin || u.pathname.indexOf('/static/') === 0) { location.href = u.href; return; }
     darfGehen().then(function (ja) { if (ja) gehen(u.href, null, 'neu', null); });
+  };
+  // weichZeigen(url, html): eine Seite zeigen, deren HTML die App schon hat (Betreuung: vorab geholter Nachbarmonat beim
+  // Wischen) – ohne zweite Anfrage und ohne Überblendung, Scrollstelle bleibt. Sicherer Rückfall: echt laden.
+  W.weichZeigen = function (url, html) {
+    var u = new URL(url, location.href);
+    if (u.origin !== location.origin) { location.href = u.href; return; }
+    darfGehen().then(function (ja) { if (ja) { nr++; fertig(); zeigen(html, u.href, 'neu', false, true, true); } });
   };
   W.weichNeu = function () {
     delete vorab[location.href.split('#')[0]];   // frisch vom Server, nicht aus dem Vorladen
